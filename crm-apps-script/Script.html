@@ -1,0 +1,1118 @@
+<script>
+/* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
+
+// ───────── Translations (Arabic default, English toggle) ─────────
+const I18N = {
+  ar: {
+    app: 'CRM Console', caption: 'إدارة العملاء والتحصيل', eyebrow: 'نظام إدارة العملاء',
+    workspace: 'مساحة العمل', reports: 'التقارير والمتابعة', admin: 'الإدارة',
+    p_dashboard: 'لوحة التحكم', p_customers: 'العملاء', p_transactions: 'حركات العملاء', p_groups: 'مجموعات العملاء',
+    p_balances: 'تقرير الأرصدة', p_paid: 'الفواتير المسددة', p_overdue: 'تقرير المتأخرات', p_followup: 'متابعة المتأخرات',
+    p_collection: 'لوحة فريق التحصيل', p_import: 'استيراد البيانات', p_users: 'المستخدمون والصلاحيات',
+    s_dashboard: 'ملخص الأرصدة والتحصيل والمتأخرات لحظياً.',
+    s_customers: 'بيانات العملاء الأساسية وبيانات التواصل ومسؤول التحصيل.',
+    s_transactions: 'الفواتير والدفعات المستوردة من Dynamics 365 والحركات اليدوية مع الترحيل.',
+    s_groups: 'تصنيف العملاء حسب المجموعات.',
+    s_balances: 'الرصيد الافتتاحي وحركات الفترة والرصيد الختامي لكل عميل حسب الفلتر.',
+    s_paid: 'الفواتير التي تم سدادها بالكامل خلال الفترة (تسوية الأقدم فالأحدث).',
+    s_overdue: 'الفواتير المفتوحة التي تجاوزت تاريخ التحصيل المتوقع.',
+    s_followup: 'متابعة العملاء المتأخرين وتسجيل الاتصالات والوعود بالسداد.',
+    s_collection: 'مسؤول التحصيل، الشركات التابعة له، المتأخرات وأيام التأخير.',
+    s_import: 'استيراد ملفات Excel / CSV المصدرة من Dynamics 365.',
+    s_users: 'إضافة المستخدمين وتحديد الصفحات والعمليات المسموحة لكل مستخدم.',
+    f_account: 'رقم العميل', f_name: 'اسم العميل', f_group: 'مجموعة العميل', f_currency: 'العملة',
+    f_contactPerson: 'جهة الاتصال', f_phone: 'رقم التواصل', f_email: 'البريد الإلكتروني', f_address: 'العنوان',
+    f_city: 'المدينة', f_country: 'الدولة', f_taxNo: 'الرقم الضريبي', f_creditLimit: 'حد الائتمان',
+    f_termsDays: 'أيام السداد', f_collector: 'مسؤول التحصيل', f_status: 'الحالة', f_notes: 'ملاحظات',
+    f_createdAt: 'تاريخ الإنشاء', f_updatedAt: 'آخر تعديل', f_voucher: 'رقم السند', f_type: 'نوع الحركة', f_date: 'التاريخ',
+    f_description: 'البيان', f_dueDate: 'تاريخ الاستحقاق', f_amountCur: 'المبلغ بعملة الحركة', f_exchange: 'سعر الصرف',
+    f_debitMST: 'مدين (عملة محلية)', f_creditMST: 'دائن (عملة محلية)', f_postStatus: 'الترحيل',
+    f_createdByName: 'أنشئ بواسطة', f_updatedByName: 'عُدّل بواسطة', f_groupId: 'رمز المجموعة', f_groupName: 'اسم المجموعة',
+    f_username: 'اسم المستخدم', f_fullName: 'الاسم الكامل', f_password: 'كلمة المرور', f_role: 'الدور',
+    f_pages: 'الصفحات المسموحة', f_actions: 'العمليات المسموحة', f_canAdd: 'إضافة', f_canEdit: 'تعديل',
+    f_canDelete: 'حذف', f_canPost: 'ترحيل', f_isCollector: 'مسؤول تحصيل', f_scope: 'نطاق البيانات',
+    f_active: 'نشط', f_lastLogin: 'آخر دخول', f_actionDate: 'تاريخ الإجراء', f_actionType: 'نوع الإجراء',
+    f_note: 'الملاحظة', f_promiseDate: 'تاريخ الوعد بالسداد', f_promiseAmount: 'مبلغ الوعد', f_createdBy: 'بواسطة',
+    opening: 'الرصيد الافتتاحي', debit: 'مدين', credit: 'دائن', closing: 'الرصيد الختامي', balance: 'الرصيد',
+    remaining: 'المتبقي', amount: 'المبلغ', paidDate: 'تاريخ السداد', lateDays: 'أيام التأخير', days: 'أيام التأخير',
+    invoices: 'الفواتير', maxDays: 'أقصى تأخير', avgDays: 'متوسط التأخير', lastFollowUp: 'آخر متابعة',
+    lastPayment: 'آخر دفعة', overdueAmt: 'المتأخرات', customersCount: 'عدد العملاء', collectedMTD: 'المحصل هذا الشهر',
+    receivable: 'إجمالي الأرصدة', companies: 'الشركات', bucket: 'الفئة', openAmount: 'المبالغ المفتوحة',
+    add: 'إضافة', edit: 'تعديل', del: 'حذف', save: 'حفظ', cancel: 'إلغاء', close: 'إغلاق', run: 'عرض التقرير',
+    exportCsv: 'تصدير CSV', print: 'طباعة', post: 'ترحيل', unpost: 'إلغاء الترحيل', postSelected: 'ترحيل المحدد',
+    login: 'تسجيل الدخول', logout: 'تسجيل الخروج', search: 'بحث بالاسم، الرقم، البريد...', all: 'الكل',
+    from: 'من تاريخ', to: 'إلى تاريخ', asOf: 'حتى تاريخ', minDays: 'أقل أيام تأخير', hideZero: 'إخفاء الأرصدة الصفرية',
+    statement: 'كشف حساب', logAction: 'تسجيل متابعة', call: 'اتصال', mail: 'بريد', apply: 'تطبيق',
+    confirmDelete: 'هل أنت متأكد من الحذف؟', saved: 'تم الحفظ بنجاح', deleted: 'تم الحذف', postedN: 'تم ترحيل {n} حركة',
+    unpostedN: 'تم إلغاء ترحيل {n} حركة', noData: 'لا توجد بيانات', page: 'صفحة', of: 'من', rowsWord: 'سجل',
+    prev: 'السابق', next: 'التالي', loading: 'جارٍ التحميل...', unassigned: 'بدون مسؤول', perPage: 'لكل صفحة',
+    addCustomer: 'عميل جديد', addTransaction: 'حركة جديدة', addGroup: 'مجموعة جديدة', addUser: 'مستخدم جديد',
+    newFollowUp: 'متابعة جديدة', selectDraft: 'حدد حركات المسودة ثم اضغط ترحيل', nothingSelected: 'لم يتم تحديد أي حركة',
+    Active: 'نشط', Inactive: 'غير نشط', Blocked: 'موقوف', Draft: 'مسودة', Posted: 'مرحّل', Open: 'مفتوح', Done: 'تم', Broken: 'وعد غير منفذ',
+    b1: '1 - 30 يوم', b2: '31 - 60 يوم', b3: '61 - 90 يوم', b4: 'أكثر من 90 يوم',
+    Call: 'اتصال هاتفي', Email: 'بريد إلكتروني', Visit: 'زيارة', WhatsApp: 'واتساب', Promise: 'وعد بالسداد', Other: 'أخرى',
+    scope_all: 'كل العملاء', scope_own: 'عملاؤه فقط', Admin: 'مدير النظام', User: 'مستخدم',
+    err_INVALID_LOGIN: 'اسم المستخدم أو كلمة المرور غير صحيحة', err_NO_PERMISSION: 'ليست لديك صلاحية لهذه العملية',
+    err_SESSION_EXPIRED: 'انتهت الجلسة، سجّل الدخول مرة أخرى', err_REQUIRED_FIELDS: 'أكمل الحقول المطلوبة',
+    err_DUPLICATE_ID: 'هذا الرقم/الاسم مستخدم من قبل', err_POSTED_LOCKED: 'لا يمكن تعديل أو حذف حركة مرحّلة',
+    err_HAS_TRANSACTIONS: 'لا يمكن حذف عميل لديه حركات', err_IN_USE: 'لا يمكن الحذف لأنه مستخدم',
+    err_NOT_FOUND: 'السجل غير موجود', err_PASSWORD_REQUIRED: 'كلمة المرور مطلوبة للمستخدم الجديد',
+    err_CANNOT_DELETE_SELF: 'لا يمكنك حذف حسابك الحالي',
+    imp_entity: 'الجدول', imp_mode: 'طريقة الاستيراد', append: 'إضافة للموجود', upsert: 'تحديث الموجود وإضافة الجديد',
+    replace: 'حذف الموجود واستبداله', chooseFile: 'ملف Excel أو CSV', importNow: 'بدء الاستيراد', template: 'تنزيل قالب الأعمدة',
+    importedMsg: 'تم: إضافة {i} — تحديث {u} — تخطي {s}', rowsFound: 'عدد الصفوف في الملف', previewTitle: 'معاينة أول 5 صفوف',
+    imp_help: 'صدّر الجدول من Dynamics 365 إلى Excel ثم ارفعه هنا. تتم مطابقة الأعمدة تلقائياً بالاسم (Customer account، Voucher، Debit in local currency ...). الحركات المستوردة تعتبر مرحّلة.',
+    xlsxMissing: 'تعذر تحميل مكتبة قراءة Excel، تأكد من الاتصال بالإنترنت.',
+    settings: 'إعدادات النظام', AppName: 'اسم التطبيق', CompanyName: 'اسم الشركة', LocalCurrency: 'العملة المحلية',
+    k_customers: 'إجمالي العملاء', k_receivable: 'إجمالي الأرصدة المستحقة', k_overdue: 'إجمالي المتأخرات',
+    k_collected: 'المحصل هذا الشهر', activeWord: 'نشط', lateCustomers: 'عميل متأخر', drafts: 'حركة غير مرحّلة',
+    avgLate: 'متوسط التأخير {n} يوم', monthly: 'الفواتير والتحصيل - آخر 6 أشهر', aging: 'أعمار المتأخرات',
+    topCustomers: 'أعلى العملاء رصيداً', invoicesL: 'فواتير', paymentsL: 'تحصيل', viewAll: 'عرض الكل ←', details: 'التفاصيل ←',
+    team: 'أداء فريق التحصيل', overdueCustomers: 'عملاء متأخرون', overdueInvoices: 'فواتير متأخرة',
+    companiesOf: 'شركات المسؤول', allCompanies: 'المتأخرات حسب المسؤول والشركة', ofBalance: 'من الرصيد',
+    promisesDue: 'وعود سداد مستحقة اليوم', followLog: 'سجل المتابعات', noOverdue: 'لا توجد متأخرات',
+    onTime: 'سددت في الموعد', late: 'سددت متأخرة', paidCount: 'عدد الفواتير المسددة', totalPaid: 'إجمالي المسدد',
+    welcome: 'مرحباً بك', loginHint: 'أدخل بيانات حسابك للمتابعة', byInvoice: 'حسب الفاتورة', byCustomer: 'حسب العميل',
+    customerInfo: 'بيانات العميل', amountHint: 'سالب = مدين / موجب = دائن (يُحسب تلقائياً إذا ترك فارغاً)',
+    passwordHint: 'اتركها فارغة للإبقاء على كلمة المرور الحالية', pagesN: '{n} صفحة', day: 'يوم', invoiceWord: 'فاتورة',
+    collector: 'المسؤول', overdueTotal: 'المتأخر', lastNote: 'آخر ملاحظة', settingsSaved: 'تم حفظ الإعدادات'
+  },
+  en: {
+    app: 'CRM Console', caption: 'Customers & Collections', eyebrow: 'Internal CRM',
+    workspace: 'Workspace', reports: 'Reports & follow-up', admin: 'Administration',
+    p_dashboard: 'Dashboard', p_customers: 'Customers', p_transactions: 'Customer transactions', p_groups: 'Customer groups',
+    p_balances: 'Balances report', p_paid: 'Paid invoices', p_overdue: 'Overdue report', p_followup: 'Overdue follow-up',
+    p_collection: 'Collection team', p_import: 'Import data', p_users: 'Users & permissions',
+    s_dashboard: 'Live summary of balances, collections and overdue amounts.',
+    s_customers: 'Customer master data, contact details and assigned collector.',
+    s_transactions: 'Invoices and payments imported from Dynamics 365 plus manual entries with posting.',
+    s_groups: 'Customer segmentation by group.',
+    s_balances: 'Opening balance, period activity and closing balance per customer.',
+    s_paid: 'Invoices fully settled within the period (oldest-first settlement).',
+    s_overdue: 'Open invoices past their expected collection date.',
+    s_followup: 'Follow up late customers, log calls and payment promises.',
+    s_collection: 'Collector, assigned companies, overdue amounts and days late.',
+    s_import: 'Import Excel / CSV files exported from Dynamics 365.',
+    s_users: 'Add users and choose the pages and actions each one is allowed.',
+    f_account: 'Customer account', f_name: 'Name', f_group: 'Customer group', f_currency: 'Currency',
+    f_contactPerson: 'Contact person', f_phone: 'Contact number', f_email: 'Email', f_address: 'Address',
+    f_city: 'City', f_country: 'Country', f_taxNo: 'Tax number', f_creditLimit: 'Credit limit',
+    f_termsDays: 'Payment terms (days)', f_collector: 'Collector', f_status: 'Status', f_notes: 'Notes',
+    f_createdAt: 'Created', f_updatedAt: 'Updated', f_voucher: 'Voucher', f_type: 'Transaction type', f_date: 'Date',
+    f_description: 'Description', f_dueDate: 'Due date', f_amountCur: 'Amount (transaction currency)', f_exchange: 'Exchange rate',
+    f_debitMST: 'Debit (local)', f_creditMST: 'Credit (local)', f_postStatus: 'Posting',
+    f_createdByName: 'Created by', f_updatedByName: 'Updated by', f_groupId: 'Group ID', f_groupName: 'Group name',
+    f_username: 'Username', f_fullName: 'Full name', f_password: 'Password', f_role: 'Role',
+    f_pages: 'Allowed pages', f_actions: 'Allowed actions', f_canAdd: 'Add', f_canEdit: 'Edit',
+    f_canDelete: 'Delete', f_canPost: 'Post', f_isCollector: 'Collector', f_scope: 'Data scope',
+    f_active: 'Active', f_lastLogin: 'Last login', f_actionDate: 'Action date', f_actionType: 'Action type',
+    f_note: 'Note', f_promiseDate: 'Promise date', f_promiseAmount: 'Promise amount', f_createdBy: 'By',
+    opening: 'Opening', debit: 'Debit', credit: 'Credit', closing: 'Closing', balance: 'Balance',
+    remaining: 'Remaining', amount: 'Amount', paidDate: 'Paid on', lateDays: 'Days late', days: 'Days late',
+    invoices: 'Invoices', maxDays: 'Max days', avgDays: 'Avg days', lastFollowUp: 'Last follow-up',
+    lastPayment: 'Last payment', overdueAmt: 'Overdue', customersCount: 'Customers', collectedMTD: 'Collected MTD',
+    receivable: 'Total balance', companies: 'Companies', bucket: 'Bucket', openAmount: 'Open amount',
+    add: 'Add', edit: 'Edit', del: 'Delete', save: 'Save', cancel: 'Cancel', close: 'Close', run: 'Run report',
+    exportCsv: 'Export CSV', print: 'Print', post: 'Post', unpost: 'Unpost', postSelected: 'Post selected',
+    login: 'Sign in', logout: 'Sign out', search: 'Search name, account, email...', all: 'All',
+    from: 'From', to: 'To', asOf: 'As of', minDays: 'Min days late', hideZero: 'Hide zero balances',
+    statement: 'Statement', logAction: 'Log follow-up', call: 'Call', mail: 'Email', apply: 'Apply',
+    confirmDelete: 'Are you sure you want to delete?', saved: 'Saved', deleted: 'Deleted', postedN: '{n} transactions posted',
+    unpostedN: '{n} transactions unposted', noData: 'No data', page: 'Page', of: 'of', rowsWord: 'records',
+    prev: 'Prev', next: 'Next', loading: 'Loading...', unassigned: 'Unassigned', perPage: 'per page',
+    addCustomer: 'New customer', addTransaction: 'New transaction', addGroup: 'New group', addUser: 'New user',
+    newFollowUp: 'New follow-up', selectDraft: 'Select draft rows, then post', nothingSelected: 'Nothing selected',
+    Active: 'Active', Inactive: 'Inactive', Blocked: 'Blocked', Draft: 'Draft', Posted: 'Posted', Open: 'Open', Done: 'Done', Broken: 'Broken promise',
+    b1: '1 - 30 days', b2: '31 - 60 days', b3: '61 - 90 days', b4: '90+ days',
+    Call: 'Phone call', Email: 'Email', Visit: 'Visit', WhatsApp: 'WhatsApp', Promise: 'Promise to pay', Other: 'Other',
+    scope_all: 'All customers', scope_own: 'Own customers only', Admin: 'Administrator', User: 'User',
+    err_INVALID_LOGIN: 'Wrong username or password', err_NO_PERMISSION: 'You are not allowed to do this',
+    err_SESSION_EXPIRED: 'Session expired, please sign in again', err_REQUIRED_FIELDS: 'Please fill the required fields',
+    err_DUPLICATE_ID: 'This ID / name already exists', err_POSTED_LOCKED: 'Posted transactions cannot be changed',
+    err_HAS_TRANSACTIONS: 'Customer has transactions and cannot be deleted', err_IN_USE: 'Cannot delete: in use',
+    err_NOT_FOUND: 'Record not found', err_PASSWORD_REQUIRED: 'Password is required for new users',
+    err_CANNOT_DELETE_SELF: 'You cannot delete your own account',
+    imp_entity: 'Table', imp_mode: 'Import mode', append: 'Append', upsert: 'Update existing + add new',
+    replace: 'Replace all', chooseFile: 'Excel or CSV file', importNow: 'Start import', template: 'Download column template',
+    importedMsg: 'Done: {i} added — {u} updated — {s} skipped', rowsFound: 'Rows in file', previewTitle: 'Preview (first 5 rows)',
+    imp_help: 'Export the table from Dynamics 365 to Excel and upload it here. Columns are matched by name (Customer account, Voucher, Debit in local currency ...). Imported transactions are treated as posted.',
+    xlsxMissing: 'Could not load the Excel reader library. Check your connection.',
+    settings: 'System settings', AppName: 'App name', CompanyName: 'Company name', LocalCurrency: 'Local currency',
+    k_customers: 'Total customers', k_receivable: 'Total receivables', k_overdue: 'Total overdue',
+    k_collected: 'Collected this month', activeWord: 'active', lateCustomers: 'late customers', drafts: 'unposted transactions',
+    avgLate: 'avg {n} days late', monthly: 'Invoiced vs collected — last 6 months', aging: 'Overdue aging',
+    topCustomers: 'Top customers by balance', invoicesL: 'Invoiced', paymentsL: 'Collected', viewAll: 'View all →', details: 'Details →',
+    team: 'Collection team performance', overdueCustomers: 'Late customers', overdueInvoices: 'Late invoices',
+    companiesOf: 'Collector companies', allCompanies: 'Overdue by collector and company', ofBalance: 'of balance',
+    promisesDue: 'Payment promises due', followLog: 'Follow-up log', noOverdue: 'No overdue customers',
+    onTime: 'Paid on time', late: 'Paid late', paidCount: 'Invoices paid', totalPaid: 'Total paid',
+    welcome: 'Welcome back', loginHint: 'Sign in to continue', byInvoice: 'By invoice', byCustomer: 'By customer',
+    customerInfo: 'Customer details', amountHint: 'Negative = debit / positive = credit (auto if empty)',
+    passwordHint: 'Leave empty to keep the current password', pagesN: '{n} pages', day: 'days', invoiceWord: 'invoices',
+    collector: 'Collector', overdueTotal: 'Overdue', lastNote: 'Last note', settingsSaved: 'Settings saved'
+  }
+};
+
+const PAGES = [
+  { id: 'dashboard', glyph: '▦', sec: 'workspace' },
+  { id: 'customers', glyph: '♙', sec: 'workspace' },
+  { id: 'transactions', glyph: '⇄', sec: 'workspace' },
+  { id: 'groups', glyph: '▤', sec: 'workspace' },
+  { id: 'balances', glyph: '≡', sec: 'reports' },
+  { id: 'paid', glyph: '✓', sec: 'reports' },
+  { id: 'overdue', glyph: '!', sec: 'reports' },
+  { id: 'followup', glyph: '☎', sec: 'reports' },
+  { id: 'collection', glyph: '◉', sec: 'reports' },
+  { id: 'import', glyph: '⇪', sec: 'admin' },
+  { id: 'users', glyph: '⚙', sec: 'admin' }
+];
+
+// ───────── State & helpers ─────────
+const S = { token: '', user: null, settings: {}, lookups: { groups: [], collectors: [], customers: [], transactionTypes: [] },
+  lang: 'ar', view: '', lists: {}, rows: {}, rep: {}, exportData: null, badges: {} };
+
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }
+};
+const $ = (s, el) => (el || document).querySelector(s);
+const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const t = (k, vars) => {
+  let s = (I18N[S.lang] && I18N[S.lang][k]) || I18N.en[k] || k;
+  if (vars) Object.keys(vars).forEach(v => { s = s.replace('{' + v + '}', vars[v]); });
+  return s;
+};
+const NF = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = n => NF.format(+n || 0);
+const short = n => { n = +n || 0; const a = Math.abs(n); return a >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : a >= 1e4 ? (n / 1e3).toFixed(1) + 'K' : NF.format(n); };
+const cur = () => S.settings.LocalCurrency || '';
+const z = n => String(n).padStart(2, '0');
+const ymd = d => d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
+const today = () => ymd(new Date());
+const monthStart = () => today().slice(0, 8) + '01';
+const yearStart = () => today().slice(0, 5) + '01-01';
+const can = a => S.user && (S.user.isAdmin || S.user['can' + a[0].toUpperCase() + a.slice(1)]);
+const hasPage = p => S.user && S.user.pages.indexOf(p) > -1;
+const groupName = id => { const g = S.lookups.groups.find(x => x.id === id); return g ? g.name : (id || ''); };
+const collectorName = u => { if (!u) return t('unassigned'); const c = S.lookups.collectors.find(x => x.username === u); return c ? c.name : u; };
+const pill = (txt, cls) => `<span class="health ${cls}">${esc(txt)}</span>`;
+const statusPill = v => pill(t(v || 'Active'), { Active: 'healthy', Inactive: 'neutral', Blocked: 'risk', Draft: 'watch', Posted: 'healthy', Open: 'info', Done: 'healthy', Broken: 'risk' }[v] || 'neutral');
+const daysPill = d => pill(d + ' ' + t('day'), d > 90 ? 'risk' : d > 30 ? 'watch' : 'info');
+const numCell = n => `<span class="${+n < 0 ? 'neg' : ''}">${money(n)}</span>`;
+
+// ───────── Server bridge ─────────
+let pending = 0;
+function setLoading(d) { pending = Math.max(0, pending + d); $('#loading').hidden = pending === 0; }
+function run(fn, ...args) {
+  return new Promise((res, rej) => {
+    google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args);
+  });
+}
+function errText(e) {
+  const msg = String((e && e.message) || e);
+  const code = (msg.match(/\b[A-Z][A-Z_]{4,}\b/) || [])[0];
+  return code && I18N.en['err_' + code] ? t('err_' + code) : msg.replace(/^(Exception|Error):\s*/, '');
+}
+async function api(fn, ...args) {
+  setLoading(1);
+  try { return await run(fn, ...args); }
+  catch (e) {
+    if (/SESSION_EXPIRED/.test(String(e && e.message || e))) { signOutLocal(); }
+    toast(errText(e), 'error');
+    throw e;
+  } finally { setLoading(-1); }
+}
+const call = (fn, ...args) => api(fn, S.token, ...args);
+
+let toastTimer;
+function toast(msg, kind) {
+  const el = $('#toast');
+  el.textContent = msg; el.className = 'toast ' + (kind || 'ok'); el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
+}
+
+// ───────── Theme & language ─────────
+function applyPrefs() {
+  S.lang = store.get('crm_lang') || 'ar';
+  document.documentElement.lang = S.lang;
+  document.documentElement.dir = S.lang === 'ar' ? 'rtl' : 'ltr';
+  document.documentElement.classList.toggle('light', store.get('crm_theme') === 'light');
+}
+
+// ───────── Login ─────────
+function renderLogin(err) {
+  $('#root').innerHTML = `
+    <div class="login">
+      <form class="panel login-card form-panel" id="loginForm">
+        <div class="brand"><div class="brand-mark">↗</div><div><p class="brand-name">${esc(t('app'))}</p><p class="brand-caption">${esc(t('caption'))}</p></div></div>
+        <div><h1>${t('welcome')}</h1><p class="subtitle">${t('loginHint')}</p></div>
+        <label class="field">${t('f_username')}<input name="u" autocomplete="username" required></label>
+        <label class="field">${t('f_password')}<input name="p" type="password" autocomplete="current-password" required></label>
+        <div class="login-error">${esc(err || '')}</div>
+        <button class="button-primary" type="submit">${t('login')}</button>
+        <div style="display:flex;justify-content:space-between;gap:8px">
+          <button type="button" class="icon-button" data-act="lang">${S.lang === 'ar' ? 'EN' : 'ع'}</button>
+          <button type="button" class="icon-button" data-act="theme">☼</button>
+        </div>
+      </form>
+    </div>`;
+}
+
+async function doLogin(form) {
+  const btn = form.querySelector('button[type=submit]');
+  btn.disabled = true;
+  try {
+    setLoading(1);
+    const r = await run('login', form.u.value, form.p.value);
+    onLogin(r);
+  } catch (e) {
+    renderLogin(errText(e));
+  } finally { setLoading(-1); }
+}
+
+function onLogin(r) {
+  S.token = r.token; S.user = r.user; S.settings = r.settings || {}; S.lookups = r.lookups;
+  store.set('crm_token', r.token);
+  renderShell();
+  const last = store.get('crm_view');
+  go(last && hasPage(last) ? last : S.user.pages[0]);
+}
+
+function signOutLocal() {
+  S.token = ''; S.user = null; store.set('crm_token', null);
+  closeDrawer(); renderLogin();
+}
+
+// ───────── Shell ─────────
+function renderShell() {
+  const u = S.user;
+  const nav = sec => {
+    const items = PAGES.filter(p => p.sec === sec && hasPage(p.id));
+    if (!items.length) return '';
+    return `<p class="nav-label">${t(sec)}</p><nav class="nav">${items.map(p =>
+      `<button class="nav-item" data-go="${p.id}"><span><span class="nav-glyph">${p.glyph}</span>${t('p_' + p.id)}</span><span class="badge red" data-badge="${p.id}" hidden></span></button>`).join('')}</nav>`;
+  };
+  $('#root').innerHTML = `
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><div class="brand-mark">↗</div><div><p class="brand-name">${esc(S.settings.AppName || t('app'))}</p><p class="brand-caption">${esc(S.settings.CompanyName || t('caption'))}</p></div></div>
+      ${nav('workspace')}${nav('reports')}${nav('admin')}
+      <div class="profile"><div class="avatar">${esc((u.fullName || u.username)[0].toUpperCase())}</div>
+        <div><p class="profile-name">${esc(u.fullName || u.username)}</p><p class="profile-role">${esc(t(u.role))}</p></div>
+        <button class="icon-button" data-act="logout" title="${t('logout')}" aria-label="${t('logout')}">⎋</button></div>
+    </aside>
+    <div class="scrim" id="scrim" data-act="menu"></div>
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" data-act="menu" aria-label="Menu">☰</button>
+        <span class="eyebrow">${t('eyebrow')}</span>
+        <div class="top-actions">
+          ${hasPage('customers') ? `<input class="search" id="gsearch" type="search" placeholder="${t('search')}" aria-label="${t('search')}">` : ''}
+          <button class="icon-button" data-act="lang" aria-label="Language">${S.lang === 'ar' ? 'EN' : 'ع'}</button>
+          <button class="icon-button" data-act="theme" aria-label="Theme">☼</button>
+        </div>
+      </header>
+      <div class="content" id="content"></div>
+    </main>
+  </div>
+  <datalist id="dl_customers"></datalist>`;
+  fillDatalist();
+  Object.keys(S.badges).forEach(k => setBadge(k, S.badges[k]));
+}
+
+function fillDatalist() {
+  const dl = $('#dl_customers');
+  if (dl) dl.innerHTML = S.lookups.customers.map(c => `<option value="${esc(c.account)}">${esc(c.name)}</option>`).join('');
+}
+
+async function refreshLookups() {
+  S.lookups = await call('getLookups');
+  fillDatalist();
+}
+
+function setBadge(page, n) {
+  S.badges[page] = n;
+  const el = $(`[data-badge="${page}"]`);
+  if (el) { el.textContent = n; el.hidden = !n; }
+}
+
+function go(view) {
+  if (!hasPage(view)) view = S.user.pages[0];
+  if (!view) { setContent(`<div class="panel empty">${t('err_NO_PERMISSION')}</div>`); return; }
+  S.view = view; store.set('crm_view', view);
+  $$('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.go === view));
+  $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('open');
+  S.exportData = null;
+  VIEWS[view]();
+}
+const reload = () => VIEWS[S.view]();
+
+function heading(view, actions) {
+  return `<div class="page-heading"><div><h1>${t('p_' + view)}</h1><p class="subtitle">${t('s_' + view)}</p></div>
+    <div class="page-actions">${(actions || []).filter(Boolean).join('')}</div></div>`;
+}
+const btn = (act, label, cls, extra) => `<button class="${cls || 'button-primary'}" data-act="${act}" ${extra || ''}>${label}</button>`;
+const reportBtns = () => [btn('export', t('exportCsv'), 'button-ghost'), btn('print', t('print'), 'button-ghost')];
+const setContent = html => { $('#content').innerHTML = html; };
+
+// ───────── Generic building blocks ─────────
+function opts(list, value, withAll) {
+  return (withAll ? `<option value="">${t('all')}</option>` : '') +
+    list.map(o => `<option value="${esc(o[0])}" ${String(o[0]) === String(value == null ? '' : value) ? 'selected' : ''}>${esc(o[1])}</option>`).join('');
+}
+const groupOpts = () => S.lookups.groups.map(g => [g.id, g.name]);
+const collectorOpts = () => S.lookups.collectors.map(c => [c.username, c.name]);
+const statusOpts = () => ['Active', 'Inactive', 'Blocked'].map(s => [s, t(s)]);
+
+function tool(key, label, type, value, options) {
+  let input;
+  if (type === 'select') input = `<select data-f="${key}">${opts(options, value, true)}</select>`;
+  else if (type === 'customer') input = `<input data-f="${key}" list="dl_customers" value="${esc(value)}" placeholder="${t('all')}">`;
+  else if (type === 'check') return `<label class="check" style="flex:0 0 auto"><input type="checkbox" data-f="${key}" ${value ? 'checked' : ''}>${label}</label>`;
+  else input = `<input data-f="${key}" type="${type || 'text'}" value="${esc(value)}" ${type === 'search' ? `placeholder="${t('search')}"` : ''}>`;
+  return `<label class="tool">${esc(label)}${input}</label>`;
+}
+function readTools(el) {
+  const o = {};
+  $$('[data-f]', el).forEach(i => { o[i.dataset.f] = i.type === 'checkbox' ? i.checked : i.value.trim(); });
+  return o;
+}
+
+/**
+ * cols: [{k, l, f(value,row) → html, num, cls}]
+ * opts: { rowClass, actions(row,i) → html, foot: html, select(row) → bool }
+ */
+function table(view, cols, rows, o) {
+  o = o || {};
+  S.rows[view] = rows;
+  if (!rows.length) return `<div class="empty">${t('noData')}</div>`;
+  const st = S.lists[view];
+  const sortable = !!(st && o.sortable !== false);
+  const th = cols.map(c => {
+    const arrow = sortable && st.sort === c.k ? (st.desc ? ' ↓' : ' ↑') : '';
+    return `<th class="${c.num ? 'num' : ''} ${sortable && c.k ? 'sortable' : ''}" ${sortable && c.k ? `data-sort="${c.k}"` : ''}>${esc(c.l)}${arrow}</th>`;
+  }).join('');
+  const body = rows.map((r, i) => `<tr data-i="${i}" class="${o.click ? 'click' : ''}">` +
+    (o.select ? `<td class="actions-cell" data-label="">${o.select(r) ? `<label class="check"><input type="checkbox" data-sel="${esc(r.rowId)}"></label>` : ''}</td>` : '') +
+    cols.map(c => {
+      const v = r[c.k];
+      const html = c.f ? c.f(v, r) : c.num ? numCell(v) : esc(v);
+      return `<td data-label="${esc(c.l)}" class="${c.num ? 'num' : ''} ${c.cls || ''}">${html}</td>`;
+    }).join('') +
+    (o.actions ? `<td class="actions-cell" data-label=""><div class="row-actions">${o.actions(r, i)}</div></td>` : '') +
+    '</tr>').join('');
+  return `<div class="table-wrap"><table class="cards" data-view="${view}"><thead><tr>${o.select ? '<th></th>' : ''}${th}${o.actions ? '<th></th>' : ''}</tr></thead>
+    <tbody>${body}</tbody>${o.foot ? `<tfoot>${o.foot}</tfoot>` : ''}</table></div>`;
+}
+
+function footRow(cols, totals, label, lead) {
+  return '<tr>' + (lead ? '<td data-label=""></td>' : '') + cols.map((c, i) =>
+    `<td data-label="${esc(c.l)}" class="${c.num ? 'num' : ''}">${i === 0 ? esc(label) : totals[c.k] !== undefined ? numCell(totals[c.k]) : ''}</td>`).join('') + '</tr>';
+}
+
+function pager(view, res) {
+  const pages = Math.max(1, Math.ceil(res.total / res.pageSize));
+  return `<div class="pager" data-view="${view}"><span>${res.total} ${t('rowsWord')} · ${t('page')} ${res.page} ${t('of')} ${pages}</span>
+    <div class="pager-btns">
+      <select data-pagesize>${opts([[25, '25'], [50, '50'], [100, '100'], [250, '250']], res.pageSize)}</select>
+      <button class="button-ghost" data-act="page" data-p="${res.page - 1}" ${res.page <= 1 ? 'disabled' : ''}>${t('prev')}</button>
+      <button class="button-ghost" data-act="page" data-p="${res.page + 1}" ${res.page >= pages ? 'disabled' : ''}>${t('next')}</button>
+    </div></div>`;
+}
+
+function stat(label, value, mark, markCls, foot) {
+  return `<article class="panel stat"><div class="stat-top"><div><div class="stat-label">${esc(label)}</div><div class="stat-value">${value}</div></div>
+    <div class="stat-mark ${markCls || ''}">${mark}</div></div>${foot ? `<div class="stat-foot">${foot}</div>` : ''}</article>`;
+}
+
+// ───────── Data lists (customers, transactions, groups, users, follow-ups) ─────────
+const LISTS = {
+  customers: {
+    entity: 'Customers', id: 'account', click: r => openCustomer(r.account),
+    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q), tool('group', t('f_group'), 'select', s.filters.group, groupOpts()),
+      tool('collector', t('f_collector'), 'select', s.filters.collector, collectorOpts()), tool('status', t('f_status'), 'select', s.filters.status, statusOpts())],
+    cols: () => [
+      { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name'), cls: 'wrap' },
+      { k: 'group', l: t('f_group'), f: v => esc(groupName(v)) }, { k: 'phone', l: t('f_phone') },
+      { k: 'email', l: t('f_email') }, { k: 'city', l: t('f_city') },
+      { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) }, { k: 'status', l: t('f_status'), f: statusPill }],
+    actions: r => (can('edit') ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') + (can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '')
+  },
+  transactions: {
+    entity: 'Transactions', id: 'rowId',
+    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q), tool('account', t('f_account'), 'customer', s.filters.account),
+      tool('type', t('f_type'), 'select', s.filters.type, S.lookups.transactionTypes.map(x => [x, x])),
+      tool('postStatus', t('f_postStatus'), 'select', s.filters.postStatus, [['Draft', t('Draft')], ['Posted', t('Posted')]]),
+      tool('dateFrom', t('from'), 'date', s.dateFrom), tool('dateTo', t('to'), 'date', s.dateTo)],
+    cols: () => [
+      { k: 'voucher', l: t('f_voucher') }, { k: 'date', l: t('f_date') },
+      { k: 'account', l: t('f_name'), cls: 'wrap', f: (v, r) => `${esc(r.customerName)}<br><small style="color:var(--subtle)">${esc(v)}</small>` },
+      { k: 'type', l: t('f_type') }, { k: 'description', l: t('f_description'), cls: 'wrap' }, { k: 'dueDate', l: t('f_dueDate') },
+      { k: 'debitMST', l: t('debit'), num: true }, { k: 'creditMST', l: t('credit'), num: true },
+      { k: 'postStatus', l: t('f_postStatus'), f: statusPill }],
+    select: r => can('post') && r.postStatus === 'Draft',
+    actions: r => {
+      const draft = r.postStatus === 'Draft';
+      return (draft && can('edit') ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') +
+        (draft && can('post') ? `<button data-act="rowPost" title="${t('post')}">⇪</button>` : '') +
+        (!draft && S.user.isAdmin ? `<button data-act="rowUnpost" title="${t('unpost')}">↺</button>` : '') +
+        ((draft || S.user.isAdmin) && can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '');
+    }
+  },
+  groups: {
+    entity: 'CustomerGroups', id: 'groupId',
+    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q)],
+    cols: () => [{ k: 'groupId', l: t('f_groupId') }, { k: 'groupName', l: t('f_groupName') }],
+    actions: () => (can('edit') ? `<button data-act="rowEdit">✎</button>` : '') + (can('delete') ? `<button data-act="rowDelete">🗑</button>` : '')
+  },
+  users: {
+    entity: 'Users', id: 'userId',
+    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q)],
+    cols: () => [
+      { k: 'username', l: t('f_username') }, { k: 'fullName', l: t('f_fullName') }, { k: 'role', l: t('f_role'), f: v => pill(t(v), v === 'Admin' ? 'info' : 'neutral') },
+      { k: 'pages', l: t('f_pages'), f: (v, r) => r.role === 'Admin' ? t('all') : t('pagesN', { n: String(v || '').split(',').filter(String).length }) },
+      { k: 'canAdd', l: t('f_actions'), f: (v, r) => r.role === 'Admin' ? t('all') : ['Add', 'Edit', 'Delete', 'Post'].filter(a => r['can' + a]).map(a => t('f_can' + a)).join(' · ') },
+      { k: 'isCollector', l: t('f_isCollector'), f: v => v ? '✓' : '' }, { k: 'scope', l: t('f_scope'), f: v => t('scope_' + (v || 'all')) },
+      { k: 'active', l: t('f_active'), f: v => pill(v ? t('Active') : t('Inactive'), v ? 'healthy' : 'neutral') }, { k: 'lastLogin', l: t('f_lastLogin') }],
+    actions: () => `<button data-act="rowEdit">✎</button><button data-act="rowDelete">🗑</button>`
+  },
+  followlog: {
+    entity: 'FollowUps', id: 'id',
+    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q), tool('account', t('f_account'), 'customer', s.filters.account),
+      tool('status', t('f_status'), 'select', s.filters.status, ['Open', 'Done', 'Broken'].map(x => [x, t(x)])),
+      tool('dateFrom', t('from'), 'date', s.dateFrom), tool('dateTo', t('to'), 'date', s.dateTo)],
+    cols: () => [
+      { k: 'actionDate', l: t('f_actionDate') }, { k: 'customerName', l: t('f_name'), cls: 'wrap' }, { k: 'actionType', l: t('f_actionType'), f: v => esc(t(v)) },
+      { k: 'note', l: t('f_note'), cls: 'wrap' }, { k: 'promiseDate', l: t('f_promiseDate') }, { k: 'promiseAmount', l: t('f_promiseAmount'), num: true },
+      { k: 'status', l: t('f_status'), f: statusPill }, { k: 'createdBy', l: t('f_createdBy') }],
+    actions: () => (can('edit') ? `<button data-act="rowEdit">✎</button>` : '') + (can('delete') ? `<button data-act="rowDelete">🗑</button>` : '')
+  }
+};
+
+function listState(view) {
+  return S.lists[view] = S.lists[view] || { q: '', filters: {}, page: 1, pageSize: 25, sort: '', desc: undefined, dateFrom: '', dateTo: '' };
+}
+
+function listBlock(view) {
+  const cfg = LISTS[view], s = listState(view);
+  return `<div class="panel view-tools" data-list="${view}">${cfg.tools(s).join('')}</div>
+    <section class="panel section" style="margin-top:0"><div id="list_${view}"><div class="skeleton">${t('loading')}</div></div></section>`;
+}
+
+async function loadList(view) {
+  const cfg = LISTS[view], s = listState(view);
+  const res = await call('listRecords', cfg.entity, { q: s.q, filters: s.filters, page: s.page, pageSize: s.pageSize, sort: s.sort, desc: s.desc, dateFrom: s.dateFrom, dateTo: s.dateTo });
+  s.page = res.page;
+  const cols = cfg.cols();
+  const actions = cfg.actions && ((r, i) => cfg.actions(r, i));
+  const foot = view === 'transactions' && res.rows.length ? footRow(cols, { debitMST: res.totals.debit, creditMST: res.totals.credit }, t('all') + ' (' + res.total + ')', cfg.select && can('post')) + '' : '';
+  const el = $('#list_' + view);
+  if (!el) return;
+  el.innerHTML = table(view, cols, res.rows, { click: !!cfg.click, actions: actions, select: can('post') ? cfg.select : null, foot: foot ? foot.replace('</tr>', actions ? '<td></td></tr>' : '</tr>') : '' }) + pager(view, res);
+  S.exportData = { name: view, cols: cols, rows: res.rows };
+}
+
+function onListTools(view, el) {
+  const s = listState(view), v = readTools(el);
+  s.q = v.q || ''; s.dateFrom = v.dateFrom || ''; s.dateTo = v.dateTo || '';
+  s.filters = {};
+  Object.keys(v).forEach(k => { if (['q', 'dateFrom', 'dateTo'].indexOf(k) === -1) s.filters[k] = v[k]; });
+  s.page = 1;
+  loadList(view);
+}
+
+// ───────── Forms ─────────
+const FORMS = {
+  Customers: () => [
+    { k: 'account', req: 1, lock: 1 }, { k: 'name', req: 1 }, { k: 'group', type: 'select', o: groupOpts() }, { k: 'currency' },
+    { k: 'contactPerson' }, { k: 'phone', type: 'tel' }, { k: 'email', type: 'email' }, { k: 'city' }, { k: 'country' }, { k: 'taxNo' },
+    { k: 'creditLimit', type: 'number' }, { k: 'termsDays', type: 'number' },
+    { k: 'collector', type: 'select', o: collectorOpts(), hide: !S.user.isAdmin && S.user.scope === 'own' },
+    { k: 'status', type: 'select', o: statusOpts(), noAll: 1 }, { k: 'address', type: 'textarea', span: 1 }, { k: 'notes', type: 'textarea', span: 1 }],
+  Transactions: () => [
+    { k: 'voucher', req: 1 }, { k: 'type', type: 'select', o: S.lookups.transactionTypes.map(x => [x, x]), noAll: 1 },
+    { k: 'account', type: 'customer', req: 1 }, { k: 'date', type: 'date', req: 1 }, { k: 'dueDate', type: 'date' }, { k: 'currency' },
+    { k: 'debitMST', type: 'number' }, { k: 'creditMST', type: 'number' }, { k: 'amountCur', type: 'number', hint: t('amountHint') },
+    { k: 'exchange', type: 'number' }, { k: 'description', type: 'textarea', span: 1 }],
+  CustomerGroups: () => [{ k: 'groupId', req: 1, lock: 1 }, { k: 'groupName', req: 1 }],
+  FollowUps: () => [
+    { k: 'account', type: 'customer', req: 1 }, { k: 'voucher' }, { k: 'actionDate', type: 'date', req: 1 },
+    { k: 'actionType', type: 'select', o: ['Call', 'Email', 'Visit', 'WhatsApp', 'Promise', 'Other'].map(x => [x, t(x)]), noAll: 1 },
+    { k: 'promiseDate', type: 'date' }, { k: 'promiseAmount', type: 'number' },
+    { k: 'status', type: 'select', o: ['Open', 'Done', 'Broken'].map(x => [x, t(x)]), noAll: 1 }, { k: 'note', type: 'textarea', span: 1, req: 1 }],
+  Users: () => [
+    { k: 'username', req: 1 }, { k: 'fullName', req: 1 }, { k: 'email', type: 'email' }, { k: 'password', type: 'password', hint: t('passwordHint') },
+    { k: 'role', type: 'select', o: [['User', t('User')], ['Admin', t('Admin')]], noAll: 1 },
+    { k: 'scope', type: 'select', o: [['all', t('scope_all')], ['own', t('scope_own')]], noAll: 1 },
+    { k: 'active', type: 'check' }, { k: 'isCollector', type: 'check' }, { k: 'actions', type: 'flags', span: 1 }, { k: 'pages', type: 'pages', span: 1 }]
+};
+const ENTITY_TITLE = { Customers: 'p_customers', Transactions: 'p_transactions', CustomerGroups: 'p_groups', FollowUps: 'p_followup', Users: 'p_users' };
+let FORM = null;
+
+function fieldHtml(f, rec, isNew) {
+  const v = rec[f.k] == null ? '' : rec[f.k];
+  const label = t('f_' + f.k) + (f.req ? ' <span class="req">*</span>' : '');
+  const req = f.req ? 'required' : '';
+  const cls = 'field' + (f.span ? ' span2' : '');
+  const hint = f.hint ? `<span class="field-hint">${esc(f.hint)}</span>` : '';
+  switch (f.type) {
+    case 'select': return `<label class="${cls}">${label}<select name="${f.k}" ${req}>${f.noAll ? '' : '<option value=""></option>'}${opts(f.o, v)}</select>${hint}</label>`;
+    case 'textarea': return `<label class="${cls}">${label}<textarea name="${f.k}" ${req}>${esc(v)}</textarea>${hint}</label>`;
+    case 'customer': return `<label class="${cls}">${label}<input name="${f.k}" list="dl_customers" value="${esc(v)}" ${req} autocomplete="off">${hint}</label>`;
+    case 'check': return `<label class="check" style="align-self:end;min-height:34px"><input type="checkbox" name="${f.k}" ${v ? 'checked' : ''}>${t('f_' + f.k)}</label>`;
+    case 'flags': return `<div class="${cls}">${label}<div class="check-grid">${['canAdd', 'canEdit', 'canDelete', 'canPost'].map(k =>
+      `<label class="check"><input type="checkbox" name="${k}" ${rec[k] ? 'checked' : ''}>${t('f_' + k)}</label>`).join('')}</div></div>`;
+    case 'pages': {
+      const sel = String(v || '').split(',');
+      return `<div class="${cls}">${label}<div class="check-grid">${PAGES.map(p =>
+        `<label class="check"><input type="checkbox" name="page" value="${p.id}" ${sel.indexOf(p.id) > -1 ? 'checked' : ''}>${t('p_' + p.id)}</label>`).join('')}</div></div>`;
+    }
+    default: return `<label class="${cls}">${label}<input name="${f.k}" type="${f.type || 'text'}" ${f.type === 'number' ? 'step="any"' : ''} value="${esc(v)}" ${req} ${f.lock && !isNew ? 'readonly' : ''} ${f.type === 'password' ? 'autocomplete="new-password"' : ''}>${hint}</label>`;
+  }
+}
+
+function openForm(entity, rec, isNew) {
+  rec = Object.assign({}, rec || {});
+  const fields = FORMS[entity]().filter(f => !f.hide);
+  FORM = { entity, rec, isNew, fields };
+  openDrawer(`
+    <div class="drawer-head"><h2>${isNew ? '＋ ' : '✎ '}${t(ENTITY_TITLE[entity])}</h2><button class="icon-button" data-act="closeDrawer" aria-label="${t('close')}">×</button></div>
+    <form class="form-panel" id="recForm" style="padding:16px 0 0">
+      <div class="form-grid">${fields.map(f => fieldHtml(f, rec, isNew)).join('')}</div>
+      <div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button><button class="button-primary" type="submit">${t('save')}</button></div>
+    </form>`);
+}
+
+async function submitForm(form) {
+  const { entity, rec, isNew, fields } = FORM;
+  const data = {};
+  const idKey = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', FollowUps: 'id', Users: 'userId' }[entity];
+  if (!isNew) data[idKey] = rec[idKey];
+  fields.forEach(f => {
+    if (f.type === 'flags') ['canAdd', 'canEdit', 'canDelete', 'canPost'].forEach(k => { data[k] = form.elements[k].checked; });
+    else if (f.type === 'pages') data.pages = $$('input[name=page]:checked', form).map(i => i.value).join(',');
+    else if (f.type === 'check') data[f.k] = form.elements[f.k].checked;
+    else data[f.k] = form.elements[f.k].value.trim();
+  });
+  if ((entity === 'Transactions' || entity === 'FollowUps') && !S.lookups.customers.some(c => c.account === data.account)) {
+    toast(t('err_NOT_FOUND') + ': ' + data.account, 'error'); return;
+  }
+  const b = form.querySelector('button[type=submit]'); b.disabled = true;
+  try {
+    await call('saveRecord', entity, data, isNew);
+    toast(t('saved'));
+    closeDrawer();
+    if (['Customers', 'CustomerGroups', 'Users'].indexOf(entity) > -1) await refreshLookups();
+    reload();
+  } catch (e) { b.disabled = false; }
+}
+
+// ───────── Drawer ─────────
+function openDrawer(html, wide) {
+  const d = $('#drawer');
+  d.className = 'drawer' + (wide ? ' wide' : '');
+  d.innerHTML = html; d.scrollTop = 0;
+  $('#overlay').classList.add('open');
+}
+function closeDrawer() { $('#overlay').classList.remove('open'); }
+
+/** Customer 360: balance, overdue, contact data, statement with running balance, follow-ups. */
+async function openCustomer(account, from, to, keep) {
+  const canStatement = ['customers', 'balances', 'overdue', 'followup', 'collection', 'dashboard', 'paid'].some(hasPage);
+  if (!canStatement) return;
+  if (!keep) openDrawer(`<div class="skeleton">${t('loading')}</div>`, true);
+  const r = await call('customerStatement', account, from || '', to || '');
+  const c = r.customer || {};
+  const kv = (k, v) => `<div><div class="drawer-label">${t(k)}</div><p>${v || '—'}</p></div>`;
+  const cols = [{ k: 'date', l: t('f_date') }, { k: 'voucher', l: t('f_voucher') }, { k: 'type', l: t('f_type') },
+    { k: 'description', l: t('f_description'), cls: 'wrap' }, { k: 'debit', l: t('debit'), num: true }, { k: 'credit', l: t('credit'), num: true }, { k: 'balance', l: t('balance'), num: true }];
+  const openingRow = `<tr><td data-label="">${t('opening')}</td><td></td><td></td><td></td><td></td><td></td><td class="num" data-label="${t('balance')}">${numCell(r.opening)}</td></tr>`;
+  S.exportData = { name: 'statement_' + account, cols: cols, rows: r.lines };
+  openDrawer(`
+    <div class="drawer-head"><div><h2>${esc(c.name)}</h2><p style="margin:4px 0 0">${esc(c.account)} · ${esc(groupName(c.group))} · ${statusPill(c.status)}</p></div>
+      <button class="icon-button" data-act="closeDrawer" aria-label="${t('close')}">×</button></div>
+    <section class="stats four" style="margin:16px 0 0">
+      ${stat(t('balance'), `${money(r.closing)} <small>${esc(cur())}</small>`, '$', 'green')}
+      ${stat(t('openAmount'), money(r.openAmount), '◔', '')}
+      ${stat(t('overdueAmt'), money(r.overdueAmount), '!', 'red')}
+      ${stat(t('maxDays'), r.maxDays + ' <small>' + t('day') + '</small>', '⏱', 'amber')}
+    </section>
+    <div class="panel"><div class="drawer-label" style="margin-bottom:10px">${t('customerInfo')}</div><div class="kv">
+      ${kv('f_contactPerson', esc(c.contactPerson))}${kv('f_phone', c.phone ? `<a style="color:inherit" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : '')}
+      ${kv('f_email', c.email ? `<a style="color:inherit" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}${kv('f_address', esc([c.address, c.city, c.country].filter(Boolean).join('، ')))}
+      ${kv('f_collector', esc(collectorName(c.collector)))}${kv('f_currency', esc(c.currency))}
+      ${kv('f_creditLimit', c.creditLimit ? money(c.creditLimit) : '')}${kv('f_termsDays', esc(c.termsDays))}
+      ${kv('f_taxNo', esc(c.taxNo))}${kv('f_createdAt', esc(c.createdAt))}</div>
+      ${c.notes ? `<div class="drawer-label">${t('f_notes')}</div><p>${esc(c.notes)}</p>` : ''}
+      <div class="card-actions">
+        ${hasPage('customers') && can('edit') ? btn('custEdit', '✎ ' + t('edit'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
+        ${hasPage('followup') && can('add') ? btn('newFollow', '☎ ' + t('logAction'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
+        ${btn('export', t('exportCsv'), 'button-ghost')}${btn('print', t('print'), 'button-ghost')}
+      </div></div>
+    <div class="panel flush">
+      <div class="section-head"><h3 class="section-title">${t('statement')}</h3></div>
+      <div class="view-tools" id="stmtTools" data-acc="${esc(c.account)}" style="margin:0">
+        ${tool('from', t('from'), 'date', from || '')}${tool('to', t('to'), 'date', to || '')}
+        <div class="tool-btns">${btn('stmtApply', t('apply'))}</div></div>
+      <div class="table-wrap"><table class="cards"><thead><tr>${cols.map(x => `<th class="${x.num ? 'num' : ''}">${esc(x.l)}</th>`).join('')}</tr></thead>
+        <tbody>${openingRow}${r.lines.map(l => '<tr>' + cols.map(x => `<td data-label="${esc(x.l)}" class="${x.num ? 'num' : ''} ${x.cls || ''}">${x.num ? numCell(l[x.k]) : esc(l[x.k])}</td>`).join('') + '</tr>').join('')}</tbody>
+        <tfoot><tr><td data-label="">${t('closing')}</td><td></td><td></td><td></td><td></td><td></td><td class="num" data-label="${t('balance')}">${numCell(r.closing)}</td></tr></tfoot></table></div></div>
+    ${r.followUps.length ? `<div class="panel"><div class="drawer-label">${t('followLog')}</div>${r.followUps.map(f =>
+      `<p><b style="color:var(--text)">${esc(f.actionDate)} · ${esc(t(f.actionType))}</b> ${statusPill(f.status)}<br>${esc(f.note)}${f.promiseDate ? `<br>${t('f_promiseDate')}: ${esc(f.promiseDate)} — ${money(f.promiseAmount)}` : ''}</p>`).join('')}</div>` : ''}
+  `, true);
+}
+
+// ───────── Views ─────────
+const VIEWS = {
+  async dashboard() {
+    setContent(heading('dashboard', [hasPage('transactions') && can('add') && btn('newTx', '＋ ' + t('addTransaction'))]) + `<div class="skeleton">${t('loading')}</div>`);
+    const d = await call('getDashboard');
+    setBadge('overdue', d.kpi.overdueCustomers); setBadge('followup', d.kpi.overdueCustomers);
+    if (S.view !== 'dashboard') return;
+    const max = Math.max(1, ...d.months.map(m => Math.max(m.debit, m.credit)));
+    const totalB = Object.values(d.buckets).reduce((a, b) => a + b, 0) || 1;
+    const pct = k => d.buckets[k] / totalB * 100;
+    const p1 = pct('b1'), p2 = p1 + pct('b2'), p3 = p2 + pct('b3');
+    const donutBg = Object.values(d.buckets).some(Boolean)
+      ? `conic-gradient(var(--green) 0 ${p1}%, var(--amber) ${p1}% ${p2}%, var(--orange) ${p2}% ${p3}%, var(--red) ${p3}% 100%)` : 'var(--surface-raised)';
+    const topCols = [{ k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'account', l: t('f_account') }, { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) },
+      { k: 'balance', l: t('balance'), num: true }, { k: 'overdue', l: t('overdueAmt'), num: true },
+      { k: 'maxDays', l: t('maxDays'), f: v => v ? daysPill(v) : pill('0', 'healthy') }];
+    setContent(heading('dashboard', [hasPage('transactions') && can('add') && btn('newTx', '＋ ' + t('addTransaction'))]) + `
+      <section class="stats four">
+        ${stat(t('k_customers'), d.kpi.customers, '♙', '', `<span class="trend">${d.kpi.active}</span><span>${t('activeWord')}</span>`)}
+        ${stat(t('k_receivable'), `${short(d.kpi.receivable)} <small>${esc(cur())}</small>`, '$', 'green', d.kpi.drafts ? `<span class="trend down">${d.kpi.drafts}</span><span>${t('drafts')}</span>` : '')}
+        ${stat(t('k_overdue'), `${short(d.kpi.overdue)} <small>${esc(cur())}</small>`, '!', 'red', `<span class="trend down">${d.kpi.overdueCustomers}</span><span>${t('lateCustomers')} · ${t('avgLate', { n: d.kpi.avgDays })}</span>`)}
+        ${stat(t('k_collected'), `${short(d.kpi.collectedMTD)} <small>${esc(cur())}</small>`, '✓', 'amber')}
+      </section>
+      <section class="charts">
+        <article class="panel">
+          <div class="section-head"><h2 class="section-title">${t('monthly')}</h2>
+            <div class="legend" style="display:flex;gap:12px"><span class="legend-row"><i class="dot blue"></i>${t('invoicesL')}</span><span class="legend-row"><i class="dot"></i>${t('paymentsL')}</span></div></div>
+          <div class="chart-body">${d.months.map(m => `<div class="bar-group" title="${esc(m.key)}: ${money(m.debit)} / ${money(m.credit)}">
+            <div class="bar-pair"><div class="bar" style="height:${m.debit / max * 100}%"></div><div class="bar alt" style="height:${m.credit / max * 100}%"></div></div><span>${esc(m.label)}</span></div>`).join('')}</div>
+        </article>
+        <article class="panel">
+          <div class="section-head"><h2 class="section-title">${t('aging')}</h2>${hasPage('overdue') ? `<button class="section-action" data-go="overdue">${t('details')}</button>` : ''}</div>
+          <div class="donut-wrap"><div class="donut" style="background:${donutBg}"><div class="donut-center"><div>${d.kpi.overdueCustomers}<small>${t('lateCustomers')}</small></div></div></div>
+            <div class="legend">${['b1', 'b2', 'b3', 'b4'].map((b, i) => `<div class="legend-row"><i class="dot ${['', 'amber', 'orange', 'red'][i]}"></i>${t(b)} <b>${short(d.buckets[b])}</b></div>`).join('')}</div></div>
+        </article>
+      </section>
+      <section class="panel section">
+        <div class="section-head"><h2 class="section-title">${t('topCustomers')}</h2>${hasPage('balances') ? `<button class="section-action" data-go="balances">${t('viewAll')}</button>` : ''}</div>
+        ${table('dashTop', topCols, d.top, { click: true })}
+      </section>`);
+  },
+
+  customers() {
+    setContent(heading('customers', [can('add') && btn('newCustomer', '＋ ' + t('addCustomer')), btn('export', t('exportCsv'), 'button-ghost')]) + listBlock('customers'));
+    loadList('customers');
+  },
+
+  transactions() {
+    setContent(heading('transactions', [can('post') && btn('postSelected', '⇪ ' + t('postSelected'), 'button-ghost'),
+      can('add') && btn('newTx', '＋ ' + t('addTransaction')), btn('export', t('exportCsv'), 'button-ghost')]) + listBlock('transactions'));
+    loadList('transactions');
+  },
+
+  groups() {
+    setContent(heading('groups', [can('add') && btn('newGroup', '＋ ' + t('addGroup'))]) + listBlock('groups'));
+    loadList('groups');
+  },
+
+  users() {
+    const st = S.settings;
+    setContent(heading('users', [btn('newUser', '＋ ' + t('addUser'))]) + listBlock('users') + `
+      <form class="panel form-panel section" id="settingsForm">
+        <h2 class="section-title">${t('settings')}</h2>
+        <div class="form-grid">${['AppName', 'CompanyName', 'LocalCurrency'].map(k =>
+          `<label class="field">${t(k)}<input name="${k}" value="${esc(st[k] || '')}"></label>`).join('')}</div>
+        <div style="display:flex;justify-content:end"><button class="button-primary" type="submit">${t('save')}</button></div>
+      </form>`);
+    loadList('users');
+  },
+
+  balances() {
+    const f = S.rep.balances = S.rep.balances || { dateFrom: yearStart(), dateTo: today(), hideZero: true };
+    setContent(heading('balances', reportBtns()) + `
+      <div class="panel view-tools" id="repTools">
+        ${tool('dateFrom', t('from'), 'date', f.dateFrom)}${tool('dateTo', t('to'), 'date', f.dateTo)}
+        ${tool('group', t('f_group'), 'select', f.group, groupOpts())}${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}
+        ${tool('account', t('f_account'), 'customer', f.account)}${tool('hideZero', t('hideZero'), 'check', f.hideZero)}
+        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
+      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
+    runReport();
+  },
+
+  paid() {
+    const f = S.rep.paid = S.rep.paid || { dateFrom: monthStart(), dateTo: today() };
+    setContent(heading('paid', reportBtns()) + `
+      <div class="panel view-tools" id="repTools">
+        ${tool('dateFrom', t('from'), 'date', f.dateFrom)}${tool('dateTo', t('to'), 'date', f.dateTo)}
+        ${tool('group', t('f_group'), 'select', f.group, groupOpts())}${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}
+        ${tool('account', t('f_account'), 'customer', f.account)}
+        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
+      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
+    runReport();
+  },
+
+  overdue() {
+    const f = S.rep.overdue = S.rep.overdue || { asOf: today(), minDays: 1, tab: 'inv' };
+    setContent(heading('overdue', reportBtns()) + `
+      <div class="panel view-tools" id="repTools">
+        ${tool('asOf', t('asOf'), 'date', f.asOf)}${tool('group', t('f_group'), 'select', f.group, groupOpts())}
+        ${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}${tool('account', t('f_account'), 'customer', f.account)}
+        ${tool('minDays', t('minDays'), 'number', f.minDays)}
+        ${tool('bucket', t('bucket'), 'select', f.bucket, ['b1', 'b2', 'b3', 'b4'].map(b => [b, t(b)]))}
+        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
+      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
+    runReport();
+  },
+
+  followup() {
+    const f = S.rep.followup = S.rep.followup || { minDays: 1 };
+    setContent(heading('followup', [can('add') && btn('newFollow', '＋ ' + t('newFollowUp'))]) + `
+      <div class="panel view-tools" id="repTools">
+        ${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}${tool('group', t('f_group'), 'select', f.group, groupOpts())}
+        ${tool('minDays', t('minDays'), 'number', f.minDays)}
+        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
+      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>
+      <section class="section"><div class="section-head panel" style="border-radius:8px 8px 0 0;border-bottom:0"><h2 class="section-title">${t('followLog')}</h2></div>
+        ${listBlock('followlog').replace('class="panel view-tools"', 'class="panel view-tools" style="border-radius:0;margin:0;border-bottom:0"')}</section>`);
+    runReport();
+    loadList('followlog');
+  },
+
+  collection() {
+    const f = S.rep.collection = S.rep.collection || { asOf: today() };
+    setContent(heading('collection', reportBtns()) + `
+      <div class="panel view-tools" id="repTools">
+        ${tool('asOf', t('asOf'), 'date', f.asOf)}${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}
+        ${tool('group', t('f_group'), 'select', f.group, groupOpts())}
+        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
+      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
+    runReport();
+  },
+
+  import() {
+    setContent(heading('import', []) + `
+      <section class="panel form-panel">
+        <p class="subtitle" style="margin:0;line-height:1.7">${t('imp_help')}</p>
+        <div class="form-grid">
+          <label class="field">${t('imp_entity')}<select id="impEntity">${opts([['Customers', t('p_customers')], ['Transactions', t('p_transactions')], ['CustomerGroups', t('p_groups')]], 'Customers')}</select></label>
+          <label class="field">${t('imp_mode')}<select id="impMode">${opts([['append', t('append')], ['upsert', t('upsert')]].concat(can('delete') ? [['replace', t('replace')]] : []), 'upsert')}</select></label>
+          <label class="field span2">${t('chooseFile')}<input type="file" id="impFile" accept=".xlsx,.xls,.csv"></label>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          ${btn('impTemplate', t('template'), 'button-ghost')}${btn('impRun', t('importNow'), 'button-primary', 'id="impRun" disabled')}</div>
+      </section>
+      <div id="impPreview"></div>`);
+  }
+};
+
+// Report runner — reads the tool bar, calls the matching server report, renders it.
+async function runReport() {
+  const view = S.view;
+  const tools = $('#repTools');
+  const f = Object.assign(S.rep[view], readTools(tools));
+  const out = () => $('#repOut');
+  if (view === 'balances') {
+    const r = await call('reportBalances', f);
+    if (S.view !== view) return;
+    const cols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'group', l: t('f_group'), f: v => esc(groupName(v)) },
+      { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) },
+      { k: 'opening', l: t('opening'), num: true }, { k: 'debit', l: t('debit'), num: true }, { k: 'credit', l: t('credit'), num: true }, { k: 'closing', l: t('closing'), num: true }];
+    S.exportData = { name: 'balances_' + r.from + '_' + r.to, cols, rows: r.rows };
+    out().innerHTML = `<section class="stats four">
+        ${stat(t('opening'), short(r.totals.opening), '◐', '')}${stat(t('debit'), short(r.totals.debit), '↑', 'amber')}
+        ${stat(t('credit'), short(r.totals.credit), '↓', 'green')}${stat(t('closing'), short(r.totals.closing), '$', 'red', `<span>${r.rows.length} ${t('customersCount')}</span>`)}</section>
+      <section class="panel">${table('balances', cols, r.rows, { click: true, sortable: false, foot: footRow(cols, r.totals, t('all')) })}</section>`;
+  } else if (view === 'paid') {
+    const r = await call('reportPaidInvoices', f);
+    if (S.view !== view) return;
+    const cols = [{ k: 'voucher', l: t('f_voucher') }, { k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'date', l: t('f_date') }, { k: 'dueDate', l: t('f_dueDate') },
+      { k: 'paidDate', l: t('paidDate') }, { k: 'amount', l: t('amount'), num: true },
+      { k: 'lateDays', l: t('lateDays'), f: v => v ? daysPill(v) : pill(t('onTime'), 'healthy') }, { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) }];
+    S.exportData = { name: 'paid_invoices', cols, rows: r.rows };
+    out().innerHTML = `<section class="stats four">
+        ${stat(t('paidCount'), r.totals.count, '✓', 'green')}${stat(t('totalPaid'), short(r.totals.amount), '$', '')}
+        ${stat(t('onTime'), r.totals.onTime, '◷', 'green')}${stat(t('late'), r.totals.late, '!', 'red')}</section>
+      <section class="panel">${table('paid', cols, r.rows, { click: true, sortable: false, foot: footRow(cols, { amount: r.totals.amount }, t('all')) })}</section>`;
+  } else if (view === 'overdue') {
+    const r = await call('reportOverdue', f);
+    if (S.view !== view) return;
+    setBadge('overdue', f.account || f.group || f.collector ? S.badges.overdue : r.totals.customers);
+    const rows = f.bucket ? r.rows.filter(x => x.bucket === f.bucket) : r.rows;
+    const invCols = [{ k: 'voucher', l: t('f_voucher') }, { k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'date', l: t('f_date') }, { k: 'dueDate', l: t('f_dueDate') },
+      { k: 'amount', l: t('amount'), num: true }, { k: 'remaining', l: t('remaining'), num: true }, { k: 'days', l: t('days'), f: daysPill },
+      { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) }, { k: 'lastFollowUp', l: t('lastFollowUp') }];
+    const custRows = f.bucket ? groupCustomers(rows) : r.customers;
+    const custCols = [{ k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'account', l: t('f_account') }, { k: 'count', l: t('invoices') },
+      { k: 'remaining', l: t('overdueAmt'), num: true }, { k: 'maxDays', l: t('maxDays'), f: daysPill }, { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) },
+      { k: 'phone', l: t('f_phone') }, { k: 'lastFollowUp', l: t('lastFollowUp') }, { k: 'promiseDate', l: t('f_promiseDate') }];
+    const byCust = f.tab === 'cust';
+    S.exportData = byCust ? { name: 'overdue_customers', cols: custCols, rows: custRows } : { name: 'overdue_invoices', cols: invCols, rows };
+    const sumRem = rows.reduce((a, x) => a + x.remaining, 0);
+    out().innerHTML = `<section class="stats four">
+        ${stat(t('overdueAmt'), `${short(sumRem)} <small>${esc(cur())}</small>`, '!', 'red')}${stat(t('overdueInvoices'), rows.length, '▤', 'amber')}
+        ${stat(t('overdueCustomers'), custRows.length, '♙', '')}${stat(t('avgDays'), r.totals.avgDays + ' <small>' + t('day') + '</small>', '⏱', 'amber')}</section>
+      <section class="panel" style="padding:14px 16px;margin-bottom:16px"><div class="legend" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        ${['b1', 'b2', 'b3', 'b4'].map((b, i) => `<div><div class="legend-row"><i class="dot ${['', 'amber', 'orange', 'red'][i]}"></i>${t(b)} <b style="color:var(--text)">${money(r.buckets[b])}</b></div>
+          <div class="meter"><i style="width:${r.totals.remaining ? r.buckets[b] / r.totals.remaining * 100 : 0}%;background:var(--${['green', 'amber', 'orange', 'red'][i]})"></i></div></div>`).join('')}</div></section>
+      <div class="panel tabs"><button class="tab ${byCust ? '' : 'active'}" data-act="odTab" data-tab="inv">${t('byInvoice')}</button><button class="tab ${byCust ? 'active' : ''}" data-act="odTab" data-tab="cust">${t('byCustomer')}</button></div>
+      <section class="panel">${byCust
+        ? table('overdueCust', custCols, custRows, { click: true, sortable: false, foot: footRow(custCols, { remaining: sumRem }, t('all')) })
+        : table('overdue', invCols, rows, { click: true, sortable: false, foot: footRow(invCols, { remaining: sumRem, amount: rows.reduce((a, x) => a + x.amount, 0) }, t('all')) })}</section>`;
+  } else if (view === 'followup') {
+    const r = await call('getFollowUpBoard', f);
+    if (S.view !== view) return;
+    setBadge('followup', r.totals.customers);
+    S.rows.followCards = r.customers;
+    out().innerHTML = `<section class="stats">
+        ${stat(t('overdueCustomers'), r.totals.customers, '♙', 'red')}${stat(t('overdueAmt'), `${short(r.totals.remaining)} <small>${esc(cur())}</small>`, '!', 'amber')}
+        ${stat(t('promisesDue'), r.promisesDue, '☎', '')}</section>
+      ${r.customers.length ? `<div class="risk-grid">${r.customers.map((c, i) => `
+        <article class="panel risk-item">
+          <div class="card-head">${daysPill(c.maxDays)}<small style="color:var(--subtle)">${esc(c.account)}</small></div>
+          <h3>${esc(c.name)}</h3>
+          <p>${t('f_collector')}: ${esc(collectorName(c.collector))}</p>
+          <div class="mini-stats"><div><span>${t('overdueAmt')}</span><b>${money(c.remaining)}</b></div><div><span>${t('invoices')}</span><b>${c.count}</b></div></div>
+          <p>${t('lastFollowUp')}: ${esc(c.lastFollowUp || '—')}${c.promiseDate ? `<br>${t('f_promiseDate')}: <b style="color:var(--text)">${esc(c.promiseDate)}</b>` : ''}</p>
+          <div class="card-actions">
+            ${can('add') ? btn('newFollow', '☎ ' + t('logAction'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
+            ${btn('openCust', t('statement'), 'button-ghost', `data-acc="${esc(c.account)}"`)}
+            ${c.phone ? `<a class="button-ghost" style="display:inline-grid;place-items:center;text-decoration:none" href="tel:${esc(c.phone)}">${t('call')}</a>` : ''}
+            ${c.email ? `<a class="button-ghost" style="display:inline-grid;place-items:center;text-decoration:none" href="mailto:${esc(c.email)}">${t('mail')}</a>` : ''}
+          </div></article>`).join('')}</div>` : `<div class="panel empty">${t('noOverdue')}</div>`}`;
+  } else if (view === 'collection') {
+    const r = await call('reportCollection', f);
+    if (S.view !== view) return;
+    S.rows.collectors = r.rows;
+    const flat = [];
+    r.rows.forEach(m => m.companies.forEach(c => flat.push(Object.assign({ collector: m.collector }, c))));
+    const cols = [{ k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) }, { k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'account', l: t('f_account') },
+      { k: 'balance', l: t('balance'), num: true }, { k: 'remaining', l: t('overdueAmt'), num: true }, { k: 'count', l: t('invoices') },
+      { k: 'maxDays', l: t('maxDays'), f: daysPill }, { k: 'lastFollowUp', l: t('lastFollowUp') }];
+    S.exportData = { name: 'collection_team', cols, rows: flat };
+    out().innerHTML = `<section class="stats">
+        ${stat(t('receivable'), `${short(r.totals.balance)} <small>${esc(cur())}</small>`, '$', '')}
+        ${stat(t('overdueAmt'), `${short(r.totals.overdue)} <small>${esc(cur())}</small>`, '!', 'red')}
+        ${stat(t('collectedMTD'), `${short(r.totals.collectedMTD)} <small>${esc(cur())}</small>`, '✓', 'green')}</section>
+      <div class="section-head" style="padding:0 0 10px;border:0"><h2 class="section-title">${t('team')}</h2></div>
+      <div class="risk-grid">${r.rows.map((m, i) => `
+        <article class="panel risk-item">
+          <div class="card-head"><div style="display:flex;gap:10px;align-items:center"><div class="avatar">${esc((m.name || '?')[0].toUpperCase())}</div>
+            <div><h3 style="margin:0">${esc(m.name || t('unassigned'))}</h3><p style="margin:0">${m.customers} ${t('companies')}</p></div></div>
+            ${m.maxDays ? daysPill(m.maxDays) : pill('0', 'healthy')}</div>
+          <div class="mini-stats">
+            <div><span>${t('balance')}</span><b>${short(m.balance)}</b></div><div><span>${t('overdueAmt')}</span><b class="neg">${short(m.overdue)}</b></div>
+            <div><span>${t('overdueCustomers')}</span><b>${m.overdueCustomers}</b></div><div><span>${t('avgDays')}</span><b>${m.avgDays}</b></div>
+            <div><span>${t('overdueInvoices')}</span><b>${m.overdueInvoices}</b></div><div><span>${t('collectedMTD')}</span><b class="pos">${short(m.collectedMTD)}</b></div></div>
+          <p>${t('overdueAmt')} ${m.balance > 0 ? Math.round(m.overdue / m.balance * 100) : 0}% ${t('ofBalance')}</p>
+          <div class="meter"><i style="width:${m.balance > 0 ? Math.min(100, m.overdue / m.balance * 100) : 0}%"></i></div>
+          <div class="card-actions">${btn('collCompanies', t('companiesOf'), 'button-ghost', `data-i="${i}"`)}</div>
+        </article>`).join('')}</div>
+      <section class="panel section"><div class="section-head"><h2 class="section-title">${t('allCompanies')}</h2></div>
+        ${table('collFlat', cols, flat, { click: true, sortable: false })}</section>`;
+  }
+}
+
+function groupCustomers(rows) {
+  const m = {};
+  rows.forEach(r => {
+    const c = m[r.account] = m[r.account] || { account: r.account, name: r.name, collector: r.collector, phone: r.phone, count: 0, remaining: 0, maxDays: 0, lastFollowUp: r.lastFollowUp, promiseDate: r.promiseDate };
+    c.count++; c.remaining += r.remaining; c.maxDays = Math.max(c.maxDays, r.days);
+  });
+  return Object.values(m).sort((a, b) => b.remaining - a.remaining);
+}
+
+// ───────── Import ─────────
+const IMP = { rows: null };
+function readImportFile(file) {
+  if (typeof XLSX === 'undefined') { toast(t('xlsxMissing'), 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
+    // google.script.run cannot send Date objects → convert to strings.
+    IMP.rows = raw.map(r => {
+      const o = {};
+      Object.keys(r).forEach(k => {
+        const v = r[k];
+        o[k] = v instanceof Date ? ymd(v) + ' ' + z(v.getHours()) + ':' + z(v.getMinutes()) : v;
+      });
+      return o;
+    });
+    const heads = IMP.rows.length ? Object.keys(IMP.rows[0]) : [];
+    const sample = IMP.rows.slice(0, 5);
+    $('#impPreview').innerHTML = `<section class="panel section">
+      <div class="section-head"><h2 class="section-title">${t('previewTitle')}</h2><span class="badge blue">${t('rowsFound')}: ${IMP.rows.length}</span></div>
+      <div class="table-wrap"><table><thead><tr>${heads.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${sample.map(r => '<tr>' + heads.map(h => `<td>${esc(r[h])}</td>`).join('') + '</tr>').join('')}</tbody></table></div></section>`;
+    $('#impRun').disabled = !IMP.rows.length;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function runImport() {
+  const entity = $('#impEntity').value, mode = $('#impMode').value;
+  if (!IMP.rows || !IMP.rows.length) return;
+  if (mode === 'replace' && !confirm(t('replace') + ' — ' + t('confirmDelete'))) return;
+  const b = $('#impRun'); b.disabled = true;
+  const total = { inserted: 0, updated: 0, skipped: 0 };
+  const size = 2000;
+  try {
+    for (let i = 0; i < IMP.rows.length; i += size) {
+      b.textContent = `${t('importNow')} ${Math.min(i + size, IMP.rows.length)}/${IMP.rows.length}`;
+      const r = await call('importRows', entity, IMP.rows.slice(i, i + size), i === 0 ? mode : (mode === 'replace' ? 'append' : mode));
+      total.inserted += r.inserted; total.updated += r.updated; total.skipped += r.skipped;
+    }
+    toast(t('importedMsg', { i: total.inserted, u: total.updated, s: total.skipped }));
+    await refreshLookups();
+  } finally { b.disabled = false; b.textContent = t('importNow'); }
+}
+
+// ───────── Export ─────────
+function exportCsv() {
+  const d = S.exportData;
+  if (!d || !d.rows.length) { toast(t('noData'), 'error'); return; }
+  const q = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const csv = [d.cols.map(c => q(c.l)).join(',')].concat(d.rows.map(r => d.cols.map(c => q(r[c.k])).join(','))).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = d.name + '_' + today() + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ───────── Events ─────────
+const ACT = {
+  menu() { $('#sidebar').classList.toggle('open'); $('#scrim').classList.toggle('open'); },
+  theme() { const l = !document.documentElement.classList.contains('light'); document.documentElement.classList.toggle('light', l); store.set('crm_theme', l ? 'light' : 'dark'); },
+  lang() { store.set('crm_lang', S.lang === 'ar' ? 'en' : 'ar'); applyPrefs(); if (S.user) { renderShell(); go(S.view); } else renderLogin(); },
+  async logout() { try { await run('logout', S.token); } catch (e) {} signOutLocal(); },
+  closeDrawer,
+  export: exportCsv,
+  print() { window.print(); },
+  runReport,
+  page(el) { const v = el.closest('.pager').dataset.view; listState(v).page = +el.dataset.p; loadList(v); },
+  newCustomer() { openForm('Customers', { status: 'Active', currency: cur(), termsDays: 30, collector: S.user.isCollector ? S.user.username : '' }, true); },
+  newTx() { openForm('Transactions', { date: today(), type: 'Invoice', currency: cur(), exchange: 1 }, true); },
+  newGroup() { openForm('CustomerGroups', {}, true); },
+  newUser() { openForm('Users', { role: 'User', scope: 'all', active: true, pages: 'dashboard,customers' }, true); },
+  newFollow(el) { openForm('FollowUps', { account: el.dataset.acc || '', actionDate: today(), actionType: 'Call', status: 'Open' }, true); },
+  openCust(el) { openCustomer(el.dataset.acc); },
+  custEdit(el) {
+    call('listRecords', 'Customers', { filters: { account: el.dataset.acc }, pageSize: 5 }).then(r => r.rows[0] && openForm('Customers', r.rows[0], false));
+  },
+  stmtApply() { const tl = $('#stmtTools'); const v = readTools(tl); openCustomer(tl.dataset.acc, v.from, v.to, true); },
+  rowEdit(el) { const { view, row } = rowOf(el); openForm(LISTS[view].entity, row, false); },
+  async rowDelete(el) {
+    const { view, row } = rowOf(el);
+    if (!confirm(t('confirmDelete'))) return;
+    await call('deleteRecord', LISTS[view].entity, row[LISTS[view].id]);
+    toast(t('deleted'));
+    if (['customers', 'groups', 'users'].indexOf(view) > -1) await refreshLookups();
+    loadList(view);
+  },
+  async rowPost(el) { const { row } = rowOf(el); const n = await call('postTransactions', [row.rowId], false); toast(t('postedN', { n })); loadList('transactions'); },
+  async rowUnpost(el) { const { row } = rowOf(el); const n = await call('postTransactions', [row.rowId], true); toast(t('unpostedN', { n })); loadList('transactions'); },
+  async postSelected() {
+    const ids = $$('[data-sel]:checked').map(i => i.dataset.sel);
+    if (!ids.length) { toast(t('selectDraft'), 'error'); return; }
+    const n = await call('postTransactions', ids, false);
+    toast(t('postedN', { n })); loadList('transactions');
+  },
+  odTab(el) { S.rep.overdue.tab = el.dataset.tab; runReport(); },
+  collCompanies(el) {
+    const m = S.rows.collectors[+el.dataset.i];
+    const cols = [{ k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'account', l: t('f_account') }, { k: 'balance', l: t('balance'), num: true },
+      { k: 'remaining', l: t('overdueAmt'), num: true }, { k: 'count', l: t('invoices') }, { k: 'maxDays', l: t('maxDays'), f: daysPill }, { k: 'lastFollowUp', l: t('lastFollowUp') }];
+    openDrawer(`<div class="drawer-head"><h2>${esc(m.name || t('unassigned'))} — ${t('companies')}</h2><button class="icon-button" data-act="closeDrawer">×</button></div>
+      <div class="panel flush">${table('collDrawer', cols, m.companies, { click: true, sortable: false })}</div>`, true);
+  },
+  impTemplate() {
+    const entity = $('#impEntity').value;
+    call('getTemplateHeaders', entity).then(h => {
+      S.exportData = { name: entity + '_template', cols: h.map(x => ({ k: x, l: x })), rows: [{}] };
+      exportCsv();
+    });
+  },
+  impRun: runImport
+};
+
+function rowOf(el) {
+  const tbl = el.closest('table'), tr = el.closest('tr');
+  const view = tbl.dataset.view;
+  return { view, row: S.rows[view][+tr.dataset.i] };
+}
+
+// Rows that open the customer 360 drawer when clicked.
+const ROW_CUSTOMER_VIEWS = ['customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'collFlat', 'collDrawer'];
+
+document.addEventListener('click', e => {
+  const goEl = e.target.closest('[data-go]');
+  if (goEl) { go(goEl.dataset.go); return; }
+  const actEl = e.target.closest('[data-act]');
+  if (actEl && ACT[actEl.dataset.act]) { e.preventDefault(); ACT[actEl.dataset.act](actEl, e); return; }
+  const th = e.target.closest('th[data-sort]');
+  if (th) {
+    const view = th.closest('table').dataset.view, s = listState(view);
+    s.desc = s.sort === th.dataset.sort ? !s.desc : false; s.sort = th.dataset.sort; loadList(view); return;
+  }
+  if (e.target.closest('input,label,a,button,select')) return;
+  const tr = e.target.closest('tbody tr[data-i]');
+  if (tr) {
+    const view = tr.closest('table').dataset.view;
+    const row = (S.rows[view] || [])[+tr.dataset.i];
+    if (row && ROW_CUSTOMER_VIEWS.indexOf(view) > -1) openCustomer(row.account);
+  }
+  if (e.target.id === 'overlay') closeDrawer();
+});
+
+let searchTimer;
+document.addEventListener('input', e => {
+  const tools = e.target.closest('[data-list]');
+  if (tools && (e.target.type === 'search' || e.target.dataset.f === 'account')) {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => onListTools(tools.dataset.list, tools), 400);
+  }
+});
+document.addEventListener('change', e => {
+  const tools = e.target.closest('[data-list]');
+  if (tools && e.target.type !== 'search') { onListTools(tools.dataset.list, tools); return; }
+  if (e.target.matches('[data-pagesize]')) {
+    const v = e.target.closest('.pager').dataset.view, s = listState(v);
+    s.pageSize = +e.target.value; s.page = 1; loadList(v); return;
+  }
+  if (e.target.id === 'impFile' && e.target.files[0]) readImportFile(e.target.files[0]);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDrawer();
+  if (e.key === 'Enter' && e.target.id === 'gsearch') {
+    const s = listState('customers'); s.q = e.target.value.trim(); s.page = 1; go('customers');
+  }
+});
+document.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (e.target.id === 'loginForm') doLogin(e.target);
+  else if (e.target.id === 'recForm') submitForm(e.target);
+  else if (e.target.id === 'settingsForm') {
+    const fd = {}; ['AppName', 'CompanyName', 'LocalCurrency'].forEach(k => { fd[k] = e.target.elements[k].value.trim(); });
+    S.settings = await call('saveSettings', fd); toast(t('settingsSaved')); renderShell(); go('users');
+  }
+});
+
+// ───────── Boot ─────────
+(async function boot() {
+  applyPrefs();
+  const tok = store.get('crm_token');
+  if (tok) {
+    try { setLoading(1); onLogin(await run('resume', tok)); return; }
+    catch (e) { store.set('crm_token', null); }
+    finally { setLoading(-1); }
+  }
+  renderLogin();
+})();
+</script>

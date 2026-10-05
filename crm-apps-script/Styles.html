@@ -234,7 +234,7 @@
   /* Searchable dropdowns */
   .cb { position: relative; width: 100%; }
   .cb-native { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; opacity: 0; pointer-events: none; }
-  .cb .cb-input { width: 100%; min-height: 34px; border: 1px solid var(--border); border-radius: 6px; padding-block: 7px; padding-inline: 9px 26px; background: var(--page); color: var(--text); font-size: 11px; font-weight: 600; text-overflow: ellipsis; }
+  .cb .cb-input { width: 100%; min-height: 34px; border: 1px solid var(--border); border-radius: 6px; padding-block: 7px; padding-inline: 24px; background: var(--page); color: var(--text); font-size: 11px; font-weight: 600; text-overflow: ellipsis; }
   .cb .cb-input:focus { outline: 0; border-color: var(--accent); }
   .cb::after { content: "▾"; position: absolute; inset-inline-end: 9px; top: 50%; transform: translateY(-50%); color: var(--subtle); font-size: 11px; pointer-events: none; }
   .cb-list { position: absolute; top: calc(100% + 4px); inset-inline-start: 0; z-index: 30; min-width: 100%; width: max-content; max-width: min(460px, 92vw); max-height: 300px; overflow: auto; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); }
@@ -309,13 +309,38 @@
     table.cards td.actions-cell .row-actions { justify-content: start; }
     table.cards td:empty { display: none; }
   }
+  /* ── Printing: only the generated A4 document is printed ── */
+  #printArea { display: none; }
   @media print {
-    .sidebar, .topbar, .view-tools, .page-actions, .pager, .row-actions, .toast { display: none !important; }
-    .app { display: block; }
-    body, :root { background: #fff !important; color: #000 !important; }
-    .panel { border-color: #ccc; box-shadow: none; }
-    td, th { color: #000 !important; }
-    table { min-width: 0; }
+    body > *:not(#printArea) { display: none !important; }
+    #printArea { display: block !important; }
+    html, body, :root { background: #fff !important; color: #111 !important; }
+    body { margin: 0; min-width: 0; }
   }
+
+  /* On-screen A4 preview (statement page) */
+  .paper { max-width: 210mm; margin: 0 auto; padding: 12mm 11mm; background: #fff; color: #111; border-radius: 6px; box-shadow: var(--shadow); overflow-x: auto; }
+  @media (max-width: 680px) { .paper { padding: 14px 10px; } }
+
+  /* Modal (print orientation, email, WhatsApp) */
+  .modal { position: fixed; inset: 0; z-index: 35; display: grid; place-items: center; padding: 16px; background: #000a; }
+  .modal-card { width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 18px; box-shadow: var(--shadow); }
+  .modal-card .drawer-head { padding-bottom: 12px; }
+  .orient { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .orient-btn { display: grid; justify-items: center; gap: 10px; padding: 18px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--page); color: var(--text); font-size: 12px; font-weight: 650; }
+  .orient-btn:hover, .orient-btn.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .sheet { display: block; border: 2px solid currentColor; border-radius: 3px; opacity: .8; }
+  .sheet.p { width: 42px; height: 58px; } .sheet.l { width: 58px; height: 42px; margin: 8px 0; }
+  .wa-btn { width: 100%; min-height: 40px; margin-top: 4px; background: #16a34a; }
+
+  /* Collection form: invoice allocation table */
+  .form-panel > .field, .alloc-box { min-width: 0; }
+  .alloc-box { border: 1px solid var(--border); border-radius: 7px; padding: 10px; background: var(--page); }
+  table.alloc { width: 100%; min-width: 520px; }
+  table.alloc td, table.alloc th { padding: 7px 8px; }
+  table.alloc td:first-child { width: 28px; }
+  .alloc-amt { width: 130px !important; min-height: 30px; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; background: var(--surface); color: var(--text); font-size: 11px; }
+  .alloc-amt.over { border-color: var(--red); color: var(--red); }
+
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 </style>

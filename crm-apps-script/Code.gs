@@ -27,7 +27,10 @@ const SCHEMA = {
     ['createdById', 'created_by_user_id'], ['createdByName', 'created_by_name'],
     ['createdAt', 'created_at'], ['updatedByName', 'updated_by_name'], ['updatedAt', 'updated_at'],
     ['isDeleted', 'is_deleted'], ['postStatus', 'posting_status'], ['postedBy', 'posted_by'],
-    ['postedAt', 'posted_at'], ['rowId', 'row_id']
+    ['postedAt', 'posted_at'], ['rowId', 'row_id'],
+    // Collection receipts (added in v3): method, cheque / transfer details, collector.
+    ['payMethod', 'Payment method'], ['chequeNo', 'Cheque number'], ['chequeDate', 'Cheque date'],
+    ['bankName', 'Bank'], ['payRef', 'Payment reference'], ['collectedBy', 'Collected by']
   ],
   CustomerGroups: [['groupId', 'GroupId'], ['groupName', 'GroupName']],
   Users: [
@@ -43,26 +46,37 @@ const SCHEMA = {
     ['promiseDate', 'Promise Date'], ['promiseAmount', 'Promise Amount'], ['status', 'Status'],
     ['createdBy', 'Created By'], ['createdAt', 'Created At']
   ],
+  // Links a collection receipt (payment row) to the invoices it pays.
+  Allocations: [
+    ['id', 'AllocationId'], ['paymentRowId', 'Payment row_id'], ['paymentVoucher', 'Payment voucher'],
+    ['account', 'Customer account'], ['invoiceVoucher', 'Invoice voucher'], ['amount', 'Amount (local)'],
+    ['date', 'Date'], ['createdBy', 'Created By'], ['createdAt', 'Created At']
+  ],
   Currencies: [['code', 'Code'], ['name', 'Name'], ['rate', 'Rate to reporting currency'], ['active', 'Active'], ['updatedAt', 'Updated At']],
   Settings: [['key', 'Key'], ['value', 'Value']]
 };
 
-const ID_FIELD = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', Users: 'userId', FollowUps: 'id', Currencies: 'code' };
-const DATE_FIELDS = ['date', 'dueDate', 'createdAt', 'updatedAt', 'postedAt', 'lastLogin', 'actionDate', 'promiseDate'];
-const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'creditLimit', 'termsDays', 'promiseAmount', 'rate'];
+const ID_FIELD = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', Users: 'userId', FollowUps: 'id', Currencies: 'code', Allocations: 'id' };
+const DATE_FIELDS = ['date', 'dueDate', 'createdAt', 'updatedAt', 'postedAt', 'lastLogin', 'actionDate', 'promiseDate', 'chequeDate'];
+const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'creditLimit', 'termsDays', 'promiseAmount', 'rate', 'amount'];
 const BOOL_FIELDS = ['isDeleted', 'canAdd', 'canEdit', 'canDelete', 'canPost', 'isCollector', 'active'];
 
-const ALL_PAGES = ['dashboard', 'customers', 'transactions', 'groups', 'balances', 'paid',
+const ALL_PAGES = ['dashboard', 'customers', 'transactions', 'receipts', 'groups', 'statement', 'balances', 'paid',
   'overdue', 'credit', 'followup', 'collection', 'currencies', 'import', 'users'];
+const PAY_METHODS = ['Cash', 'Cheque', 'Transfer'];
 
 // Which entity each page edits (used for permission checks on writes).
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies' };
 
 // Per-execution read cache: every server call re-reads the sheet once at most.
 const MEMO = {};
-function invalidate_() { Object.keys(MEMO).forEach(function (k) { delete MEMO[k]; }); }
+function invalidate_() { Object.keys(MEMO).forEach(function (k) { if (k.indexOf('hdr_') !== 0) delete MEMO[k]; }); }
 
-const SESSION_HOURS = 8;
+/** Idle minutes before a session expires (Settings → SessionMinutes, max 360). */
+function sessionSeconds_() {
+  const m = +getSettings_().SessionMinutes || 60;
+  return Math.max(5, Math.min(m, 360)) * 60;
+}
 const TZ = Session.getScriptTimeZone();
 
 // ───────────────────────────── Web app ─────────────────────────────
@@ -113,7 +127,8 @@ function setup() {
     }]);
   }
   const settings = readTable('Settings');
-  const defaults = { AppName: 'CRM Console', LocalCurrency: 'SAR', ReportCurrency: 'SAR', ConversionBasis: 'local', CompanyName: 'My Company' };
+  const defaults = { AppName: 'CRM Console', LocalCurrency: 'SAR', ReportCurrency: 'SAR', ConversionBasis: 'local', CompanyName: 'My Company',
+    CompanyAddress: '', CompanyPhone: '', CompanyEmail: '', BankDetails: '', StatementNote: '', WhatsAppCountryCode: '', SessionMinutes: 60 };
   const toAdd = Object.keys(defaults).filter(function (k) {
     return !settings.some(function (s) { return s.key === k; });
   }).map(function (k) { return { key: k, value: defaults[k] }; });
@@ -133,6 +148,13 @@ function sheet_(name) {
     sh.setFrozenRows(1);
   }
   if (!sh) throw new Error('Sheet "' + name + '" not found. Run setup() first.');
+  if (SCHEMA[name] && !MEMO['hdr_' + name]) { // add columns introduced by newer versions
+    MEMO['hdr_' + name] = true;
+    const lastCol = Math.max(sh.getLastColumn(), 1);
+    const have = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) { return String(h).trim(); });
+    const missing = SCHEMA[name].map(function (f) { return f[1]; }).filter(function (h) { return have.indexOf(h) === -1; });
+    if (missing.length) sh.getRange(1, (have.join('') === '' ? 0 : lastCol) + 1, 1, missing.length).setValues([missing]);
+  }
   return sh;
 }
 
@@ -292,7 +314,7 @@ function login(username, password) {
   }
   user.isAdmin = user.role === 'Admin';
   const token = Utilities.getUuid();
-  CacheService.getScriptCache().put('sess_' + token, user.userId, SESSION_HOURS * 3600);
+  CacheService.getScriptCache().put('sess_' + token, user.userId, sessionSeconds_());
   updateRow_('Users', user._row, { lastLogin: new Date() });
   return { token: token, user: publicUser_(user), settings: getSettings_(), lookups: lookups_(user) };
 }
@@ -312,7 +334,7 @@ function auth_(token, page) {
   if (!userId) throw new Error('SESSION_EXPIRED');
   const user = readTable('Users').filter(function (u) { return u.userId === userId; })[0];
   if (!user || !user.active) throw new Error('SESSION_EXPIRED');
-  CacheService.getScriptCache().put('sess_' + token, userId, SESSION_HOURS * 3600); // sliding
+  CacheService.getScriptCache().put('sess_' + token, userId, sessionSeconds_()); // sliding idle timeout
   user.isAdmin = user.role === 'Admin';
   user.pageList = user.isAdmin ? ALL_PAGES.slice() : String(user.pages || '').split(',').map(function (p) { return p.trim(); }).filter(String);
   if (page && !user.isAdmin && user.pageList.indexOf(page) === -1) throw new Error('NO_PERMISSION');
@@ -350,6 +372,7 @@ function lookups_(user) {
       .map(function (u) { return { username: u.username, name: u.fullName || u.username }; }),
     customers: visibleCustomers_(user).map(function (c) { return { account: c.account, name: c.name }; }),
     currencies: readTable('Currencies').map(function (c) { return { code: String(c.code).toUpperCase(), name: c.name, rate: c.rate }; }),
+    payMethods: PAY_METHODS,
     transactionTypes: ['Invoice', 'Payment', 'Credit note', 'Debit note', 'Settlement', 'Opening balance', 'Adjustment']
   };
 }
@@ -365,7 +388,7 @@ function listRecords(token, entity, opts) {
   opts = opts || {};
   const page = ENTITY_PAGE[entity];
   if (!page) throw new Error('Unknown entity');
-  const user = auth_(token, page);
+  const user = auth_(token, opts.receipts ? 'receipts' : page);
   if (entity === 'Users' && !user.isAdmin) throw new Error('NO_PERMISSION');
   if (entity === 'Transactions') ensureRowIds_();
   let rows;
@@ -393,6 +416,14 @@ function listRecords(token, entity, opts) {
         }).forEach(function (r) { run = round2_(run + (+r.debitMST || 0) - (+r.creditMST || 0)); r.balance = run; });
       });
     }
+  }
+  if (entity === 'Transactions' && opts.receipts) {
+    const re = /pay|receipt|دفع|سداد|تحصيل|قبض/i;
+    rows = rows.filter(function (r) { return r.payMethod || (+r.creditMST > 0 && re.test(r.type)); });
+    const al = allocationsByPayment_();
+    rows.forEach(function (r) {
+      r.allocText = (al[r.rowId] || []).map(function (a) { return a.invoiceVoucher + ' (' + a.amount.toFixed(2) + ')'; }).join('، ');
+    });
   }
   if (opts.voucher) {
     const v = String(opts.voucher).trim().toLowerCase();
@@ -428,6 +459,13 @@ function listRecords(token, entity, opts) {
     totals.debit = sum_(rows, 'debitMST');
     totals.credit = sum_(rows, 'creditMST');
     totals.net = round2_(totals.debit - totals.credit);
+    if (opts.receipts) {
+      totals.byMethod = { Cash: 0, Cheque: 0, Transfer: 0, Other: 0 };
+      rows.forEach(function (r) {
+        const k = totals.byMethod[r.payMethod] !== undefined ? r.payMethod : 'Other';
+        totals.byMethod[k] = round2_(totals.byMethod[k] + (+r.creditMST || 0) - (+r.debitMST || 0));
+      });
+    }
     totals.localCurrency = getSettings_().LocalCurrency || '';
   }
   const size = Math.min(Math.max(+opts.pageSize || 25, 5), 500);
@@ -477,6 +515,7 @@ function saveRecord(token, entity, record, isNew) {
       } else {
         const existing = getById_(entity, rec.rowId);
         if (existing.postStatus === 'Posted') throw new Error('POSTED_LOCKED');
+        if ((allocationsByPayment_()[rec.rowId] || []).length) throw new Error('RECEIPT_LOCKED');
         ['createdById', 'createdByName', 'createdAt', 'userAdd', 'postStatus', 'postedBy', 'postedAt', 'isDeleted']
           .forEach(function (k) { delete rec[k]; });
       }
@@ -842,6 +881,168 @@ function saveCurrencySettings(token, vals) {
   });
 }
 
+// ───────────────────────────── Collections (receipts ↔ invoices) ─────────────────────────────
+/** paymentRowId → [{invoiceVoucher, amount}] */
+function allocationsByPayment_() {
+  if (MEMO.alloc) return MEMO.alloc;
+  const out = {};
+  readTable('Allocations').forEach(function (a) { (out[a.paymentRowId] = out[a.paymentRowId] || []).push(a); });
+  return (MEMO.alloc = out);
+}
+
+/** Open (unpaid) invoices of a customer in local currency, minus amounts held by draft receipts. */
+function openInvoices_(user, account) {
+  const L = ledger_(user, '9999-12-31', getSettings_().LocalCurrency);
+  const drafts = {};
+  readTable('Transactions').forEach(function (t) {
+    if (t.account === account && !t.isDeleted && t.postStatus === 'Draft') drafts[t.rowId] = true;
+  });
+  const pending = {};
+  readTable('Allocations').forEach(function (a) {
+    if (drafts[a.paymentRowId]) pending[a.invoiceVoucher] = round2_((pending[a.invoiceVoucher] || 0) + a.amount);
+  });
+  const today = today_();
+  const rows = [];
+  L.invoices.filter(function (i) { return i.account === account && i.remaining > 0.005; }).forEach(function (i) {
+    const hold = Math.min(pending[i.voucher] || 0, i.remaining);
+    if (hold) pending[i.voucher] = round2_(pending[i.voucher] - hold);
+    const left = round2_(i.remaining - hold);
+    if (left > 0.005) rows.push({ voucher: i.voucher, date: i.date, dueDate: i.dueDate, amount: i.amount, remaining: left,
+      pending: hold, days: Math.max(0, daysBetween_(i.dueDate, today)) });
+  });
+  return { invoices: rows, currency: L.fx.local, customer: L.cmap[account] };
+}
+
+function getOpenInvoices(token, account) {
+  const user = auth_(token, 'receipts');
+  assertCustomerVisible_(user, account);
+  return openInvoices_(user, account);
+}
+
+function nextReceiptNo_() {
+  const rows = readTable('Settings');
+  const r = rows.filter(function (x) { return x.key === 'ReceiptSeq'; })[0];
+  const n = (r ? +r.value || 0 : 0) + 1;
+  if (r) updateRow_('Settings', r._row, { value: n }); else appendRows('Settings', [{ key: 'ReceiptSeq', value: n }]);
+  return 'RC-' + ('00000' + n).slice(-6);
+}
+
+/**
+ * Records a collection: one payment transaction (credit) + links to the invoices it pays.
+ * r: {account, date, voucher?, payMethod, chequeNo, chequeDate, bankName, payRef, currency, exchange,
+ *     description, post, onAccount, allocations: [{voucher, amount}]}  — amounts in local currency.
+ */
+function saveReceipt(token, r) {
+  const user = auth_(token, 'receipts');
+  requireAction_(user, 'add');
+  assertCustomerVisible_(user, r.account);
+  if (PAY_METHODS.indexOf(r.payMethod) === -1) throw new Error('REQUIRED_FIELDS');
+  if (r.payMethod === 'Cheque' && !String(r.chequeNo || '').trim()) throw new Error('CHEQUE_REQUIRED');
+  if (!r.date) throw new Error('REQUIRED_FIELDS');
+  const allocs = (r.allocations || []).map(function (a) { return { voucher: String(a.voucher), amount: round2_(toNum_(a.amount)) }; })
+    .filter(function (a) { return a.voucher && a.amount > 0; });
+  const onAccount = round2_(Math.max(0, toNum_(r.onAccount)));
+  return withLock_(function () {
+    const open = openInvoices_(user, r.account);
+    if (!allocs.length && !(onAccount > 0 && !open.invoices.length)) throw new Error('INVOICE_REQUIRED');
+    const left = {};
+    open.invoices.forEach(function (i) { left[i.voucher] = round2_((left[i.voucher] || 0) + i.remaining); });
+    allocs.forEach(function (a) {
+      if (left[a.voucher] === undefined || a.amount > left[a.voucher] + 0.01) throw new Error('OVER_ALLOCATED: ' + a.voucher);
+      left[a.voucher] = round2_(left[a.voucher] - a.amount);
+    });
+    const total = round2_(allocs.reduce(function (s, a) { return s + a.amount; }, 0) + onAccount);
+    const voucher = String(r.voucher || '').trim() || nextReceiptNo_();
+    if (readTable('Transactions').some(function (t) { return !t.isDeleted && t.payMethod && String(t.voucher) === voucher; })) throw new Error('DUPLICATE_ID');
+    const now = new Date(), who = user.fullName || user.username;
+    const exchange = toNum_(r.exchange) || 1;
+    const post = !!r.post && (user.isAdmin || user.canPost);
+    const tx = {
+      voucher: voucher, type: 'Payment', account: r.account, date: r.date, description: r.description || ('Collection - ' + r.payMethod),
+      amountCur: round2_(total / exchange), currency: String(r.currency || open.currency || '').toUpperCase(), exchange: exchange,
+      creditMST: total, debitMST: 0, userAdd: user.username, createdById: user.userId, createdByName: who, createdAt: now,
+      updatedByName: who, updatedAt: now, isDeleted: false, postStatus: post ? 'Posted' : 'Draft',
+      postedBy: post ? who : '', postedAt: post ? now : '', rowId: Utilities.getUuid(),
+      payMethod: r.payMethod, chequeNo: r.chequeNo || '', chequeDate: r.chequeDate || '', bankName: r.bankName || '',
+      payRef: r.payRef || '', collectedBy: user.username
+    };
+    appendRows('Transactions', [tx]);
+    appendRows('Allocations', allocs.map(function (a) {
+      return { id: Utilities.getUuid(), paymentRowId: tx.rowId, paymentVoucher: voucher, account: r.account,
+        invoiceVoucher: a.voucher, amount: a.amount, date: r.date, createdBy: who, createdAt: now };
+    }));
+    return { rowId: tx.rowId, voucher: voucher, total: total, postStatus: tx.postStatus };
+  });
+}
+
+/** Everything needed to print a receipt voucher. */
+function getReceipt(token, rowId) {
+  const user = auth_(token, 'receipts');
+  const t = getById_('Transactions', rowId);
+  assertCustomerVisible_(user, t.account);
+  const c = visibleCustomers_(user).filter(function (x) { return x.account === t.account; })[0];
+  return { tx: t, customer: c, allocations: allocationsByPayment_()[rowId] || [], settings: publicSettings_() };
+}
+
+function publicSettings_() {
+  const s = getSettings_();
+  const out = {};
+  ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'BankDetails', 'StatementNote',
+    'WhatsAppCountryCode', 'LocalCurrency', 'ReportCurrency'].forEach(function (k) { out[k] = s[k] || ''; });
+  return out;
+}
+
+// ───────────────────────────── Statement sending ─────────────────────────────
+function pdfFromHtml_(html, name) {
+  return Utilities.newBlob(html, 'text/html', 'statement.html').getAs('application/pdf').setName(name.replace(/[\\/:*?"<>|]/g, '_') + '.pdf');
+}
+
+function logContact_(user, account, type, note) {
+  appendRows('FollowUps', [{ id: Utilities.getUuid(), account: account, actionDate: new Date(), actionType: type, note: note,
+    status: 'Done', createdBy: user.fullName || user.username, createdAt: new Date() }]);
+}
+
+/** Emails the statement (PDF attachment built from the page's printable HTML). */
+function sendStatementEmail(token, account, o) {
+  const user = auth_(token, 'statement');
+  assertCustomerVisible_(user, account);
+  const to = String(o.to || '').trim();
+  if (!to) throw new Error('EMAIL_REQUIRED');
+  const s = getSettings_();
+  const esc = function (v) { return String(v || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  const mail = {
+    to: to, subject: o.subject || 'Statement of account', name: s.CompanyName || s.AppName || 'CRM',
+    htmlBody: '<div dir="' + (o.rtl ? 'rtl' : 'ltr') + '" style="font-family:Tahoma,Arial,sans-serif;font-size:14px;line-height:1.7">' +
+      esc(o.message).replace(/\n/g, '<br>') + '</div>',
+    attachments: [pdfFromHtml_(o.html, o.fileName || ('Statement_' + account))]
+  };
+  if (o.cc) mail.cc = o.cc;
+  if (s.CompanyEmail) mail.replyTo = s.CompanyEmail;
+  MailApp.sendEmail(mail);
+  withLock_(function () { logContact_(user, account, 'Email', 'Statement sent to ' + to); });
+  return { quota: MailApp.getRemainingDailyQuota() };
+}
+
+/** Saves the statement PDF to Drive ("CRM Statements") and returns a view link for WhatsApp. */
+function statementPdfLink(token, account, o) {
+  const user = auth_(token, 'statement');
+  assertCustomerVisible_(user, account);
+  const it = DriveApp.getFoldersByName('CRM Statements');
+  const folder = it.hasNext() ? it.next() : DriveApp.createFolder('CRM Statements');
+  const file = folder.createFile(pdfFromHtml_(o.html, o.fileName || ('Statement_' + account)));
+  let shared = true;
+  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { shared = false; }
+  return { url: file.getUrl(), shared: shared };
+}
+
+/** Logs a WhatsApp (or other) contact in the follow-up log. */
+function logContact(token, account, type, note) {
+  const user = auth_(token, 'statement');
+  assertCustomerVisible_(user, account);
+  withLock_(function () { logContact_(user, account, type, note); });
+  return true;
+}
+
 // ───────────────────────────── Ledger engine ─────────────────────────────
 /**
  * Loads posted, non-deleted transactions for visible customers (amounts converted to
@@ -863,41 +1064,54 @@ function ledger_(user, asOf, display) {
   });
   const byCust = {};
   tx.forEach(function (t) { (byCust[t.account] = byCust[t.account] || []).push(t); });
+  const links = allocationsByPayment_();
   const invoices = [];
   Object.keys(byCust).forEach(function (acc) {
     const list = byCust[acc].sort(function (a, b) {
       return a.date < b.date ? -1 : a.date > b.date ? 1 : (b.dr - a.dr);
     });
-    const queue = [];
-    let unapplied = 0;
     const terms = +cmap[acc].termsDays || 0;
+    const invs = [], credits = [];
     list.forEach(function (t) {
       const net = round2_(t.dr - t.cr);
       if (net > 0) {
-        const inv = {
+        invs.push({
           account: acc, voucher: t.voucher, type: t.type, date: t.date, description: t.description,
-          dueDate: t.dueDate || addDays_(t.date, terms), amount: net, remaining: net, paidDate: '', lastPaymentDate: ''
-        };
-        if (unapplied > 0) {
-          const a = Math.min(unapplied, inv.remaining);
-          inv.remaining = round2_(inv.remaining - a); unapplied = round2_(unapplied - a);
-          inv.lastPaymentDate = t.date;
-          if (inv.remaining <= 0.005) { inv.remaining = 0; inv.paidDate = t.date; }
-        }
-        invoices.push(inv);
-        if (inv.remaining > 0.005) queue.push(inv);
-      } else if (net < 0) {
-        let credit = -net;
-        while (credit > 0.005 && queue.length) {
-          const inv = queue[0];
-          const a = Math.min(credit, inv.remaining);
-          inv.remaining = round2_(inv.remaining - a); credit = round2_(credit - a);
-          inv.lastPaymentDate = t.date;
-          if (inv.remaining <= 0.005) { inv.remaining = 0; inv.paidDate = t.date; queue.shift(); }
-        }
-        unapplied = round2_(unapplied + credit);
-      }
+          dueDate: t.dueDate || addDays_(t.date, terms), amount: net, remaining: net, paidDate: '', lastPaymentDate: '', payments: []
+        });
+      } else if (net < 0) credits.push({ t: t, total: -net, left: -net });
     });
+    const apply = function (inv, c, a, linked) {
+      a = round2_(a);
+      if (a <= 0) return 0;
+      inv.remaining = round2_(inv.remaining - a); c.left = round2_(c.left - a);
+      const d = c.t.date > inv.date ? c.t.date : inv.date;
+      if (d > inv.lastPaymentDate) inv.lastPaymentDate = d;
+      inv.payments.push({ voucher: c.t.voucher, date: c.t.date, amount: a, method: c.t.payMethod || '', linked: linked });
+      if (inv.remaining <= 0.005) { inv.remaining = 0; if (d > inv.paidDate) inv.paidDate = d; }
+      return a;
+    };
+    // 1) Receipts linked to specific invoices (collection form).
+    credits.forEach(function (c) {
+      const al = links[c.t.rowId];
+      if (!al) return;
+      const localCr = Math.abs((+c.t.creditMST || 0) - (+c.t.debitMST || 0)) || c.total;
+      al.forEach(function (a) {
+        let amt = Math.min(c.left, a.amount * c.total / localCr);
+        invs.forEach(function (inv) {
+          if (amt > 0.005 && inv.remaining > 0.005 && String(inv.voucher) === String(a.invoiceVoucher)) {
+            amt -= apply(inv, c, Math.min(amt, inv.remaining), true);
+          }
+        });
+      });
+    });
+    // 2) Everything else: oldest invoice first (FIFO).
+    credits.forEach(function (c) {
+      invs.forEach(function (inv) {
+        if (c.left > 0.005 && inv.remaining > 0.005) apply(inv, c, Math.min(c.left, inv.remaining), false);
+      });
+    });
+    Array.prototype.push.apply(invoices, invs);
   });
   const balance = {};
   tx.forEach(function (t) { balance[t.account] = (balance[t.account] || 0) + t.dr - t.cr; });
@@ -968,7 +1182,7 @@ function reportBalances(token, f) {
 /** Customer statement of account with running balance. */
 function customerStatement(token, account, dateFrom, dateTo, currency) {
   const user = auth_(token);
-  const pages = ['customers', 'balances', 'paid', 'overdue', 'followup', 'collection', 'dashboard', 'credit', 'transactions'];
+  const pages = ['customers', 'balances', 'paid', 'overdue', 'followup', 'collection', 'dashboard', 'credit', 'transactions', 'statement', 'receipts'];
   if (!pages.some(function (p) { return user.pageList.indexOf(p) > -1; })) throw new Error('NO_PERMISSION');
   assertCustomerVisible_(user, account);
   const from = dateFrom || '1900-01-01', to = dateTo || today_();
@@ -981,15 +1195,27 @@ function customerStatement(token, account, dateFrom, dateTo, currency) {
     .forEach(function (t) {
       if (t.date < from) { opening += t.dr - t.cr; return; }
       lines.push({ date: t.date, voucher: t.voucher, type: t.type, description: t.description, dueDate: t.dueDate,
-        currency: t.currency, amountCur: t.amountCur, debit: round2_(t.dr), credit: round2_(t.cr) });
+        currency: t.currency, amountCur: t.amountCur, debit: round2_(t.dr), credit: round2_(t.cr),
+        payMethod: t.payMethod || '', chequeNo: t.chequeNo || '', payRef: t.payRef || '' });
     });
   let run = opening;
   lines.forEach(function (l) { run = round2_(run + l.debit - l.credit); l.balance = run; });
-  const today = today_();
+  const today = to < today_() ? to : today_();
   const open = L.invoices.filter(function (i) { return i.account === account && i.remaining > 0; });
   const overdue = open.filter(function (i) { return i.dueDate < today; });
+  const aging = { current: 0, b1: 0, b2: 0, b3: 0, b4: 0 };
+  const openInvoices = open.map(function (i) {
+    const days = Math.max(0, daysBetween_(i.dueDate, today));
+    const k = i.dueDate < today ? bucket_(days) : 'current';
+    aging[k] = round2_(aging[k] + i.remaining);
+    return { voucher: i.voucher, date: i.date, dueDate: i.dueDate, amount: i.amount, paid: round2_(i.amount - i.remaining),
+      remaining: i.remaining, days: i.dueDate < today ? days : 0,
+      payments: i.payments.map(function (p) { return p.voucher; }).join('، ') };
+  });
   return Object.assign(fxInfo_(L.fx), {
-    customer: cust, opening: round2_(opening), closing: round2_(run), lines: lines,
+    customer: cust, from: dateFrom || '', to: to, opening: round2_(opening), closing: round2_(run), lines: lines,
+    periodDebit: sum_(lines, 'debit'), periodCredit: sum_(lines, 'credit'),
+    aging: aging, openInvoices: openInvoices, settings: publicSettings_(),
     openAmount: sum_(open, 'remaining'), overdueAmount: sum_(overdue, 'remaining'),
     maxDays: overdue.reduce(function (m, i) { return Math.max(m, daysBetween_(i.dueDate, today)); }, 0),
     followUps: readTable('FollowUps').filter(function (x) { return x.account === account; })
@@ -1010,7 +1236,10 @@ function reportPaidInvoices(token, f) {
     return {
       account: i.account, name: c.name, collector: c.collector, voucher: i.voucher, date: i.date,
       dueDate: i.dueDate, paidDate: i.paidDate, amount: i.amount,
-      lateDays: Math.max(0, daysBetween_(i.dueDate, i.paidDate))
+      lateDays: Math.max(0, daysBetween_(i.dueDate, i.paidDate)),
+      payVouchers: i.payments.map(function (p) { return p.voucher; }).join('، '),
+      methods: i.payments.map(function (p) { return p.method; }).filter(function (m, k, a) { return m && a.indexOf(m) === k; }).join('، '),
+      linked: i.payments.some(function (p) { return p.linked; })
     };
   }).sort(function (a, b) { return a.paidDate < b.paidDate ? 1 : -1; });
   const onTime = rows.filter(function (r) { return r.lateDays === 0; }).length;

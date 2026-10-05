@@ -52,11 +52,16 @@ const SCHEMA = {
     ['account', 'Customer account'], ['invoiceVoucher', 'Invoice voucher'], ['amount', 'Amount (local)'],
     ['date', 'Date'], ['createdBy', 'Created By'], ['createdAt', 'Created At']
   ],
+  // Messages between users + system notifications (to = usernames comma list, or ALL).
+  Messages: [
+    ['id', 'MessageId'], ['from', 'From'], ['to', 'To'], ['subject', 'Subject'], ['body', 'Body'], ['type', 'Type'],
+    ['account', 'Customer account'], ['replyTo', 'ReplyTo'], ['createdAt', 'Created At'], ['readBy', 'ReadBy'], ['deletedBy', 'DeletedBy']
+  ],
   Currencies: [['code', 'Code'], ['name', 'Name'], ['rate', 'Rate to reporting currency'], ['active', 'Active'], ['updatedAt', 'Updated At']],
   Settings: [['key', 'Key'], ['value', 'Value']]
 };
 
-const ID_FIELD = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', Users: 'userId', FollowUps: 'id', Currencies: 'code', Allocations: 'id' };
+const ID_FIELD = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', Users: 'userId', FollowUps: 'id', Currencies: 'code', Allocations: 'id', Messages: 'id' };
 const DATE_FIELDS = ['date', 'dueDate', 'createdAt', 'updatedAt', 'postedAt', 'lastLogin', 'actionDate', 'promiseDate', 'chequeDate'];
 const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'creditLimit', 'termsDays', 'promiseAmount', 'rate', 'amount'];
 const BOOL_FIELDS = ['isDeleted', 'canAdd', 'canEdit', 'canDelete', 'canPost', 'isCollector', 'active'];
@@ -329,12 +334,12 @@ function resume(token) {
   return { token: token, user: publicUser_(user), settings: getSettings_(), lookups: lookups_(user) };
 }
 
-function auth_(token, page) {
+function auth_(token, page, noSlide) {
   const userId = token && CacheService.getScriptCache().get('sess_' + token);
   if (!userId) throw new Error('SESSION_EXPIRED');
   const user = readTable('Users').filter(function (u) { return u.userId === userId; })[0];
   if (!user || !user.active) throw new Error('SESSION_EXPIRED');
-  CacheService.getScriptCache().put('sess_' + token, userId, sessionSeconds_()); // sliding idle timeout
+  if (!noSlide) CacheService.getScriptCache().put('sess_' + token, userId, sessionSeconds_()); // sliding idle timeout
   user.isAdmin = user.role === 'Admin';
   user.pageList = user.isAdmin ? ALL_PAGES.slice() : String(user.pages || '').split(',').map(function (p) { return p.trim(); }).filter(String);
   if (page && !user.isAdmin && user.pageList.indexOf(page) === -1) throw new Error('NO_PERMISSION');
@@ -372,6 +377,7 @@ function lookups_(user) {
       .map(function (u) { return { username: u.username, name: u.fullName || u.username }; }),
     customers: visibleCustomers_(user).map(function (c) { return { account: c.account, name: c.name }; }),
     currencies: readTable('Currencies').map(function (c) { return { code: String(c.code).toUpperCase(), name: c.name, rate: c.rate }; }),
+    users: users.filter(function (u) { return u.active; }).map(function (u) { return { username: u.username, name: u.fullName || u.username }; }),
     payMethods: PAY_METHODS,
     transactionTypes: ['Invoice', 'Payment', 'Credit note', 'Debit note', 'Settlement', 'Opening balance', 'Adjustment']
   };
@@ -422,7 +428,7 @@ function listRecords(token, entity, opts) {
     rows = rows.filter(function (r) { return r.payMethod || (+r.creditMST > 0 && re.test(r.type)); });
     const al = allocationsByPayment_();
     rows.forEach(function (r) {
-      r.allocText = (al[r.rowId] || []).map(function (a) { return a.invoiceVoucher + ' (' + a.amount.toFixed(2) + ')'; }).join('، ');
+      r.allocText = (al[r.rowId] || []).map(function (a) { return a.invoiceVoucher + ' (' + fmtInt_(a.amount) + ')'; }).join('، ');
     });
   }
   if (opts.voucher) {
@@ -478,6 +484,8 @@ function sum_(rows, key) {
   return round2_(rows.reduce(function (s, r) { return s + (+r[key] || 0); }, 0));
 }
 function round2_(n) { return Math.round(n * 100) / 100; }
+/** Whole number with thousands separators, for texts built on the server. */
+function fmtInt_(n) { return String(Math.round(+n || 0) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
 // ───────────────────────────── Save / delete / post ─────────────────────────────
 function saveRecord(token, entity, record, isNew) {
@@ -623,7 +631,8 @@ function deleteRecord(token, entity, id) {
 
 /** Post (ترحيل) or un-post draft transactions. Only posted rows affect balances & reports. */
 function postTransactions(token, ids, unpost) {
-  const user = auth_(token, 'transactions');
+  const user = auth_(token);
+  if (!user.isAdmin && user.pageList.indexOf('transactions') === -1 && user.pageList.indexOf('receipts') === -1) throw new Error('NO_PERMISSION');
   requireAction_(user, 'post');
   if (unpost && !user.isAdmin) throw new Error('NO_PERMISSION');
   return withLock_(function () {
@@ -640,14 +649,20 @@ function postTransactions(token, ids, unpost) {
     visibleCustomers_(user).forEach(function (c) { allowed[c.account] = true; });
     let n = 0;
     const now = new Date(), who = user.fullName || user.username;
+    const told = {};
     values.forEach(function (row) {
       if (!set[String(row[idx.rowId])] || !allowed[String(row[idx.account]).trim()]) return;
       row[idx.postStatus] = unpost ? 'Draft' : 'Posted';
       row[idx.postedBy] = unpost ? '' : who;
       row[idx.postedAt] = unpost ? '' : now;
+      const by = idx.collectedBy !== undefined ? String(row[idx.collectedBy] || '') : '';
+      if (!unpost && by && by !== user.username) (told[by] = told[by] || []).push(String(row[idx.voucher]));
       n++;
     });
     range.setValues(values);
+    Object.keys(told).forEach(function (u) {
+      notify_([u], 'RECEIPT_POSTED', told[u].join(', ') + ' — ' + who, '');
+    });
     return n;
   });
 }
@@ -971,6 +986,12 @@ function saveReceipt(token, r) {
       return { id: Utilities.getUuid(), paymentRowId: tx.rowId, paymentVoucher: voucher, account: r.account,
         invoiceVoucher: a.voucher, amount: a.amount, date: r.date, createdBy: who, createdAt: now };
     }));
+    if (!post) {
+      const posters = readTable('Users').filter(function (u) {
+        return u.active && u.username !== user.username && (u.role === 'Admin' || u.canPost);
+      }).map(function (u) { return u.username; });
+      notify_(posters, 'RECEIPT_PENDING', voucher + ' — ' + fmtInt_(total) + ' — ' + who, r.account);
+    }
     return { rowId: tx.rowId, voucher: voucher, total: total, postStatus: tx.postStatus };
   });
 }
@@ -1041,6 +1062,162 @@ function logContact(token, account, type, note) {
   assertCustomerVisible_(user, account);
   withLock_(function () { logContact_(user, account, type, note); });
   return true;
+}
+
+// ───────────────────────────── Messages & notifications ─────────────────────────────
+function listHas_(csv, v) { return String(csv || '').split(',').map(function (x) { return x.trim(); }).indexOf(v) > -1; }
+function msgToMe_(m, u) { return m.to === 'ALL' || listHas_(m.to, u); }
+function msgVisible_(m, u) { return !listHas_(m.deletedBy, u) && (m.from === u || msgToMe_(m, u)); }
+
+/** System notification (from "system"); subject is a code the client translates. */
+function notify_(users, subject, body, account) {
+  users = (users || []).filter(String);
+  if (!users.length) return;
+  appendRows('Messages', [{ id: Utilities.getUuid(), from: 'system', to: users.join(','), subject: subject, body: body || '',
+    type: 'notification', account: account || '', replyTo: '', createdAt: new Date(), readBy: '', deletedBy: '' }]);
+}
+
+/** Payment promises due (today or earlier) on customers this user follows — computed live. */
+function promiseAlerts_(user) {
+  const today = today_();
+  const mine = {};
+  visibleCustomers_(user).forEach(function (c) { if (user.isAdmin || c.collector === user.username || user.scope !== 'own') mine[c.account] = c.name; });
+  const own = {};
+  visibleCustomers_(user).forEach(function (c) { if (c.collector === user.username) own[c.account] = true; });
+  const hasOwn = Object.keys(own).length > 0;
+  return readTable('FollowUps').filter(function (f) {
+    return f.status === 'Open' && f.promiseDate && f.promiseDate <= today && mine[f.account] !== undefined && (!hasOwn || own[f.account]);
+  }).map(function (f) {
+    return { id: 'promise_' + f.id, from: 'system', subject: 'PROMISE_DUE', body: f.promiseDate + ' — ' + fmtInt_(f.promiseAmount) + (f.note ? ' — ' + f.note : ''),
+      account: f.account, customerName: mine[f.account], type: 'alert', createdAt: f.promiseDate, unread: true };
+  });
+}
+
+/** box: inbox | sent | alerts */
+function getMessages(token, box) {
+  const user = auth_(token);
+  const u = user.username;
+  const names = { system: 'system' };
+  readTable('Users').forEach(function (x) { names[x.username] = x.fullName || x.username; });
+  const cust = {};
+  readTable('Customers').forEach(function (c) { cust[c.account] = c.name; });
+  let rows = readTable('Messages').filter(function (m) { return msgVisible_(m, u); });
+  if (box === 'sent') rows = rows.filter(function (m) { return m.from === u; });
+  else if (box === 'alerts') rows = rows.filter(function (m) { return m.type === 'notification' && msgToMe_(m, u); });
+  else rows = rows.filter(function (m) { return m.type !== 'notification' && m.from !== u && msgToMe_(m, u); });
+  rows = rows.map(function (m) {
+    return { id: m.id, from: m.from, fromName: names[m.from] || m.from, to: m.to,
+      toName: m.to === 'ALL' ? 'ALL' : m.to.split(',').map(function (x) { return names[x.trim()] || x; }).join('، '),
+      subject: m.subject, body: m.body, type: m.type, account: m.account, customerName: cust[m.account] || '',
+      replyTo: m.replyTo, createdAt: m.createdAt, unread: m.from !== u && !listHas_(m.readBy, u) };
+  });
+  if (box === 'alerts') rows = promiseAlerts_(user).concat(rows);
+  rows.sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : -1; });
+  return rows.slice(0, 500);
+}
+
+/** Whole conversation for a message; marks it read for the current user. */
+function getThread(token, id) {
+  const user = auth_(token);
+  const u = user.username;
+  const all = readTable('Messages');
+  const msg = all.filter(function (m) { return m.id === id; })[0];
+  if (!msg || !msgVisible_(msg, u)) throw new Error('NOT_FOUND');
+  const root = msg.replyTo || msg.id;
+  const names = { system: 'system' };
+  readTable('Users').forEach(function (x) { names[x.username] = x.fullName || x.username; });
+  const thread = all.filter(function (m) { return (m.id === root || m.replyTo === root) && msgVisible_(m, u); })
+    .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : 1; })
+    .map(function (m) { return { id: m.id, from: m.from, fromName: names[m.from] || m.from, to: m.to, subject: m.subject, body: m.body,
+      type: m.type, account: m.account, createdAt: m.createdAt, mine: m.from === u }; });
+  markRead_(u, thread.map(function (m) { return m.id; }));
+  const c = readTable('Customers').filter(function (x) { return x.account === (thread[0] && thread[0].account); })[0];
+  return { root: root, thread: thread, customerName: c ? c.name : '' };
+}
+
+/** Patches many message rows with one read + one write. */
+function patchMessages_(fn) {
+  withLock_(function () {
+    const sh = sheet_('Messages');
+    const last = sh.getLastRow();
+    if (last < 2) return;
+    const hm = headerMap_(sh), idx = fieldIndex_('Messages', hm);
+    const range = sh.getRange(2, 1, last - 1, hm.headers.length);
+    const values = range.getValues();
+    let changed = false;
+    values.forEach(function (row) { if (fn(row, idx)) changed = true; });
+    if (changed) range.setValues(values);
+  });
+}
+
+function markRead_(u, ids) {
+  const set = {};
+  ids.forEach(function (i) { set[i] = true; });
+  patchMessages_(function (row, idx) {
+    if (!set[String(row[idx.id])] || listHas_(row[idx.readBy], u)) return false;
+    row[idx.readBy] = row[idx.readBy] ? row[idx.readBy] + ',' + u : u;
+    return true;
+  });
+}
+
+function markMessagesRead(token, ids) {
+  const user = auth_(token);
+  if (ids === 'ALL') ids = readTable('Messages').filter(function (m) { return msgToMe_(m, user.username); }).map(function (m) { return m.id; });
+  markRead_(user.username, ids);
+  return true;
+}
+
+function deleteMessage(token, id) {
+  const u = auth_(token).username;
+  patchMessages_(function (row, idx) {
+    if (String(row[idx.id]) !== id || listHas_(row[idx.deletedBy], u)) return false;
+    row[idx.deletedBy] = row[idx.deletedBy] ? row[idx.deletedBy] + ',' + u : u;
+    return true;
+  });
+  return true;
+}
+
+/** m: {to: [usernames] | ['ALL'], subject, body, account, replyTo} */
+function sendMessage(token, m) {
+  const user = auth_(token);
+  const u = user.username;
+  const body = String(m.body || '').trim().slice(0, 5000);
+  if (!body) throw new Error('REQUIRED_FIELDS');
+  let to = (m.to || []).map(String).filter(String);
+  let subject = String(m.subject || '').trim().slice(0, 200);
+  let account = m.account || '';
+  if (m.replyTo) { // reply goes to everyone in the conversation except me
+    const all = readTable('Messages');
+    const root = all.filter(function (x) { return x.id === m.replyTo; })[0];
+    if (!root || !msgVisible_(root, u)) throw new Error('NOT_FOUND');
+    const people = {};
+    all.filter(function (x) { return x.id === root.id || x.replyTo === root.id; }).forEach(function (x) {
+      people[x.from] = true;
+      if (x.to === 'ALL') people.ALL = true; else x.to.split(',').forEach(function (p) { people[p.trim()] = true; });
+    });
+    delete people[u]; delete people.system;
+    to = people.ALL ? ['ALL'] : Object.keys(people);
+    subject = subject || ('Re: ' + root.subject);
+    account = account || root.account;
+  }
+  if (!to.length) throw new Error('REQUIRED_FIELDS');
+  if (to.indexOf('ALL') > -1) to = ['ALL'];
+  const msg = { id: Utilities.getUuid(), from: u, to: to.join(','), subject: subject, body: body, type: 'message',
+    account: account, replyTo: m.replyTo || '', createdAt: new Date(), readBy: u, deletedBy: '' };
+  withLock_(function () { appendRows('Messages', [msg]); });
+  return { id: msg.id };
+}
+
+/** Lightweight poll for the unread badge; does not extend an idle session. */
+function getUnreadCount(token) {
+  const user = auth_(token, null, true);
+  const u = user.username;
+  let messages = 0, alerts = 0;
+  readTable('Messages').forEach(function (m) {
+    if (m.from === u || !msgToMe_(m, u) || listHas_(m.readBy, u) || listHas_(m.deletedBy, u)) return;
+    if (m.type === 'notification') alerts++; else messages++;
+  });
+  return { messages: messages, alerts: alerts + promiseAlerts_(user).length };
 }
 
 // ───────────────────────────── Ledger engine ─────────────────────────────
@@ -1118,6 +1295,9 @@ function ledger_(user, asOf, display) {
   return { customers: custs, cmap: cmap, tx: tx, invoices: invoices, balance: balance, fx: fx };
 }
 
+/** Transactions of type "Opening balance" always feed the opening balance column. */
+function isOpening_(t) { return /opening|افتتاح/i.test(String(t.type || '')); }
+
 /** Payments = credit lines whose type looks like a payment; falls back to all credits. */
 function paymentTest_(tx) {
   const re = /pay|receipt|دفع|سداد|تحصيل|قبض/i;
@@ -1161,7 +1341,7 @@ function reportBalances(token, f) {
   const agg = {};
   L.tx.forEach(function (t) {
     const a = agg[t.account] = agg[t.account] || { opening: 0, debit: 0, credit: 0 };
-    if (t.date < from) a.opening += t.dr - t.cr;
+    if (t.date < from || isOpening_(t)) a.opening += t.dr - t.cr;
     else { a.debit += t.dr; a.credit += t.cr; }
   });
   const rows = L.customers.filter(function (c) { return customerFilter_(c, f); }).map(function (c) {
@@ -1193,7 +1373,7 @@ function customerStatement(token, account, dateFrom, dateTo, currency) {
   L.tx.filter(function (t) { return t.account === account; })
     .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; })
     .forEach(function (t) {
-      if (t.date < from) { opening += t.dr - t.cr; return; }
+      if (t.date < from || isOpening_(t)) { opening += t.dr - t.cr; return; }
       lines.push({ date: t.date, voucher: t.voucher, type: t.type, description: t.description, dueDate: t.dueDate,
         currency: t.currency, amountCur: t.amountCur, debit: round2_(t.dr), credit: round2_(t.cr),
         payMethod: t.payMethod || '', chequeNo: t.chequeNo || '', payRef: t.payRef || '' });
@@ -1408,7 +1588,7 @@ function getDashboard(token, currency) {
   let collectedMTD = 0;
   L.tx.forEach(function (t) {
     const i = mIdx[t.date.slice(0, 7)];
-    if (i !== undefined) { months[i].debit += t.dr; if (isPay(t)) months[i].credit += t.cr; }
+    if (i !== undefined && !isOpening_(t)) { months[i].debit += t.dr; if (isPay(t)) months[i].credit += t.cr; }
     if (t.date >= monthStart && isPay(t)) collectedMTD += t.cr;
   });
   months.forEach(function (m) { m.debit = round2_(m.debit); m.credit = round2_(m.credit); });

@@ -89,6 +89,12 @@ const I18N = {
     customerInfo: 'بيانات العميل', amountHint: 'سالب = مدين / موجب = دائن — يحسب المدين/الدائن تلقائياً',
     passwordHint: 'اتركها فارغة للإبقاء على كلمة المرور الحالية', pagesN: '{n} صفحة', day: 'يوم',
     settingsSaved: 'تم حفظ الإعدادات',
+    p_messages: 'الرسائل والإشعارات', s_messages: 'تواصل بين مستخدمي التطبيق وتنبيهات النظام (سندات بانتظار الترحيل، وعود سداد مستحقة).',
+    inbox: 'الوارد', sentBox: 'المرسل', alerts: 'التنبيهات', compose: 'رسالة جديدة', msgTo: 'إلى', allUsers: 'كل المستخدمين',
+    msgSubject: 'الموضوع', msgBody: 'نص الرسالة', reply: 'رد', sendMsg: 'إرسال', msgSent: 'تم إرسال الرسالة', markAllRead: 'تحديد الكل كمقروء',
+    noMessages: 'لا توجد رسائل', newMsgToast: 'لديك {n} رسالة جديدة', system: 'النظام', relatedCustomer: 'العميل المرتبط',
+    RECEIPT_PENDING: 'سند تحصيل بانتظار الترحيل', RECEIPT_POSTED: 'تم ترحيل سند التحصيل', PROMISE_DUE: 'موعد وعد بالسداد مستحق',
+    msgColleague: 'رسالة لزميل', openCustomer: 'فتح العميل', pickRecipient: 'اختر مستلماً واحداً على الأقل', writeReply: 'اكتب ردك...',
     p_receipts: 'سندات التحصيل', s_receipts: 'تسجيل التحصيل (نقدي / شيك / تحويل بنكي) وربطه بالفواتير المسددة.',
     p_statement: 'كشف حساب العميل', s_statement: 'كشف حساب رسمي للمطالبة: طباعة A4، إرسال بالبريد أو واتساب.',
     Cash: 'نقدي', Cheque: 'شيك', Transfer: 'تحويل بنكي', OtherMethod: 'أخرى (Dynamics)',
@@ -201,6 +207,12 @@ const I18N = {
     customerInfo: 'Customer details', amountHint: 'Negative = debit / positive = credit — fills debit/credit automatically',
     passwordHint: 'Leave empty to keep the current password', pagesN: '{n} pages', day: 'days',
     settingsSaved: 'Settings saved',
+    p_messages: 'Messages & notifications', s_messages: 'Messages between app users and system alerts (receipts awaiting posting, payment promises due).',
+    inbox: 'Inbox', sentBox: 'Sent', alerts: 'Alerts', compose: 'New message', msgTo: 'To', allUsers: 'All users',
+    msgSubject: 'Subject', msgBody: 'Message', reply: 'Reply', sendMsg: 'Send', msgSent: 'Message sent', markAllRead: 'Mark all as read',
+    noMessages: 'No messages', newMsgToast: 'You have {n} new message(s)', system: 'System', relatedCustomer: 'Related customer',
+    RECEIPT_PENDING: 'Receipt awaiting posting', RECEIPT_POSTED: 'Your receipt was posted', PROMISE_DUE: 'Payment promise due',
+    msgColleague: 'Message a colleague', openCustomer: 'Open customer', pickRecipient: 'Choose at least one recipient', writeReply: 'Write a reply...',
     p_receipts: 'Collection receipts', s_receipts: 'Record collections (cash / cheque / bank transfer) linked to the invoices they pay.',
     p_statement: 'Customer statement', s_statement: 'Formal statement for collection: A4 print, email or WhatsApp.',
     Cash: 'Cash', Cheque: 'Cheque', Transfer: 'Bank transfer', OtherMethod: 'Other (Dynamics)',
@@ -231,6 +243,7 @@ const I18N = {
 
 const PAGES = [
   { id: 'dashboard', glyph: '▦', sec: 'workspace' },
+  { id: 'messages', glyph: '✉', sec: 'workspace' },
   { id: 'customers', glyph: '♙', sec: 'workspace' },
   { id: 'transactions', glyph: '⇄', sec: 'workspace' },
   { id: 'receipts', glyph: '⊕', sec: 'workspace' },
@@ -270,11 +283,13 @@ const t = (k, vars) => {
   return s;
 };
 // Thousands separators everywhere: 000,000,000.00
-const NF = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// All amounts are shown rounded to the nearest whole number (rates keep their decimals).
+const NF = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const NF1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
 const NF6 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 });
 const NI = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-const money = n => NF.format(+n || 0);
-const short = n => { n = +n || 0; const a = Math.abs(n); return a >= 1e9 ? NF.format(n / 1e9) + 'B' : a >= 1e6 ? NF.format(n / 1e6) + 'M' : NF.format(n); };
+const money = n => NF.format(Math.round(+n || 0) || 0);
+const short = n => { n = +n || 0; const a = Math.abs(n); return a >= 1e9 ? NF1.format(n / 1e9) + 'B' : a >= 1e6 ? NF1.format(n / 1e6) + 'M' : money(n); };
 const baseCur = () => (S.settings.ReportCurrency || S.settings.LocalCurrency || '').toUpperCase();
 const localCur = () => (S.settings.LocalCurrency || '').toUpperCase();
 const z = n => String(n).padStart(2, '0');
@@ -283,14 +298,14 @@ const today = () => ymd(new Date());
 const monthStart = () => today().slice(0, 8) + '01';
 const yearStart = () => today().slice(0, 5) + '01-01';
 const can = a => S.user && (S.user.isAdmin || S.user['can' + a[0].toUpperCase() + a.slice(1)]);
-const hasPage = p => S.user && S.user.pages.indexOf(p) > -1;
+const hasPage = p => S.user && (p === 'messages' || S.user.pages.indexOf(p) > -1);
 const groupName = id => { const g = S.lookups.groups.find(x => x.id === id); return g ? g.name : (id || ''); };
 const collectorName = u => { if (!u) return t('unassigned'); const c = S.lookups.collectors.find(x => x.username === u); return c ? c.name : u; };
 const custName = a => { const c = S.lookups.customers.find(x => x.account === a); return c ? c.name : ''; };
 const pill = (txt, cls) => `<span class="health ${cls}">${esc(txt)}</span>`;
 const statusPill = v => pill(t(v || 'Active'), { Active: 'healthy', Inactive: 'neutral', Blocked: 'risk', Draft: 'watch', Posted: 'healthy', Open: 'info', Done: 'healthy', Broken: 'risk' }[v] || 'neutral');
 const daysPill = d => pill(NI.format(d) + ' ' + t('day'), d > 90 ? 'risk' : d > 30 ? 'watch' : 'info');
-const numCell = n => `<span class="${+n < 0 ? 'neg' : ''}">${money(n)}</span>`;
+const numCell = n => `<span dir="ltr" class="${Math.round(+n || 0) < 0 ? 'neg' : ''}">${money(n)}</span>`;
 const curTag = c => c ? ` <small class="cur">${esc(c)}</small>` : '';
 const rateOf = code => {
   code = String(code || '').toUpperCase();
@@ -465,11 +480,13 @@ function onLogin(r) {
   S.lookups.currencies = S.lookups.currencies || [];
   sess.set('crm_token', r.token);
   renderShell();
+  startPolling();
   const last = store.get('crm_view');
   go(last && hasPage(last) ? last : S.user.pages[0]);
 }
 
 function signOutLocal() {
+  clearInterval(S.pollTimer);
   S.token = ''; S.user = null; sess.set('crm_token', null);
   closeDrawer(); renderLogin();
 }
@@ -499,6 +516,7 @@ function renderShell() {
         <span class="eyebrow">${t('eyebrow')}</span>
         <div class="top-actions">
           ${hasPage('customers') ? `<input class="search" id="gsearch" type="search" placeholder="${t('search')}" aria-label="${t('search')}">` : ''}
+          <button class="icon-button bell" data-go="messages" title="${t('p_messages')}" aria-label="${t('p_messages')}">🔔<span class="bell-badge" id="bellBadge" hidden></span></button>
           <button class="icon-button" data-act="lang" aria-label="Language">${S.lang === 'ar' ? 'EN' : 'ع'}</button>
           <button class="icon-button" data-act="theme" aria-label="Theme">☼</button>
         </div>
@@ -517,6 +535,7 @@ function setBadge(page, n) {
   S.badges[page] = n;
   const el = $(`[data-badge="${page}"]`);
   if (el) { el.textContent = n; el.hidden = !n; }
+  if (page === 'messages') { const b = $('#bellBadge'); if (b) { b.textContent = n > 99 ? '99+' : n; b.hidden = !n; } }
 }
 
 function go(view) {
@@ -839,7 +858,7 @@ function fieldHtml(f, rec, isNew) {
       `<label class="check"><input type="checkbox" name="${k}" ${rec[k] ? 'checked' : ''}>${t('f_' + k)}</label>`).join('')}</div></div>`;
     case 'pages': {
       const sel = String(v || '').split(',');
-      return `<div class="${cls}">${label}<div class="check-grid">${PAGES.map(p =>
+      return `<div class="${cls}">${label}<div class="check-grid">${PAGES.filter(p => p.id !== 'messages').map(p =>
         `<label class="check"><input type="checkbox" name="page" value="${p.id}" ${sel.indexOf(p.id) > -1 ? 'checked' : ''}>${t('p_' + p.id)}</label>`).join('')}</div></div>`;
     }
     default: return `<label class="${cls}">${label}<input name="${f.k}" type="${f.type || 'text'}" value="${esc(v)}" ${req} ${f.lock && !isNew ? 'readonly' : ''} ${f.type === 'password' ? 'autocomplete="new-password"' : ''}>${hint}</label>`;
@@ -946,6 +965,7 @@ async function openCustomer(account, from, to, keep, currency) {
         ${hasPage('receipts') && can('add') ? btn('newReceipt', '⊕ ' + t('collect'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
         ${hasPage('followup') && can('add') ? btn('newFollow', '☎ ' + t('logAction'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
         ${hasPage('statement') ? btn('goStatement', '§ ' + t('p_statement'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
+        ${btn('compose', '✉ ' + t('msgColleague'), 'button-ghost', `data-acc="${esc(c.account)}"`)}
         ${exportBtn()}${btn('stmtPrint', '🖨 ' + t('print'), 'button-ghost')}
       </div></div>
     <div class="panel flush">
@@ -1019,6 +1039,24 @@ const VIEWS = {
         <div class="section-head"><h2 class="section-title">${t('topCustomers')}</h2>${hasPage('balances') ? `<button class="section-action" data-go="balances">${t('viewAll')}</button>` : ''}</div>
         ${table('dashTop', topCols, d.top, { click: true })}
       </section>`);
+  },
+
+  async messages() {
+    const box = S.msgBox || 'inbox';
+    setContent(heading('messages', [btn('compose', '✉ ' + t('compose')), btn('markAll', '✓ ' + t('markAllRead'), 'button-ghost')]) +
+      `<div class="panel tabs">${['inbox', 'alerts', 'sentBox'].map(b => `<button class="tab ${b === box || (b === 'sentBox' && box === 'sent') ? 'active' : ''}" data-act="msgTab" data-tab="${b === 'sentBox' ? 'sent' : b}">${t(b)}</button>`).join('')}</div>
+      <section class="panel msg-list" id="msgList"><div class="skeleton">${t('loading')}</div></section>`);
+    const rows = await call('getMessages', box);
+    if (S.view !== 'messages') return;
+    S.msgRows = rows;
+    $('#msgList').innerHTML = rows.length ? rows.map((m, i) => `
+      <div class="msg-item ${m.unread ? 'unread' : ''} ${m.type}" data-mi="${i}">
+        <span class="msg-dot"></span>
+        <div class="msg-main">
+          <div class="msg-top"><b>${bdi(box === 'sent' ? t('msgTo') + ': ' + msgTo(m) : msgFrom(m))}</b><span class="msg-date">${esc(m.createdAt)}</span></div>
+          <div class="msg-subject">${m.type === 'alert' ? '⏰ ' : m.type === 'notification' ? '🔔 ' : ''}${esc(msgTitle(m))}${m.account ? ` <span class="badge">${esc(m.account)}${m.customerName ? ' — ' + esc(m.customerName) : ''}</span>` : ''}</div>
+          <div class="msg-snippet">${esc(String(m.body || '').slice(0, 160))}</div>
+        </div></div>`).join('') : `<div class="empty">${t('noMessages')}</div>`;
   },
 
   customers() {
@@ -1418,7 +1456,7 @@ async function exportXlsx() {
     if (!c.num && c.k !== 'pct') return;
     for (let r = 1; r < rows; r++) {
       const cell = ws[XLSX.utils.encode_cell({ r, c: ci })];
-      if (cell && cell.t === 'n') cell.z = c.k === 'pct' ? '0%' : c.k === 'rate' || c.k === 'exchange' || c.k === 'inverse' ? '#,##0.######' : '#,##0.00';
+      if (cell && cell.t === 'n') cell.z = c.k === 'pct' ? '0%' : c.k === 'rate' || c.k === 'exchange' || c.k === 'inverse' ? '#,##0.######' : '#,##0';
     }
   });
   ws['!cols'] = d.cols.map((c, ci) => ({ wch: Math.min(60, Math.max(10, ...aoa.slice(0, 500).map(row => String(row[ci] == null ? '' : row[ci]).length + 3))) }));
@@ -1449,8 +1487,8 @@ const DOC_CSS = `
 .doc .grid th{background:#eef2f7;border:1px solid #c7cfda;padding:4px 5px;font-size:8pt;text-align:start;font-weight:bold}
 .doc .grid td{border:1px solid #d5dbe3;padding:3px 5px;font-size:8pt;vertical-align:top}
 .doc .grid tr:nth-child(even) td{background:#fafbfc}
-.doc td.n,.doc th.n{text-align:right;white-space:nowrap;direction:ltr}
-.doc[dir=rtl] td.n,.doc[dir=rtl] th.n{text-align:left}
+.doc td.n,.doc th.n{text-align:left;white-space:nowrap;direction:ltr}
+.doc[dir=rtl] td.n,.doc[dir=rtl] th.n{text-align:right}
 .doc .grid tfoot td{font-weight:bold;background:#eef2f7}
 .doc .grid tr.sub td{font-weight:bold;background:#f3f6fa}
 .doc thead{display:table-header-group}
@@ -1788,6 +1826,80 @@ async function sendWhatsApp(form) {
   } finally { b.disabled = false; }
 }
 
+
+// ───────── Messages & notifications ─────────
+function startPolling() {
+  clearInterval(S.pollTimer);
+  S.lastUnread = null;
+  pollUnread();
+  S.pollTimer = setInterval(pollUnread, 60000);
+}
+async function pollUnread() {
+  if (!S.token) return;
+  try {
+    const r = await run('getUnreadCount', S.token);
+    setBadge('messages', r.messages + r.alerts);
+    if (S.lastUnread !== null && r.messages > S.lastUnread) {
+      toast(t('newMsgToast', { n: r.messages }));
+      if (S.view === 'messages' && !$('#overlay').classList.contains('open')) VIEWS.messages();
+    }
+    S.lastUnread = r.messages;
+  } catch (e) {
+    if (/SESSION_EXPIRED/.test(String(e && e.message || e))) { signOutLocal(); toast(t('err_SESSION_EXPIRED'), 'error'); }
+  }
+}
+const msgTitle = m => I18N.en[m.subject] ? t(m.subject) : (m.subject || '—');
+const msgFrom = m => m.from === 'system' ? t('system') : m.fromName;
+const msgTo = m => m.to === 'ALL' ? t('allUsers') : (m.toName || m.to);
+
+function composeForm(account) {
+  const others = (S.lookups.users || []).filter(u => u.username !== S.user.username);
+  openDrawer(`<div class="drawer-head"><h2>✉ ${t('compose')}</h2><button class="icon-button" data-act="closeDrawer">×</button></div>
+    <form class="form-panel" id="msgForm" style="padding:16px 0 0">
+      <div class="field">${t('msgTo')} <span class="req">*</span><div class="check-grid">
+        <label class="check"><input type="checkbox" name="to" value="ALL"><b>${t('allUsers')}</b></label>
+        ${others.map(u => `<label class="check"><input type="checkbox" name="to" value="${esc(u.username)}">${bdi(u.name)}</label>`).join('')}</div></div>
+      <label class="field">${t('relatedCustomer')}<select name="account"><option value=""></option>${opts(customerOpts(), account || '')}</select></label>
+      <label class="field">${t('msgSubject')}<input name="subject" maxlength="200"></label>
+      <label class="field">${t('msgBody')} <span class="req">*</span><textarea name="body" required maxlength="5000" style="min-height:160px"></textarea></label>
+      <div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button><button class="button-primary" type="submit">${t('sendMsg')}</button></div>
+    </form>`);
+}
+async function submitMessage(form) {
+  const to = $$('input[name=to]:checked', form).map(i => i.value);
+  if (!to.length) { toast(t('pickRecipient'), 'error'); return; }
+  const b = form.querySelector('button[type=submit]'); b.disabled = true;
+  try {
+    await call('sendMessage', { to: to, subject: form.elements.subject.value, body: form.elements.body.value, account: form.elements.account.value });
+    toast(t('msgSent')); closeDrawer();
+    if (S.view === 'messages') { S.msgBox = 'sent'; VIEWS.messages(); }
+  } catch (e) { b.disabled = false; }
+}
+async function openThread(id) {
+  openDrawer(`<div class="skeleton">${t('loading')}</div>`, true);
+  const r = await call('getThread', id);
+  const first = r.thread[0] || {};
+  openDrawer(`<div class="drawer-head"><div><h2>${esc(msgTitle(first))}</h2>
+      ${first.account ? `<p style="margin:4px 0 0">${t('relatedCustomer')}: <button class="section-action" data-act="openCust" data-acc="${esc(first.account)}">${esc(first.account)} — ${bdi(r.customerName)}</button></p>` : ''}</div>
+      <div style="display:flex;gap:8px"><button class="icon-button" data-act="msgDelete" data-id="${esc(id)}" title="${t('del')}">🗑</button>
+      <button class="icon-button" data-act="closeDrawer">×</button></div></div>
+    <div class="thread">${r.thread.map(m => `<div class="bubble ${m.mine ? 'mine' : ''} ${m.type === 'notification' ? 'sys' : ''}">
+      <div class="bubble-head"><b>${bdi(m.from === 'system' ? t('system') : m.fromName)}</b><span>${esc(m.createdAt)}</span></div>
+      <div class="bubble-body">${esc(m.body)}</div></div>`).join('')}</div>
+    ${first.type !== 'notification' ? `<form id="replyForm" class="form-panel" data-root="${esc(r.root)}" style="padding:14px 0 0">
+      <textarea name="body" required maxlength="5000" placeholder="${t('writeReply')}" style="min-height:90px;width:100%;border:1px solid var(--border);border-radius:6px;padding:9px;background:var(--page);color:var(--text)"></textarea>
+      <div class="form-actions"><button class="button-primary" type="submit">↩ ${t('reply')}</button></div></form>` : ''}`, true);
+  pollUnread();
+}
+async function submitReply(form) {
+  const b = form.querySelector('button[type=submit]'); b.disabled = true;
+  try {
+    await call('sendMessage', { replyTo: form.dataset.root, body: form.elements.body.value });
+    toast(t('msgSent'));
+    openThread(form.dataset.root);
+  } catch (e) { b.disabled = false; }
+}
+
 // ───────── Events ─────────
 const ACT = {
   menu() {
@@ -1808,6 +1920,10 @@ const ACT = {
   stmtEmail() { if (!S.lastStmt) { toast(t('chooseCustomer'), 'error'); return; } openEmailDialog(); },
   stmtWa() { if (!S.lastStmt) { toast(t('chooseCustomer'), 'error'); return; } openWaDialog(); },
   goStatement(el) { closeDrawer(); S.rep.statement = Object.assign(S.rep.statement || { dateFrom: yearStart(), dateTo: today(), currency: localCur() }, { account: el.dataset.acc }); go('statement'); },
+  compose(el) { composeForm((el && el.dataset.acc) || ''); },
+  msgTab(el) { S.msgBox = el.dataset.tab; VIEWS.messages(); },
+  async markAll() { await call('markMessagesRead', 'ALL'); pollUnread(); VIEWS.messages(); },
+  async msgDelete(el) { if (!confirm(t('confirmDelete'))) return; await call('deleteMessage', el.dataset.id); closeDrawer(); toast(t('deleted')); VIEWS.messages(); },
   newReceipt(el) { openCollect((el && el.dataset.acc) || ''); },
   rowReceipt(el) { printReceipt(rowOf(el).row.rowId); },
   runReport,
@@ -1878,6 +1994,12 @@ document.addEventListener('click', e => {
     const view = th.closest('table').dataset.view, s = listState(view);
     s.desc = s.sort === th.dataset.sort ? !s.desc : false; s.sort = th.dataset.sort; loadList(view); return;
   }
+  const mi = e.target.closest('.msg-item[data-mi]');
+  if (mi) {
+    const m = S.msgRows[+mi.dataset.mi];
+    if (m.type === 'alert') openCustomer(m.account); else { mi.classList.remove('unread'); openThread(m.id); }
+    return;
+  }
   if (e.target.closest('input,label,a,button,select,.cb')) return;
   const tr = e.target.closest('tbody tr[data-i]');
   if (tr) {
@@ -1945,6 +2067,8 @@ document.addEventListener('submit', async e => {
   if (e.target.id === 'loginForm') doLogin(e.target);
   else if (e.target.id === 'recForm') submitForm(e.target);
   else if (e.target.id === 'rcForm') submitReceipt(e.target);
+  else if (e.target.id === 'msgForm') submitMessage(e.target);
+  else if (e.target.id === 'replyForm') submitReply(e.target);
   else if (e.target.id === 'mailForm') sendEmail(e.target);
   else if (e.target.id === 'waForm') sendWhatsApp(e.target);
   else if (e.target.id === 'settingsForm') {

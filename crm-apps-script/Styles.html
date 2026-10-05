@@ -134,7 +134,8 @@
   th { padding: 11px 14px; background: color-mix(in srgb, var(--surface-raised) 70%, transparent); color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; text-align: start; white-space: nowrap; }
   th.sortable { cursor: pointer; } th.sortable:hover { color: var(--text); }
   td { padding: 12px 14px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10.5px; white-space: nowrap; }
-  td.num, th.num { text-align: end; font-variant-numeric: tabular-nums; }
+  /* Numbers sit on the reading side: right in Arabic, left in English */
+  td.num, th.num { text-align: start; font-variant-numeric: tabular-nums; white-space: nowrap; }
   td.clip { max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
   td small.cur, .stat-value small.cur, small.cur { color: var(--subtle); font-size: 9px; font-weight: 650; }
   bdi { unicode-bidi: isolate; }
@@ -335,6 +336,29 @@
 
   /* Collection form: invoice allocation table */
   .form-panel > .field, .alloc-box { min-width: 0; }
+  /* Messages */
+  .bell { position: relative; font-size: 13px; }
+  .bell-badge { position: absolute; top: -6px; inset-inline-end: -6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: #be123c; color: #fff; font-size: 9px; font-weight: 700; display: grid; place-items: center; }
+  .msg-list { overflow: hidden; }
+  .msg-item { display: flex; gap: 12px; padding: 13px 16px; border-top: 1px solid var(--border); cursor: pointer; }
+  .msg-item:first-child { border-top: 0; }
+  .msg-item:hover { background: var(--surface-raised); }
+  .msg-dot { flex: 0 0 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: transparent; }
+  .msg-item.unread .msg-dot { background: var(--accent); }
+  .msg-item.unread .msg-subject, .msg-item.unread .msg-top b { color: var(--text); font-weight: 800; }
+  .msg-main { min-width: 0; flex: 1; display: grid; gap: 3px; }
+  .msg-top { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: var(--muted); }
+  .msg-date { color: var(--subtle); font-size: 10px; white-space: nowrap; }
+  .msg-subject { font-size: 12px; color: var(--muted); font-weight: 650; }
+  .msg-snippet { font-size: 11px; color: var(--subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thread { display: grid; gap: 10px; padding-top: 16px; }
+  .bubble { max-width: 85%; justify-self: start; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-raised); }
+  .bubble.mine { justify-self: end; background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+  .bubble.sys { max-width: 100%; justify-self: stretch; border-style: dashed; }
+  .bubble-head { display: flex; justify-content: space-between; gap: 14px; font-size: 10px; color: var(--subtle); margin-bottom: 5px; }
+  .bubble-head b { color: var(--text); }
+  .bubble-body { font-size: 12px; color: var(--text); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+
   .alloc-box { border: 1px solid var(--border); border-radius: 7px; padding: 10px; background: var(--page); }
   table.alloc { width: 100%; min-width: 520px; }
   table.alloc td, table.alloc th { padding: 7px 8px; }

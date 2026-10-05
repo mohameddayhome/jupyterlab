@@ -73,6 +73,10 @@ const PAY_METHODS = ['Cash', 'Cheque', 'Transfer'];
 // Which entity each page edits (used for permission checks on writes).
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies' };
 
+/** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
+const APP_VERSION = '6';
+function getVersion() { return APP_VERSION; }
+
 // Per-execution read cache: every server call re-reads the sheet once at most.
 const MEMO = {};
 function invalidate_() { Object.keys(MEMO).forEach(function (k) { if (k.indexOf('hdr_') !== 0) delete MEMO[k]; }); }
@@ -1573,10 +1577,12 @@ function reportCreditLimit(token, f) {
  * Collector = user who recorded the receipt; for imported D365 payments = the customer's collector.
  */
 function reportCollections(token, f) {
-  const user = auth_(token, 'collections');
-  f = f || {};
+  return collections_(auth_(token, 'collections'), f || {});
+}
+
+function collections_(user, f, L) {
   const from = f.dateFrom || today_().slice(0, 8) + '01', to = f.dateTo || today_();
-  const L = ledger_(user, to, f.currency);
+  L = L || ledger_(user, to, f.currency);
   const isPay = paymentTest_(L.tx);
   const names = {};
   readTable('Users').forEach(function (u) { names[u.username] = u.fullName || u.username; });
@@ -1612,12 +1618,14 @@ function reportCollections(token, f) {
  * opening balance + period invoices = due; collected (payments); other credits; remaining = closing balance.
  */
 function reportPerformance(token, f) {
-  const user = auth_(token, 'performance');
-  f = f || {};
+  return performance_(auth_(token, 'performance'), f || {});
+}
+
+function performance_(user, f, L, od) {
   const from = f.dateFrom || today_().slice(0, 8) + '01', to = f.dateTo || today_();
-  const L = ledger_(user, to, f.currency);
+  L = L || ledger_(user, to, f.currency);
   const isPay = paymentTest_(L.tx);
-  const od = overdue_(user, { asOf: to }, L);
+  od = od || overdue_(user, { asOf: to }, L);
   const odMap = {};
   od.customers.forEach(function (c) { odMap[c.account] = c; });
   const names = {};
@@ -1717,7 +1725,12 @@ function getDashboard(token, currency) {
       collectedMTD: round2_(collectedMTD), drafts: drafts, avgDays: od.totals.avgDays,
       creditOver: byCurrency.reduce(function (s, x) { return s + x.creditOver; }, 0)
     },
-    months: months, buckets: od.buckets, top: top, byCurrency: byCurrency
+    months: months, buckets: od.buckets, top: top, byCurrency: byCurrency,
+    // Month-to-date collections by method / collector and collector performance.
+    collections: (function () { const c = collections_(user, { dateFrom: monthStart, dateTo: today }, L);
+      return { byMethod: c.byMethod, collectors: c.collectors, totals: c.totals }; })(),
+    performance: (function () { const pf = performance_(user, { dateFrom: monthStart, dateTo: today }, L, od);
+      return { rows: pf.rows.map(function (r) { const o = Object.assign({}, r); delete o.list; return o; }), totals: pf.totals }; })()
   });
 }
 

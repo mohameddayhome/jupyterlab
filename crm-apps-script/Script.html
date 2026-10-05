@@ -1,6 +1,9 @@
 <script>
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
+/** Must match APP_VERSION in Code.gs. */
+const CLIENT_VERSION = '6';
+
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
   ar: {
@@ -89,6 +92,8 @@ const I18N = {
     customerInfo: 'بيانات العميل', amountHint: 'سالب = مدين / موجب = دائن — يحسب المدين/الدائن تلقائياً',
     passwordHint: 'اتركها فارغة للإبقاء على كلمة المرور الحالية', pagesN: '{n} صفحة', day: 'يوم',
     settingsSaved: 'تم حفظ الإعدادات',
+    err_OUTDATED: 'ملف Code.gs في Apps Script غير محدّث: استبدله بالنسخة الجديدة كاملة، احفظ (Ctrl+S)، ثم Deploy ← Manage deployments ← تعديل ← New version.',
+    mtdByMethod: 'التحصيل هذا الشهر حسب الطريقة', mtdPerformance: 'أداء المحصلين هذا الشهر',
     p_collections: 'تقرير التحصيل', s_collections: 'المبالغ المحصّلة خلال الفترة حسب طريقة الدفع والمحصّل.',
     p_performance: 'أداء المحصلين', s_performance: 'لكل مسؤول تحصيل: عدد الشركات، المبالغ المستحقة، المحصّل، المتبقي ونسبة التحصيل خلال الفترة.',
     byCollector: 'حسب المحصّل', receiptDetails: 'تفاصيل السندات', receiptsCount: 'عدد السندات', totalCollected: 'إجمالي المحصّل',
@@ -214,6 +219,8 @@ const I18N = {
     customerInfo: 'Customer details', amountHint: 'Negative = debit / positive = credit — fills debit/credit automatically',
     passwordHint: 'Leave empty to keep the current password', pagesN: '{n} pages', day: 'days',
     settingsSaved: 'Settings saved',
+    err_OUTDATED: 'Code.gs in Apps Script is out of date: replace it with the new version, save (Ctrl+S), then Deploy → Manage deployments → Edit → New version.',
+    mtdByMethod: 'Collections this month by method', mtdPerformance: 'Collector performance this month',
     p_collections: 'Collections report', s_collections: 'Amounts collected in the period by payment method and collector.',
     p_performance: 'Collector performance', s_performance: 'Per collector: companies, amounts due, collected, remaining and collection rate for the period.',
     byCollector: 'By collector', receiptDetails: 'Receipt details', receiptsCount: 'Receipts', totalCollected: 'Total collected',
@@ -343,6 +350,7 @@ function run(fn, ...args) {
 }
 function errText(e) {
   const msg = String((e && e.message) || e);
+  if (/is not a function/.test(msg)) return t('err_OUTDATED');
   const code = (msg.match(/\b[A-Z][A-Z_]{4,}\b/) || [])[0];
   return code && I18N.en['err_' + code] ? t('err_' + code) : msg.replace(/^(Exception|Error):\s*/, '');
 }
@@ -477,6 +485,18 @@ function renderLogin(err) {
         </div>
       </form>
     </div>`;
+  showOutdated();
+}
+
+async function checkVersion() {
+  try { S.serverVersion = await run('getVersion'); } catch (e) { S.serverVersion = 'missing'; }
+  S.outdated = S.serverVersion !== CLIENT_VERSION;
+  showOutdated();
+}
+function showOutdated() {
+  if (!S.outdated) return;
+  const host = $('#content') || $('.login-card');
+  if (host && !$('.outdated', host)) host.insertAdjacentHTML('afterbegin', `<div class="panel notice outdated">⚠ ${t('err_OUTDATED')}</div>`);
 }
 
 async function doLogin(form) {
@@ -572,7 +592,7 @@ function heading(view, actions) {
 const btn = (act, label, cls, extra) => `<button class="${cls || 'button-primary'}" data-act="${act}" ${extra || ''}>${label}</button>`;
 const exportBtn = () => btn('export', '⬇ ' + t('exportXlsx'), 'button-ghost');
 const reportBtns = () => [exportBtn(), btn('print', '🖨 ' + t('print'), 'button-ghost')];
-const setContent = html => { $('#content').innerHTML = html; enhance($('#content')); };
+const setContent = html => { $('#content').innerHTML = html; enhance($('#content')); showOutdated(); };
 
 // ───────── Generic building blocks ─────────
 /** list items: [value, label] or [value, label, code, name] for "code — name" options */
@@ -1049,6 +1069,27 @@ const VIEWS = {
           <div class="section-head"><h2 class="section-title">${t('aging')}</h2>${hasPage('overdue') ? `<button class="section-action" data-go="overdue">${t('details')}</button>` : ''}</div>
           <div class="donut-wrap"><div class="donut" style="background:${donutBg}"><div class="donut-center"><div>${NI.format(d.kpi.overdueCustomers)}<small>${t('lateCustomers')}</small></div></div></div>
             <div class="legend">${['b1', 'b2', 'b3', 'b4'].map((b, i) => `<div class="legend-row"><i class="dot ${['', 'amber', 'orange', 'red'][i]}"></i>${t(b)} <b>${short(d.buckets[b])}</b></div>`).join('')}</div></div>
+        </article>
+      </section>
+      <section class="section dual">
+        <article class="panel">
+          <div class="section-head"><h2 class="section-title">${t('mtdByMethod')} (${esc(cc)})</h2>${hasPage('collections') ? `<button class="section-action" data-go="collections">${t('details')}</button>` : ''}</div>
+          <div class="method-bars">${[['Cash', 'green'], ['Cheque', 'amber'], ['Transfer', 'accent'], ['Other', 'subtle']].map(([k, col]) => {
+            const v = d.collections.byMethod[k] || 0, tot = d.collections.totals.total || 0, pc = tot ? Math.round(v / tot * 100) : 0;
+            return `<div class="mrow"><span>${t(k === 'Other' ? 'OtherMethod' : k)}</span><div class="meter"><i style="width:${pc}%;background:var(--${col})"></i></div><b dir="ltr">${money(v)}</b><small>${pc}%</small></div>`;
+          }).join('')}
+            <div class="mrow total"><span>${t('totalCollected')}</span><div></div><b dir="ltr">${money(d.collections.totals.total)}</b><small>${NI.format(d.collections.totals.count)}</small></div></div>
+          ${table('dashCol', [{ k: 'name', l: t('f_collectedBy'), f: (v, x) => bdi(v || t('unassigned')) }, { k: 'Cash', l: t('Cash'), num: true }, { k: 'Cheque', l: t('Cheque'), num: true },
+            { k: 'Transfer', l: t('Transfer'), num: true }, { k: 'total', l: t('totalCollected'), num: true }], d.collections.collectors, { sortable: false })}
+        </article>
+        <article class="panel">
+          <div class="section-head"><h2 class="section-title">${t('mtdPerformance')} (${esc(cc)})</h2>${hasPage('performance') ? `<button class="section-action" data-go="performance">${t('details')}</button>` : ''}</div>
+          ${table('dashPerf', [{ k: 'name', l: t('f_collector'), f: (v) => bdi(v || t('unassigned')) }, { k: 'companies', l: t('companiesN'), num: true, f: v => NI.format(v) },
+            { k: 'due', l: t('totalDue'), num: true }, { k: 'collected', l: t('collectedAmt'), num: true }, { k: 'remaining', l: t('remainingAmt'), num: true },
+            { k: 'rate', l: t('collectRate'), f: v => `<div class="rate"><span dir="ltr">${v}%</span><div class="meter"><i style="width:${Math.min(100, v)}%;background:var(--${v >= 80 ? 'green' : v >= 50 ? 'amber' : 'red'})"></i></div></div>` }],
+            d.performance.rows, { sortable: false, foot: footRow([{ k: 'name' }, { k: 'companies', num: true }, { k: 'due', num: true }, { k: 'collected', num: true }, { k: 'remaining', num: true }, { k: 'rate' }],
+              { companies: { html: NI.format(d.performance.totals.companies) }, due: d.performance.totals.due, collected: d.performance.totals.collected,
+                remaining: d.performance.totals.remaining, rate: { html: d.performance.totals.rate + '%' } }, t('all')) })}
         </article>
       </section>
       <section class="panel section">
@@ -2200,6 +2241,7 @@ document.addEventListener('submit', async e => {
   applyPrefs();
   const css = document.createElement('style'); css.textContent = DOC_CSS; document.head.appendChild(css);
   const page = document.createElement('style'); page.id = 'pageStyle'; document.head.appendChild(page);
+  checkVersion();
   store.set('crm_token', null); // drop tokens saved by older versions
   const tok = sess.get('crm_token');
   if (tok) {

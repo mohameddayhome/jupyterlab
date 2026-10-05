@@ -28,6 +28,8 @@
    - عند أول استخدام لإرسال البريد أو رابط Drive سيطلب Google موافقة إضافية (Gmail / Drive): وافق ثم انشر نسخة جديدة.
 
 > بعد أي تعديل على الكود: Deploy ← Manage deployments ← Edit ← Version: New version.
+>
+> **مهم:** استبدل `Code.gs` وملفات HTML معاً في كل تحديث. إذا اختلفت النسخ يظهر شريط أصفر «ملف Code.gs غير محدّث» بدلاً من أخطاء مثل `... is not a function`.
 
 ## الجداول (Sheets)
 

@@ -336,6 +336,15 @@
 
   /* Collection form: invoice allocation table */
   .form-panel > .field, .alloc-box { min-width: 0; }
+  .dual { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 16px; }
+  @media (max-width: 1400px) { .dual { grid-template-columns: minmax(0, 1fr); } }
+  .method-bars { display: grid; gap: 10px; padding: 16px; border-bottom: 1px solid var(--border); }
+  .mrow { display: grid; grid-template-columns: 110px minmax(0, 1fr) 110px 40px; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
+  .mrow .meter { margin-top: 0; height: 8px; }
+  .mrow b { color: var(--text); text-align: start; font-variant-numeric: tabular-nums; }
+  .mrow small { color: var(--subtle); }
+  .mrow.total { padding-top: 8px; border-top: 1px dashed var(--border); }
+  @media (max-width: 680px) { .mrow { grid-template-columns: 80px minmax(0, 1fr) 80px 32px; } }
   .rate { display: grid; gap: 4px; min-width: 90px; }
   .rate .meter { margin-top: 0; }
 

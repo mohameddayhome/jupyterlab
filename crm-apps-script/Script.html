@@ -89,6 +89,13 @@ const I18N = {
     customerInfo: 'بيانات العميل', amountHint: 'سالب = مدين / موجب = دائن — يحسب المدين/الدائن تلقائياً',
     passwordHint: 'اتركها فارغة للإبقاء على كلمة المرور الحالية', pagesN: '{n} صفحة', day: 'يوم',
     settingsSaved: 'تم حفظ الإعدادات',
+    p_collections: 'تقرير التحصيل', s_collections: 'المبالغ المحصّلة خلال الفترة حسب طريقة الدفع والمحصّل.',
+    p_performance: 'أداء المحصلين', s_performance: 'لكل مسؤول تحصيل: عدد الشركات، المبالغ المستحقة، المحصّل، المتبقي ونسبة التحصيل خلال الفترة.',
+    byCollector: 'حسب المحصّل', receiptDetails: 'تفاصيل السندات', receiptsCount: 'عدد السندات', totalCollected: 'إجمالي المحصّل',
+    invoicedPeriod: 'فواتير الفترة', totalDue: 'المبالغ المستحقة', collectedAmt: 'المحصّل', otherCredits: 'إشعارات / تسويات دائنة',
+    remainingAmt: 'المتبقي', collectRate: 'نسبة التحصيل', companiesN: 'عدد الشركات', activeCompanies: 'شركات بها حركة', openingPeriod: 'رصيد أول الفترة',
+    collectorRule: 'المحصّل = المستخدم الذي سجّل السند، وللدفعات المستوردة من Dynamics = مسؤول تحصيل العميل.',
+    dueRule: 'المستحق = رصيد أول الفترة + فواتير الفترة · المتبقي = المستحق − المحصّل − الإشعارات الدائنة · نسبة التحصيل = المحصّل ÷ المستحق',
     p_messages: 'الرسائل والإشعارات', s_messages: 'تواصل بين مستخدمي التطبيق وتنبيهات النظام (سندات بانتظار الترحيل، وعود سداد مستحقة).',
     inbox: 'الوارد', sentBox: 'المرسل', alerts: 'التنبيهات', compose: 'رسالة جديدة', msgTo: 'إلى', allUsers: 'كل المستخدمين',
     msgSubject: 'الموضوع', msgBody: 'نص الرسالة', reply: 'رد', sendMsg: 'إرسال', msgSent: 'تم إرسال الرسالة', markAllRead: 'تحديد الكل كمقروء',
@@ -207,6 +214,13 @@ const I18N = {
     customerInfo: 'Customer details', amountHint: 'Negative = debit / positive = credit — fills debit/credit automatically',
     passwordHint: 'Leave empty to keep the current password', pagesN: '{n} pages', day: 'days',
     settingsSaved: 'Settings saved',
+    p_collections: 'Collections report', s_collections: 'Amounts collected in the period by payment method and collector.',
+    p_performance: 'Collector performance', s_performance: 'Per collector: companies, amounts due, collected, remaining and collection rate for the period.',
+    byCollector: 'By collector', receiptDetails: 'Receipt details', receiptsCount: 'Receipts', totalCollected: 'Total collected',
+    invoicedPeriod: 'Period invoices', totalDue: 'Amounts due', collectedAmt: 'Collected', otherCredits: 'Credit notes / adjustments',
+    remainingAmt: 'Remaining', collectRate: 'Collection rate', companiesN: 'Companies', activeCompanies: 'Active companies', openingPeriod: 'Opening balance',
+    collectorRule: 'Collector = user who recorded the receipt; for payments imported from Dynamics = the customer\'s collector.',
+    dueRule: 'Due = opening balance + period invoices · Remaining = due − collected − credit notes · Rate = collected ÷ due',
     p_messages: 'Messages & notifications', s_messages: 'Messages between app users and system alerts (receipts awaiting posting, payment promises due).',
     inbox: 'Inbox', sentBox: 'Sent', alerts: 'Alerts', compose: 'New message', msgTo: 'To', allUsers: 'All users',
     msgSubject: 'Subject', msgBody: 'Message', reply: 'Reply', sendMsg: 'Send', msgSent: 'Message sent', markAllRead: 'Mark all as read',
@@ -255,6 +269,8 @@ const PAGES = [
   { id: 'credit', glyph: '⚑', sec: 'reports' },
   { id: 'followup', glyph: '☎', sec: 'reports' },
   { id: 'collection', glyph: '◉', sec: 'reports' },
+  { id: 'collections', glyph: '∑', sec: 'reports' },
+  { id: 'performance', glyph: '★', sec: 'reports' },
   { id: 'currencies', glyph: '¤', sec: 'admin' },
   { id: 'import', glyph: '⇪', sec: 'admin' },
   { id: 'users', glyph: '⚙', sec: 'admin' }
@@ -1210,6 +1226,30 @@ const VIEWS = {
     runReport();
   },
 
+  collections() {
+    const f = S.rep.collections = S.rep.collections || { dateFrom: monthStart(), dateTo: today(), tab: 'col' };
+    setContent(heading('collections', reportBtns()) + `
+      <div class="panel view-tools" id="repTools">
+        ${tool('dateFrom', t('from'), 'date', f.dateFrom)}${tool('dateTo', t('to'), 'date', f.dateTo)}
+        ${tool('collector', t('f_collectedBy'), 'select', f.collector, (S.lookups.users || []).map(u => [u.username, u.name]))}
+        ${tool('method', t('f_payMethod'), 'select', f.method, payOpts().concat([['Other', t('OtherMethod')]]))}
+        ${tool('group', t('f_group'), 'select', f.group, groupOpts())}${tool('account', t('f_account'), 'customer', f.account)}${curTool(f)}
+        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
+      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
+    runReport();
+  },
+
+  performance() {
+    const f = S.rep.performance = S.rep.performance || { dateFrom: monthStart(), dateTo: today() };
+    setContent(heading('performance', reportBtns()) + `
+      <div class="panel view-tools" id="repTools">
+        ${tool('dateFrom', t('from'), 'date', f.dateFrom)}${tool('dateTo', t('to'), 'date', f.dateTo)}
+        ${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}${tool('group', t('f_group'), 'select', f.group, groupOpts())}${curTool(f)}
+        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
+      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
+    runReport();
+  },
+
   import() {
     setContent(heading('import', []) + `
       <section class="panel form-panel">
@@ -1244,6 +1284,67 @@ async function runReport() {
         { k: 'payMethod', l: t('f_payMethod'), x: x => x.payMethod ? t(x.payMethod) : '' }, { k: 'dueDate', l: t('f_dueDate') },
         { k: 'debit', l: t('debit') + ' ' + cc, num: true }, { k: 'credit', l: t('credit') + ' ' + cc, num: true }, { k: 'balance', l: t('balance') + ' ' + cc, num: true }] };
     out().innerHTML = missingNotice(r) + `<div class="paper"><div class="doc" dir="${document.documentElement.dir}">${statementDoc(r)}</div></div>`;
+    return;
+  }
+  if (view === 'collections') {
+    const r = await call('reportCollections', f);
+    if (S.view !== view) return;
+    const cc = r.currency;
+    const userName = u => { if (!u) return t('unassigned'); const x = (S.lookups.users || []).find(y => y.username === u); return x ? x.name : u; };
+    const colCols = [{ k: 'collector', l: t('f_collectedBy'), f: v => bdi(userName(v)), x: x => userName(x.collector) },
+      { k: 'Cash', l: t('Cash'), num: true }, { k: 'Cheque', l: t('Cheque'), num: true }, { k: 'Transfer', l: t('Transfer'), num: true },
+      { k: 'Other', l: t('OtherMethod'), num: true }, { k: 'total', l: t('totalCollected') + ' ' + cc, num: true },
+      { k: 'count', l: t('receiptsCount'), num: true, f: v => NI.format(v) }, { k: 'customers', l: t('companiesN'), num: true, f: v => NI.format(v) }];
+    const detCols = [{ k: 'voucher', l: t('receiptNo') }, { k: 'date', l: t('f_date') }, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') },
+      { k: 'method', l: t('f_payMethod'), f: v => pill(methodName(v === 'Other' ? '' : v), v === 'Other' ? 'neutral' : 'info'), x: x => methodName(x.method === 'Other' ? '' : x.method) },
+      { k: 'amount', l: t('amount') + ' ' + cc, num: true }, { k: 'collector', l: t('f_collectedBy'), f: v => bdi(userName(v)), x: x => userName(x.collector) },
+      { k: 'chequeNo', l: t('f_chequeNo') }, { k: 'chequeDate', l: t('f_chequeDate') }, { k: 'bankName', l: t('f_bankName') }, { k: 'payRef', l: t('f_payRef') }];
+    const byCol = f.tab !== 'det';
+    const totals = Object.assign({ total: r.totals.total, count: r.totals.count }, r.byMethod);
+    const summary = [[t('Cash'), money(r.byMethod.Cash)], [t('Cheque'), money(r.byMethod.Cheque)], [t('Transfer'), money(r.byMethod.Transfer)],
+      [t('OtherMethod'), money(r.byMethod.Other)], [t('totalCollected'), money(r.totals.total) + ' ' + cc]];
+    S.exportData = byCol ? { name: 'collections_by_collector_' + r.from + '_' + r.to, cols: colCols, rows: r.collectors, totals, summary }
+      : { name: 'collections_details_' + r.from + '_' + r.to, cols: detCols, rows: r.rows, totals: { amount: r.totals.total }, summary };
+    const pct = k => r.totals.total ? Math.round(r.byMethod[k] / r.totals.total * 100) : 0;
+    out().innerHTML = missingNotice(r) + `<section class="stats four">
+        ${stat(t('Cash'), money(r.byMethod.Cash) + curTag(cc), '¤', 'green', `<span>${pct('Cash')}%</span>`)}
+        ${stat(t('Cheque'), money(r.byMethod.Cheque) + curTag(cc), '✎', 'amber', `<span>${pct('Cheque')}%</span>`)}
+        ${stat(t('Transfer'), money(r.byMethod.Transfer) + curTag(cc), '⇄', '', `<span>${pct('Transfer')}%</span>`)}
+        ${stat(t('totalCollected'), money(r.totals.total) + curTag(cc), '∑', 'green', `<span>${NI.format(r.totals.count)} ${t('receiptsCount')}</span>${r.byMethod.Other ? `<span>· ${t('OtherMethod')}: ${money(r.byMethod.Other)}</span>` : ''}`)}</section>
+      <p class="subtitle" style="margin:-6px 0 12px">${t('collectorRule')}</p>
+      <div class="panel tabs"><button class="tab ${byCol ? 'active' : ''}" data-act="repTab" data-tab="col">${t('byCollector')}</button><button class="tab ${byCol ? '' : 'active'}" data-act="repTab" data-tab="det">${t('receiptDetails')}</button></div>
+      <section class="panel">${byCol
+        ? table('collectionsCol', colCols, r.collectors, { sortable: false, foot: footRow(colCols, { Cash: r.byMethod.Cash, Cheque: r.byMethod.Cheque, Transfer: r.byMethod.Transfer, Other: r.byMethod.Other, total: r.totals.total, count: { html: NI.format(r.totals.count) } }, t('all')) })
+        : table('collectionsDet', detCols, r.rows, { click: true, sortable: false, foot: footRow(detCols, { amount: r.totals.total }, t('all') + ' (' + NI.format(r.rows.length) + ')') })}</section>`;
+    return;
+  }
+  if (view === 'performance') {
+    const r = await call('reportPerformance', f);
+    if (S.view !== view) return;
+    const cc = r.currency;
+    S.rows.perf = r.rows;
+    const rateCell = v => `<div class="rate"><span dir="ltr">${NI.format(v)}%</span><div class="meter"><i style="width:${Math.min(100, v)}%;background:var(--${v >= 80 ? 'green' : v >= 50 ? 'amber' : 'red'})"></i></div></div>`;
+    const cols = [{ k: 'collector', l: t('f_collector'), f: (v, x) => bdi(x.name || t('unassigned')), x: x => x.name || t('unassigned') },
+      { k: 'companies', l: t('companiesN'), num: true, f: v => NI.format(v) },
+      { k: 'opening', l: t('openingPeriod'), num: true }, { k: 'invoiced', l: t('invoicedPeriod'), num: true },
+      { k: 'due', l: t('totalDue'), num: true }, { k: 'collected', l: t('collectedAmt'), num: true, f: v => `<span dir="ltr" class="pos">${money(v)}</span>` },
+      { k: 'otherCredits', l: t('otherCredits'), num: true }, { k: 'remaining', l: t('remainingAmt'), num: true },
+      { k: 'rate', l: t('collectRate'), f: rateCell, x: x => x.rate / 100, p: x => x.rate + '%' },
+      { k: 'overdue', l: t('overdueAmt'), num: true }, { k: 'maxDays', l: t('maxDays'), f: v => v ? daysPill(v) : '' }];
+    S.exportData = { name: 'collector_performance_' + r.from + '_' + r.to, cols, rows: r.rows,
+      totals: { companies: r.totals.companies, opening: r.totals.opening, invoiced: r.totals.invoiced, due: r.totals.due, collected: r.totals.collected,
+        otherCredits: r.totals.otherCredits, remaining: r.totals.remaining, overdue: r.totals.overdue },
+      summary: [[t('companiesN'), NI.format(r.totals.companies)], [t('totalDue'), money(r.totals.due) + ' ' + cc], [t('collectedAmt'), money(r.totals.collected) + ' ' + cc],
+        [t('remainingAmt'), money(r.totals.remaining) + ' ' + cc], [t('collectRate'), r.totals.rate + '%']] };
+    out().innerHTML = missingNotice(r) + `<section class="stats four">
+        ${stat(t('totalDue'), money(r.totals.due) + curTag(cc), '$', '', `<span>${NI.format(r.totals.companies)} ${t('companiesN')}</span>`)}
+        ${stat(t('collectedAmt'), money(r.totals.collected) + curTag(cc), '✓', 'green', `<span class="trend">${r.totals.rate}%</span><span>${t('collectRate')}</span>`)}
+        ${stat(t('remainingAmt'), money(r.totals.remaining) + curTag(cc), '◔', 'amber')}
+        ${stat(t('overdueAmt'), money(r.totals.overdue) + curTag(cc), '!', 'red')}</section>
+      <p class="subtitle" style="margin:-6px 0 12px">${t('dueRule')}</p>
+      <section class="panel">${table('perf', cols, r.rows, { sortable: false, actions: () => `<button data-act="perfList" title="${t('companies')}">☰</button>`,
+        foot: footRow(cols, { companies: { html: NI.format(r.totals.companies) }, opening: r.totals.opening, invoiced: r.totals.invoiced, due: r.totals.due,
+          collected: r.totals.collected, otherCredits: r.totals.otherCredits, remaining: r.totals.remaining, rate: { html: rateCell(r.totals.rate) }, overdue: r.totals.overdue }, t('all'), false, true) })}</section>`;
     return;
   }
   if (view === 'balances') {
@@ -1957,6 +2058,18 @@ const ACT = {
     toast(t('postedN', { n })); loadList(S.view);
   },
   odTab(el) { S.rep.overdue.tab = el.dataset.tab; runReport(); },
+  repTab(el) { S.rep[S.view].tab = el.dataset.tab; runReport(); },
+  perfList(el) {
+    const m = rowOf(el).row, cc = (S.rep.performance && S.rep.performance.currency) || baseCur();
+    const cols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'opening', l: t('openingPeriod'), num: true },
+      { k: 'invoiced', l: t('invoicedPeriod'), num: true }, { k: 'due', l: t('totalDue'), num: true }, { k: 'collected', l: t('collectedAmt'), num: true },
+      { k: 'remaining', l: t('remainingAmt'), num: true }, { k: 'rate', l: t('collectRate'), f: v => NI.format(v) + '%', p: x => x.rate + '%', x: x => x.rate / 100 },
+      { k: 'overdue', l: t('overdueAmt'), num: true }, { k: 'maxDays', l: t('maxDays'), f: v => v ? daysPill(v) : '' }];
+    S.exportData = { name: 'performance_' + (m.collector || 'unassigned'), title: t('p_performance') + ' — ' + (m.name || t('unassigned')), cols, rows: m.list };
+    openDrawer(`<div class="drawer-head"><h2>${bdi(m.name || t('unassigned'))} — ${t('companies')} (${NI.format(m.companies)})</h2>
+      <div style="display:flex;gap:8px">${exportBtn()}${btn('print', '🖨', 'button-ghost')}<button class="icon-button" data-act="closeDrawer">×</button></div></div>
+      <div class="panel flush">${table('perfDrawer', cols, m.list, { click: true, sortable: false })}</div>`, true);
+  },
   collCompanies(el) {
     const m = S.rows.collectors[+el.dataset.i];
     const cols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'balance', l: t('balance'), num: true },
@@ -1982,7 +2095,7 @@ function rowOf(el) {
 }
 
 // Rows that open the customer 360 drawer when clicked.
-const ROW_CUSTOMER_VIEWS = ['receipts', 'customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'credit', 'collFlat', 'collDrawer'];
+const ROW_CUSTOMER_VIEWS = ['collectionsDet', 'perfDrawer', 'receipts', 'customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'credit', 'collFlat', 'collDrawer'];
 
 document.addEventListener('click', e => {
   const goEl = e.target.closest('[data-go]');

@@ -67,7 +67,7 @@ const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'credit
 const BOOL_FIELDS = ['isDeleted', 'canAdd', 'canEdit', 'canDelete', 'canPost', 'isCollector', 'active'];
 
 const ALL_PAGES = ['dashboard', 'customers', 'transactions', 'receipts', 'groups', 'statement', 'balances', 'paid',
-  'overdue', 'credit', 'followup', 'collection', 'currencies', 'import', 'users'];
+  'overdue', 'credit', 'followup', 'collection', 'collections', 'performance', 'currencies', 'import', 'users'];
 const PAY_METHODS = ['Cash', 'Cheque', 'Transfer'];
 
 // Which entity each page edits (used for permission checks on writes).
@@ -1566,6 +1566,97 @@ function reportCreditLimit(token, f) {
     rows: rows, byCurrency: Object.keys(byCcy).map(function (k) { return byCcy[k]; }),
     totals: { customers: rows.length, exceeded: rows.filter(function (r) { return r.excess > 0; }).length, excessBase: excessBase }
   });
+}
+
+/**
+ * Collections in a period by payment method and collector.
+ * Collector = user who recorded the receipt; for imported D365 payments = the customer's collector.
+ */
+function reportCollections(token, f) {
+  const user = auth_(token, 'collections');
+  f = f || {};
+  const from = f.dateFrom || today_().slice(0, 8) + '01', to = f.dateTo || today_();
+  const L = ledger_(user, to, f.currency);
+  const isPay = paymentTest_(L.tx);
+  const names = {};
+  readTable('Users').forEach(function (u) { names[u.username] = u.fullName || u.username; });
+  const rows = L.tx.filter(function (t) {
+    return t.date >= from && t.date <= to && isPay(t) && customerFilter_(L.cmap[t.account], { group: f.group, account: f.account });
+  }).map(function (t) {
+    const c = L.cmap[t.account];
+    return { voucher: t.voucher, date: t.date, account: t.account, name: c.name, group: c.group,
+      collector: t.collectedBy || c.collector || '', method: PAY_METHODS.indexOf(t.payMethod) > -1 ? t.payMethod : 'Other',
+      amount: round2_(t.cr), chequeNo: t.chequeNo || '', chequeDate: t.chequeDate || '', bankName: t.bankName || '', payRef: t.payRef || '' };
+  }).filter(function (r) {
+    return (!f.collector || r.collector === f.collector) && (!f.method || r.method === f.method);
+  }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+  const byCol = {}, byMethod = { Cash: 0, Cheque: 0, Transfer: 0, Other: 0 };
+  rows.forEach(function (r) {
+    const x = byCol[r.collector] = byCol[r.collector] || { collector: r.collector, name: r.collector ? (names[r.collector] || r.collector) : '',
+      Cash: 0, Cheque: 0, Transfer: 0, Other: 0, total: 0, count: 0, customers: {} };
+    x[r.method] = round2_(x[r.method] + r.amount);
+    x.total = round2_(x.total + r.amount);
+    x.count++;
+    x.customers[r.account] = true;
+    byMethod[r.method] = round2_(byMethod[r.method] + r.amount);
+  });
+  const collectors = Object.keys(byCol).map(function (k) {
+    const x = byCol[k]; x.customers = Object.keys(x.customers).length; return x;
+  }).sort(function (a, b) { return b.total - a.total; });
+  return Object.assign(fxInfo_(L.fx), { from: from, to: to, rows: rows, collectors: collectors, byMethod: byMethod,
+    totals: { total: sum_(rows, 'amount'), count: rows.length } });
+}
+
+/**
+ * Collector performance over a period (customers grouped by their assigned collector):
+ * opening balance + period invoices = due; collected (payments); other credits; remaining = closing balance.
+ */
+function reportPerformance(token, f) {
+  const user = auth_(token, 'performance');
+  f = f || {};
+  const from = f.dateFrom || today_().slice(0, 8) + '01', to = f.dateTo || today_();
+  const L = ledger_(user, to, f.currency);
+  const isPay = paymentTest_(L.tx);
+  const od = overdue_(user, { asOf: to }, L);
+  const odMap = {};
+  od.customers.forEach(function (c) { odMap[c.account] = c; });
+  const names = {};
+  readTable('Users').forEach(function (u) { names[u.username] = u.fullName || u.username; });
+  const agg = {};
+  L.tx.forEach(function (t) {
+    const a = agg[t.account] = agg[t.account] || { opening: 0, invoiced: 0, collected: 0, otherCredits: 0 };
+    if (t.date < from || isOpening_(t)) { a.opening += t.dr - t.cr; return; }
+    a.invoiced += t.dr;
+    if (isPay(t)) a.collected += t.cr; else a.otherCredits += t.cr;
+  });
+  const team = {};
+  L.customers.filter(function (c) { return customerFilter_(c, { group: f.group, collector: f.collector }); }).forEach(function (c) {
+    const k = c.collector || '';
+    const m = team[k] = team[k] || { collector: k, name: k ? (names[k] || k) : '', companies: 0, activeCompanies: 0, opening: 0, invoiced: 0,
+      due: 0, collected: 0, otherCredits: 0, remaining: 0, overdue: 0, overdueCustomers: 0, maxDays: 0, list: [] };
+    const a = agg[c.account] || { opening: 0, invoiced: 0, collected: 0, otherCredits: 0 };
+    const due = a.opening + a.invoiced, rem = due - a.collected - a.otherCredits;
+    const o = odMap[c.account];
+    m.companies++;
+    if (a.opening || a.invoiced || a.collected || a.otherCredits) m.activeCompanies++;
+    m.opening += a.opening; m.invoiced += a.invoiced; m.due += due; m.collected += a.collected;
+    m.otherCredits += a.otherCredits; m.remaining += rem;
+    if (o) { m.overdue += o.remaining; m.overdueCustomers++; m.maxDays = Math.max(m.maxDays, o.maxDays); }
+    if (due || a.collected || rem) m.list.push({ account: c.account, name: c.name, opening: round2_(a.opening), invoiced: round2_(a.invoiced),
+      due: round2_(due), collected: round2_(a.collected), otherCredits: round2_(a.otherCredits), remaining: round2_(rem),
+      overdue: o ? o.remaining : 0, maxDays: o ? o.maxDays : 0, rate: due > 0 ? Math.round(a.collected / due * 100) : 0 });
+  });
+  const rows = Object.keys(team).map(function (k) {
+    const m = team[k];
+    ['opening', 'invoiced', 'due', 'collected', 'otherCredits', 'remaining', 'overdue'].forEach(function (x) { m[x] = round2_(m[x]); });
+    m.rate = m.due > 0 ? Math.round(m.collected / m.due * 100) : 0;
+    m.list.sort(function (a, b) { return b.remaining - a.remaining; });
+    return m;
+  }).sort(function (a, b) { return b.collected - a.collected; });
+  const T = {};
+  ['companies', 'opening', 'invoiced', 'due', 'collected', 'otherCredits', 'remaining', 'overdue'].forEach(function (x) { T[x] = round2_(rows.reduce(function (s, r) { return s + r[x]; }, 0)); });
+  T.rate = T.due > 0 ? Math.round(T.collected / T.due * 100) : 0;
+  return Object.assign(fxInfo_(L.fx), { from: from, to: to, rows: rows, totals: T });
 }
 
 /** Main dashboard KPIs (display currency) + cards per customer currency. */

@@ -7,17 +7,20 @@ const I18N = {
     app: 'CRM Console', caption: 'إدارة العملاء والتحصيل', eyebrow: 'نظام إدارة العملاء',
     workspace: 'مساحة العمل', reports: 'التقارير والمتابعة', admin: 'الإدارة',
     p_dashboard: 'لوحة التحكم', p_customers: 'العملاء', p_transactions: 'حركات العملاء', p_groups: 'مجموعات العملاء',
-    p_balances: 'تقرير الأرصدة', p_paid: 'الفواتير المسددة', p_overdue: 'تقرير المتأخرات', p_followup: 'متابعة المتأخرات',
-    p_collection: 'لوحة فريق التحصيل', p_import: 'استيراد البيانات', p_users: 'المستخدمون والصلاحيات',
+    p_balances: 'تقرير الأرصدة', p_paid: 'الفواتير المسددة', p_overdue: 'تقرير المتأخرات', p_credit: 'تجاوز حد الائتمان',
+    p_followup: 'متابعة المتأخرات', p_collection: 'لوحة فريق التحصيل', p_currencies: 'العملات وأسعار الصرف',
+    p_import: 'استيراد البيانات', p_users: 'المستخدمون والصلاحيات',
     s_dashboard: 'ملخص الأرصدة والتحصيل والمتأخرات لحظياً.',
     s_customers: 'بيانات العملاء الأساسية وبيانات التواصل ومسؤول التحصيل.',
-    s_transactions: 'الفواتير والدفعات المستوردة من Dynamics 365 والحركات اليدوية مع الترحيل.',
+    s_transactions: 'الفواتير والدفعات المستوردة من Dynamics 365 والحركات اليدوية مع الترحيل والرصيد.',
     s_groups: 'تصنيف العملاء حسب المجموعات.',
     s_balances: 'الرصيد الافتتاحي وحركات الفترة والرصيد الختامي لكل عميل حسب الفلتر.',
     s_paid: 'الفواتير التي تم سدادها بالكامل خلال الفترة (تسوية الأقدم فالأحدث).',
     s_overdue: 'الفواتير المفتوحة التي تجاوزت تاريخ التحصيل المتوقع.',
+    s_credit: 'العملاء الذين تجاوز رصيدهم حد الائتمان (بعملة العميل).',
     s_followup: 'متابعة العملاء المتأخرين وتسجيل الاتصالات والوعود بالسداد.',
     s_collection: 'مسؤول التحصيل، الشركات التابعة له، المتأخرات وأيام التأخير.',
+    s_currencies: 'تكويد العملات، عملة التقارير، وسعر كل عملة مقابل عملة التقارير.',
     s_import: 'استيراد ملفات Excel / CSV المصدرة من Dynamics 365.',
     s_users: 'إضافة المستخدمين وتحديد الصفحات والعمليات المسموحة لكل مستخدم.',
     f_account: 'رقم العميل', f_name: 'اسم العميل', f_group: 'مجموعة العميل', f_currency: 'العملة',
@@ -33,21 +36,24 @@ const I18N = {
     f_canDelete: 'حذف', f_canPost: 'ترحيل', f_isCollector: 'مسؤول تحصيل', f_scope: 'نطاق البيانات',
     f_active: 'نشط', f_lastLogin: 'آخر دخول', f_actionDate: 'تاريخ الإجراء', f_actionType: 'نوع الإجراء',
     f_note: 'الملاحظة', f_promiseDate: 'تاريخ الوعد بالسداد', f_promiseAmount: 'مبلغ الوعد', f_createdBy: 'بواسطة',
+    f_code: 'رمز العملة', f_curName: 'اسم العملة', f_rate: 'السعر مقابل عملة التقارير',
     opening: 'الرصيد الافتتاحي', debit: 'مدين', credit: 'دائن', closing: 'الرصيد الختامي', balance: 'الرصيد',
     remaining: 'المتبقي', amount: 'المبلغ', paidDate: 'تاريخ السداد', lateDays: 'أيام التأخير', days: 'أيام التأخير',
     invoices: 'الفواتير', maxDays: 'أقصى تأخير', avgDays: 'متوسط التأخير', lastFollowUp: 'آخر متابعة',
     lastPayment: 'آخر دفعة', overdueAmt: 'المتأخرات', customersCount: 'عدد العملاء', collectedMTD: 'المحصل هذا الشهر',
     receivable: 'إجمالي الأرصدة', companies: 'الشركات', bucket: 'الفئة', openAmount: 'المبالغ المفتوحة',
+    net: 'صافي الحركة', runBalance: 'رصيد العميل',
     add: 'إضافة', edit: 'تعديل', del: 'حذف', save: 'حفظ', cancel: 'إلغاء', close: 'إغلاق', run: 'عرض التقرير',
-    exportCsv: 'تصدير CSV', print: 'طباعة', post: 'ترحيل', unpost: 'إلغاء الترحيل', postSelected: 'ترحيل المحدد',
-    login: 'تسجيل الدخول', logout: 'تسجيل الخروج', search: 'بحث بالاسم، الرقم، البريد...', all: 'الكل',
+    exportXlsx: 'تصدير Excel', print: 'طباعة', post: 'ترحيل', unpost: 'إلغاء الترحيل', postSelected: 'ترحيل المحدد',
+    login: 'تسجيل الدخول', logout: 'تسجيل الخروج', search: 'بحث بالاسم، الرقم، البريد...', searchLbl: 'بحث عام', all: 'الكل',
     from: 'من تاريخ', to: 'إلى تاريخ', asOf: 'حتى تاريخ', minDays: 'أقل أيام تأخير', hideZero: 'إخفاء الأرصدة الصفرية',
     statement: 'كشف حساب', logAction: 'تسجيل متابعة', call: 'اتصال', mail: 'بريد', apply: 'تطبيق',
+    voucherSearch: 'رقم السند', displayCurrency: 'عملة العرض', typeToSearch: 'اكتب للبحث...', noResults: 'لا توجد نتائج',
     confirmDelete: 'هل أنت متأكد من الحذف؟', saved: 'تم الحفظ بنجاح', deleted: 'تم الحذف', postedN: 'تم ترحيل {n} حركة',
     unpostedN: 'تم إلغاء ترحيل {n} حركة', noData: 'لا توجد بيانات', page: 'صفحة', of: 'من', rowsWord: 'سجل',
     prev: 'السابق', next: 'التالي', loading: 'جارٍ التحميل...', unassigned: 'بدون مسؤول', perPage: 'لكل صفحة',
-    addCustomer: 'عميل جديد', addTransaction: 'حركة جديدة', addGroup: 'مجموعة جديدة', addUser: 'مستخدم جديد',
-    newFollowUp: 'متابعة جديدة', selectDraft: 'حدد حركات المسودة ثم اضغط ترحيل', nothingSelected: 'لم يتم تحديد أي حركة',
+    addCustomer: 'عميل جديد', addTransaction: 'حركة جديدة', addGroup: 'مجموعة جديدة', addUser: 'مستخدم جديد', addCurrency: 'عملة جديدة',
+    newFollowUp: 'متابعة جديدة', selectDraft: 'حدد حركات المسودة ثم اضغط ترحيل', toggleSidebar: 'إظهار / إخفاء القائمة',
     Active: 'نشط', Inactive: 'غير نشط', Blocked: 'موقوف', Draft: 'مسودة', Posted: 'مرحّل', Open: 'مفتوح', Done: 'تم', Broken: 'وعد غير منفذ',
     b1: '1 - 30 يوم', b2: '31 - 60 يوم', b3: '61 - 90 يوم', b4: 'أكثر من 90 يوم',
     Call: 'اتصال هاتفي', Email: 'بريد إلكتروني', Visit: 'زيارة', WhatsApp: 'واتساب', Promise: 'وعد بالسداد', Other: 'أخرى',
@@ -57,41 +63,51 @@ const I18N = {
     err_DUPLICATE_ID: 'هذا الرقم/الاسم مستخدم من قبل', err_POSTED_LOCKED: 'لا يمكن تعديل أو حذف حركة مرحّلة',
     err_HAS_TRANSACTIONS: 'لا يمكن حذف عميل لديه حركات', err_IN_USE: 'لا يمكن الحذف لأنه مستخدم',
     err_NOT_FOUND: 'السجل غير موجود', err_PASSWORD_REQUIRED: 'كلمة المرور مطلوبة للمستخدم الجديد',
-    err_CANNOT_DELETE_SELF: 'لا يمكنك حذف حسابك الحالي',
+    err_CANNOT_DELETE_SELF: 'لا يمكنك حذف حسابك الحالي', err_RATE_REQUIRED: 'أدخل سعر صرف أكبر من صفر لهذه العملة أولاً',
     imp_entity: 'الجدول', imp_mode: 'طريقة الاستيراد', append: 'إضافة للموجود', upsert: 'تحديث الموجود وإضافة الجديد',
     replace: 'حذف الموجود واستبداله', chooseFile: 'ملف Excel أو CSV', importNow: 'بدء الاستيراد', template: 'تنزيل قالب الأعمدة',
     importedMsg: 'تم: إضافة {i} — تحديث {u} — تخطي {s}', rowsFound: 'عدد الصفوف في الملف', previewTitle: 'معاينة أول 5 صفوف',
     imp_help: 'صدّر الجدول من Dynamics 365 إلى Excel ثم ارفعه هنا. تتم مطابقة الأعمدة تلقائياً بالاسم (Customer account، Voucher، Debit in local currency ...). الحركات المستوردة تعتبر مرحّلة.',
-    xlsxMissing: 'تعذر تحميل مكتبة قراءة Excel، تأكد من الاتصال بالإنترنت.',
-    settings: 'إعدادات النظام', AppName: 'اسم التطبيق', CompanyName: 'اسم الشركة', LocalCurrency: 'العملة المحلية',
+    xlsxMissing: 'تعذر تحميل مكتبة Excel، تأكد من الاتصال بالإنترنت.',
+    settings: 'إعدادات النظام', AppName: 'اسم التطبيق', CompanyName: 'اسم الشركة', LocalCurrency: 'العملة المحلية (عملة القيود في Dynamics)',
+    ReportCurrency: 'عملة التقارير', ConversionBasis: 'أساس التحويل', basis_local: 'من المبالغ بالعملة المحلية (موصى به)',
+    basis_transaction: 'من المبلغ بعملة الحركة × سعر عملتها', curSettings: 'إعدادات العملات',
+    curHelp: 'السعر = قيمة 1 من العملة بعملة التقارير. مثال: إذا كانت عملة التقارير USD فسعر DJF = 0.0056. عند تغيير عملة التقارير يُعاد حساب كل الأسعار تلقائياً.',
+    missingRates: 'عملات بدون سعر صرف (تُحسب حالياً بسعر 1)', addRate: 'إضافة سعر', rateOf: '1 {c} = ? {b}',
     k_customers: 'إجمالي العملاء', k_receivable: 'إجمالي الأرصدة المستحقة', k_overdue: 'إجمالي المتأخرات',
     k_collected: 'المحصل هذا الشهر', activeWord: 'نشط', lateCustomers: 'عميل متأخر', drafts: 'حركة غير مرحّلة',
     avgLate: 'متوسط التأخير {n} يوم', monthly: 'الفواتير والتحصيل - آخر 6 أشهر', aging: 'أعمار المتأخرات',
     topCustomers: 'أعلى العملاء رصيداً', invoicesL: 'فواتير', paymentsL: 'تحصيل', viewAll: 'عرض الكل ←', details: 'التفاصيل ←',
+    byCurrency: 'الأرصدة حسب عملة العميل', creditOverN: 'تجاوزوا حد الائتمان',
     team: 'أداء فريق التحصيل', overdueCustomers: 'عملاء متأخرون', overdueInvoices: 'فواتير متأخرة',
     companiesOf: 'شركات المسؤول', allCompanies: 'المتأخرات حسب المسؤول والشركة', ofBalance: 'من الرصيد',
     promisesDue: 'وعود سداد مستحقة اليوم', followLog: 'سجل المتابعات', noOverdue: 'لا توجد متأخرات',
     onTime: 'سددت في الموعد', late: 'سددت متأخرة', paidCount: 'عدد الفواتير المسددة', totalPaid: 'إجمالي المسدد',
+    threshold: 'نسبة الاستخدام ≥ %', includeNoLimit: 'إظهار العملاء بدون حد', excess: 'التجاوز', available: 'المتاح',
+    usedPct: 'نسبة الاستخدام', exceededN: 'عملاء متجاوزون', listed: 'عملاء في التقرير', excessTotal: 'إجمالي التجاوز',
     welcome: 'مرحباً بك', loginHint: 'أدخل بيانات حسابك للمتابعة', byInvoice: 'حسب الفاتورة', byCustomer: 'حسب العميل',
-    customerInfo: 'بيانات العميل', amountHint: 'سالب = مدين / موجب = دائن (يُحسب تلقائياً إذا ترك فارغاً)',
-    passwordHint: 'اتركها فارغة للإبقاء على كلمة المرور الحالية', pagesN: '{n} صفحة', day: 'يوم', invoiceWord: 'فاتورة',
-    collector: 'المسؤول', overdueTotal: 'المتأخر', lastNote: 'آخر ملاحظة', settingsSaved: 'تم حفظ الإعدادات'
+    customerInfo: 'بيانات العميل', amountHint: 'سالب = مدين / موجب = دائن — يحسب المدين/الدائن تلقائياً',
+    passwordHint: 'اتركها فارغة للإبقاء على كلمة المرور الحالية', pagesN: '{n} صفحة', day: 'يوم',
+    settingsSaved: 'تم حفظ الإعدادات'
   },
   en: {
     app: 'CRM Console', caption: 'Customers & Collections', eyebrow: 'Internal CRM',
     workspace: 'Workspace', reports: 'Reports & follow-up', admin: 'Administration',
     p_dashboard: 'Dashboard', p_customers: 'Customers', p_transactions: 'Customer transactions', p_groups: 'Customer groups',
-    p_balances: 'Balances report', p_paid: 'Paid invoices', p_overdue: 'Overdue report', p_followup: 'Overdue follow-up',
-    p_collection: 'Collection team', p_import: 'Import data', p_users: 'Users & permissions',
+    p_balances: 'Balances report', p_paid: 'Paid invoices', p_overdue: 'Overdue report', p_credit: 'Credit limit exceeded',
+    p_followup: 'Overdue follow-up', p_collection: 'Collection team', p_currencies: 'Currencies & rates',
+    p_import: 'Import data', p_users: 'Users & permissions',
     s_dashboard: 'Live summary of balances, collections and overdue amounts.',
     s_customers: 'Customer master data, contact details and assigned collector.',
-    s_transactions: 'Invoices and payments imported from Dynamics 365 plus manual entries with posting.',
+    s_transactions: 'Invoices and payments imported from Dynamics 365 plus manual entries, posting and running balance.',
     s_groups: 'Customer segmentation by group.',
     s_balances: 'Opening balance, period activity and closing balance per customer.',
     s_paid: 'Invoices fully settled within the period (oldest-first settlement).',
     s_overdue: 'Open invoices past their expected collection date.',
+    s_credit: 'Customers whose balance exceeds their credit limit (customer currency).',
     s_followup: 'Follow up late customers, log calls and payment promises.',
     s_collection: 'Collector, assigned companies, overdue amounts and days late.',
+    s_currencies: 'Currency codes, reporting currency and each currency rate to it.',
     s_import: 'Import Excel / CSV files exported from Dynamics 365.',
     s_users: 'Add users and choose the pages and actions each one is allowed.',
     f_account: 'Customer account', f_name: 'Name', f_group: 'Customer group', f_currency: 'Currency',
@@ -107,21 +123,24 @@ const I18N = {
     f_canDelete: 'Delete', f_canPost: 'Post', f_isCollector: 'Collector', f_scope: 'Data scope',
     f_active: 'Active', f_lastLogin: 'Last login', f_actionDate: 'Action date', f_actionType: 'Action type',
     f_note: 'Note', f_promiseDate: 'Promise date', f_promiseAmount: 'Promise amount', f_createdBy: 'By',
+    f_code: 'Currency code', f_curName: 'Currency name', f_rate: 'Rate to reporting currency',
     opening: 'Opening', debit: 'Debit', credit: 'Credit', closing: 'Closing', balance: 'Balance',
     remaining: 'Remaining', amount: 'Amount', paidDate: 'Paid on', lateDays: 'Days late', days: 'Days late',
     invoices: 'Invoices', maxDays: 'Max days', avgDays: 'Avg days', lastFollowUp: 'Last follow-up',
     lastPayment: 'Last payment', overdueAmt: 'Overdue', customersCount: 'Customers', collectedMTD: 'Collected MTD',
     receivable: 'Total balance', companies: 'Companies', bucket: 'Bucket', openAmount: 'Open amount',
+    net: 'Net movement', runBalance: 'Customer balance',
     add: 'Add', edit: 'Edit', del: 'Delete', save: 'Save', cancel: 'Cancel', close: 'Close', run: 'Run report',
-    exportCsv: 'Export CSV', print: 'Print', post: 'Post', unpost: 'Unpost', postSelected: 'Post selected',
-    login: 'Sign in', logout: 'Sign out', search: 'Search name, account, email...', all: 'All',
+    exportXlsx: 'Export Excel', print: 'Print', post: 'Post', unpost: 'Unpost', postSelected: 'Post selected',
+    login: 'Sign in', logout: 'Sign out', search: 'Search name, account, email...', searchLbl: 'Search', all: 'All',
     from: 'From', to: 'To', asOf: 'As of', minDays: 'Min days late', hideZero: 'Hide zero balances',
     statement: 'Statement', logAction: 'Log follow-up', call: 'Call', mail: 'Email', apply: 'Apply',
+    voucherSearch: 'Voucher no.', displayCurrency: 'Display currency', typeToSearch: 'Type to search...', noResults: 'No results',
     confirmDelete: 'Are you sure you want to delete?', saved: 'Saved', deleted: 'Deleted', postedN: '{n} transactions posted',
     unpostedN: '{n} transactions unposted', noData: 'No data', page: 'Page', of: 'of', rowsWord: 'records',
     prev: 'Prev', next: 'Next', loading: 'Loading...', unassigned: 'Unassigned', perPage: 'per page',
-    addCustomer: 'New customer', addTransaction: 'New transaction', addGroup: 'New group', addUser: 'New user',
-    newFollowUp: 'New follow-up', selectDraft: 'Select draft rows, then post', nothingSelected: 'Nothing selected',
+    addCustomer: 'New customer', addTransaction: 'New transaction', addGroup: 'New group', addUser: 'New user', addCurrency: 'New currency',
+    newFollowUp: 'New follow-up', selectDraft: 'Select draft rows, then post', toggleSidebar: 'Show / hide menu',
     Active: 'Active', Inactive: 'Inactive', Blocked: 'Blocked', Draft: 'Draft', Posted: 'Posted', Open: 'Open', Done: 'Done', Broken: 'Broken promise',
     b1: '1 - 30 days', b2: '31 - 60 days', b3: '61 - 90 days', b4: '90+ days',
     Call: 'Phone call', Email: 'Email', Visit: 'Visit', WhatsApp: 'WhatsApp', Promise: 'Promise to pay', Other: 'Other',
@@ -131,25 +150,32 @@ const I18N = {
     err_DUPLICATE_ID: 'This ID / name already exists', err_POSTED_LOCKED: 'Posted transactions cannot be changed',
     err_HAS_TRANSACTIONS: 'Customer has transactions and cannot be deleted', err_IN_USE: 'Cannot delete: in use',
     err_NOT_FOUND: 'Record not found', err_PASSWORD_REQUIRED: 'Password is required for new users',
-    err_CANNOT_DELETE_SELF: 'You cannot delete your own account',
+    err_CANNOT_DELETE_SELF: 'You cannot delete your own account', err_RATE_REQUIRED: 'Enter a rate greater than zero for this currency first',
     imp_entity: 'Table', imp_mode: 'Import mode', append: 'Append', upsert: 'Update existing + add new',
     replace: 'Replace all', chooseFile: 'Excel or CSV file', importNow: 'Start import', template: 'Download column template',
     importedMsg: 'Done: {i} added — {u} updated — {s} skipped', rowsFound: 'Rows in file', previewTitle: 'Preview (first 5 rows)',
     imp_help: 'Export the table from Dynamics 365 to Excel and upload it here. Columns are matched by name (Customer account, Voucher, Debit in local currency ...). Imported transactions are treated as posted.',
-    xlsxMissing: 'Could not load the Excel reader library. Check your connection.',
-    settings: 'System settings', AppName: 'App name', CompanyName: 'Company name', LocalCurrency: 'Local currency',
+    xlsxMissing: 'Could not load the Excel library. Check your connection.',
+    settings: 'System settings', AppName: 'App name', CompanyName: 'Company name', LocalCurrency: 'Local currency (Dynamics accounting currency)',
+    ReportCurrency: 'Reporting currency', ConversionBasis: 'Conversion basis', basis_local: 'From local-currency amounts (recommended)',
+    basis_transaction: 'From transaction amount × its currency rate', curSettings: 'Currency settings',
+    curHelp: 'Rate = value of 1 unit in the reporting currency. Example: with USD as reporting currency, DJF = 0.0056. Changing the reporting currency re-bases all rates automatically.',
+    missingRates: 'Currencies without a rate (currently counted at 1)', addRate: 'Add rate', rateOf: '1 {c} = ? {b}',
     k_customers: 'Total customers', k_receivable: 'Total receivables', k_overdue: 'Total overdue',
     k_collected: 'Collected this month', activeWord: 'active', lateCustomers: 'late customers', drafts: 'unposted transactions',
     avgLate: 'avg {n} days late', monthly: 'Invoiced vs collected — last 6 months', aging: 'Overdue aging',
     topCustomers: 'Top customers by balance', invoicesL: 'Invoiced', paymentsL: 'Collected', viewAll: 'View all →', details: 'Details →',
+    byCurrency: 'Balances by customer currency', creditOverN: 'over credit limit',
     team: 'Collection team performance', overdueCustomers: 'Late customers', overdueInvoices: 'Late invoices',
     companiesOf: 'Collector companies', allCompanies: 'Overdue by collector and company', ofBalance: 'of balance',
     promisesDue: 'Payment promises due', followLog: 'Follow-up log', noOverdue: 'No overdue customers',
     onTime: 'Paid on time', late: 'Paid late', paidCount: 'Invoices paid', totalPaid: 'Total paid',
+    threshold: 'Usage ≥ %', includeNoLimit: 'Include customers without limit', excess: 'Excess', available: 'Available',
+    usedPct: 'Usage', exceededN: 'Customers over limit', listed: 'Customers listed', excessTotal: 'Total excess',
     welcome: 'Welcome back', loginHint: 'Sign in to continue', byInvoice: 'By invoice', byCustomer: 'By customer',
-    customerInfo: 'Customer details', amountHint: 'Negative = debit / positive = credit (auto if empty)',
-    passwordHint: 'Leave empty to keep the current password', pagesN: '{n} pages', day: 'days', invoiceWord: 'invoices',
-    collector: 'Collector', overdueTotal: 'Overdue', lastNote: 'Last note', settingsSaved: 'Settings saved'
+    customerInfo: 'Customer details', amountHint: 'Negative = debit / positive = credit — fills debit/credit automatically',
+    passwordHint: 'Leave empty to keep the current password', pagesN: '{n} pages', day: 'days',
+    settingsSaved: 'Settings saved'
   }
 };
 
@@ -161,14 +187,16 @@ const PAGES = [
   { id: 'balances', glyph: '≡', sec: 'reports' },
   { id: 'paid', glyph: '✓', sec: 'reports' },
   { id: 'overdue', glyph: '!', sec: 'reports' },
+  { id: 'credit', glyph: '⚑', sec: 'reports' },
   { id: 'followup', glyph: '☎', sec: 'reports' },
   { id: 'collection', glyph: '◉', sec: 'reports' },
+  { id: 'currencies', glyph: '¤', sec: 'admin' },
   { id: 'import', glyph: '⇪', sec: 'admin' },
   { id: 'users', glyph: '⚙', sec: 'admin' }
 ];
 
 // ───────── State & helpers ─────────
-const S = { token: '', user: null, settings: {}, lookups: { groups: [], collectors: [], customers: [], transactionTypes: [] },
+const S = { token: '', user: null, settings: {}, lookups: { groups: [], collectors: [], customers: [], currencies: [], transactionTypes: [] },
   lang: 'ar', view: '', lists: {}, rows: {}, rep: {}, exportData: null, badges: {} };
 
 const store = {
@@ -178,15 +206,20 @@ const store = {
 const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const bdi = v => `<bdi>${esc(v)}</bdi>`;
 const t = (k, vars) => {
   let s = (I18N[S.lang] && I18N[S.lang][k]) || I18N.en[k] || k;
   if (vars) Object.keys(vars).forEach(v => { s = s.replace('{' + v + '}', vars[v]); });
   return s;
 };
+// Thousands separators everywhere: 000,000,000.00
 const NF = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const NF6 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 });
+const NI = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const money = n => NF.format(+n || 0);
-const short = n => { n = +n || 0; const a = Math.abs(n); return a >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : a >= 1e4 ? (n / 1e3).toFixed(1) + 'K' : NF.format(n); };
-const cur = () => S.settings.LocalCurrency || '';
+const short = n => { n = +n || 0; const a = Math.abs(n); return a >= 1e9 ? NF.format(n / 1e9) + 'B' : a >= 1e6 ? NF.format(n / 1e6) + 'M' : NF.format(n); };
+const baseCur = () => (S.settings.ReportCurrency || S.settings.LocalCurrency || '').toUpperCase();
+const localCur = () => (S.settings.LocalCurrency || '').toUpperCase();
 const z = n => String(n).padStart(2, '0');
 const ymd = d => d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
 const today = () => ymd(new Date());
@@ -196,10 +229,21 @@ const can = a => S.user && (S.user.isAdmin || S.user['can' + a[0].toUpperCase() 
 const hasPage = p => S.user && S.user.pages.indexOf(p) > -1;
 const groupName = id => { const g = S.lookups.groups.find(x => x.id === id); return g ? g.name : (id || ''); };
 const collectorName = u => { if (!u) return t('unassigned'); const c = S.lookups.collectors.find(x => x.username === u); return c ? c.name : u; };
+const custName = a => { const c = S.lookups.customers.find(x => x.account === a); return c ? c.name : ''; };
 const pill = (txt, cls) => `<span class="health ${cls}">${esc(txt)}</span>`;
 const statusPill = v => pill(t(v || 'Active'), { Active: 'healthy', Inactive: 'neutral', Blocked: 'risk', Draft: 'watch', Posted: 'healthy', Open: 'info', Done: 'healthy', Broken: 'risk' }[v] || 'neutral');
-const daysPill = d => pill(d + ' ' + t('day'), d > 90 ? 'risk' : d > 30 ? 'watch' : 'info');
+const daysPill = d => pill(NI.format(d) + ' ' + t('day'), d > 90 ? 'risk' : d > 30 ? 'watch' : 'info');
 const numCell = n => `<span class="${+n < 0 ? 'neg' : ''}">${money(n)}</span>`;
+const curTag = c => c ? ` <small class="cur">${esc(c)}</small>` : '';
+const rateOf = code => {
+  code = String(code || '').toUpperCase();
+  if (code === baseCur()) return 1;
+  const c = S.lookups.currencies.find(x => x.code === code);
+  return c && c.rate > 0 ? c.rate : 0;
+};
+// Arabic-friendly search normalisation (alef forms, taa marbuta, yaa, diacritics).
+const norm = s => String(s || '').toLowerCase().replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+const parseNum = s => { const n = parseFloat(String(s == null ? '' : s).replace(/,/g, '')); return isNaN(n) ? 0 : n; };
 
 // ───────── Server bridge ─────────
 let pending = 0;
@@ -240,6 +284,94 @@ function applyPrefs() {
   document.documentElement.classList.toggle('light', store.get('crm_theme') === 'light');
 }
 
+// ───────── Searchable dropdowns (every <select> in the app) ─────────
+function enhance(root) {
+  $$('select:not([data-plain]):not(.cb-native)', root || document).forEach(makeCombo);
+}
+function optHtml(o) {
+  return o.dataset.code
+    ? `<span class="cb-code">${esc(o.dataset.code)}</span><span class="cb-name">${esc(o.dataset.name || '')}</span>`
+    : `<span class="cb-name">${esc(o.textContent)}</span>`;
+}
+function makeCombo(sel) {
+  sel.classList.add('cb-native');
+  sel.tabIndex = -1;
+  const wrap = document.createElement('div');
+  wrap.className = 'cb';
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(sel);
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'cb-input'; inp.autocomplete = 'off'; inp.spellcheck = false; inp.dir = 'auto';
+  inp.setAttribute('role', 'combobox');
+  const list = document.createElement('div');
+  list.className = 'cb-list'; list.hidden = true;
+  wrap.append(inp, list);
+  const first = sel.options[0];
+  inp.placeholder = first && first.value === '' && first.textContent ? first.textContent : t('typeToSearch');
+  const label = () => { const o = sel.selectedOptions[0]; return o && o.value !== '' ? o.textContent : ''; };
+  inp.value = label();
+  let items = [], active = -1;
+  const paint = () => {
+    $$('.cb-opt', list).forEach((el, i) => el.classList.toggle('active', i === active));
+    const a = list.children[active];
+    if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest' });
+  };
+  const render = q => {
+    const nq = norm(q).trim();
+    items = Array.from(sel.options).filter(o => !nq || norm(o.textContent + ' ' + o.value).indexOf(nq) > -1).slice(0, 300);
+    active = nq ? (items.length ? 0 : -1) : items.findIndex(o => o.value === sel.value);
+    list.innerHTML = items.length
+      ? items.map((o, i) => `<div class="cb-opt ${o.value === '' ? 'cb-blank' : ''}" data-i="${i}">${optHtml(o)}</div>`).join('')
+      : `<div class="cb-none">${t('noResults')}</div>`;
+    paint();
+  };
+  const open = () => { if (sel.disabled || !list.hidden) return; render(''); list.hidden = false; wrap.classList.add('open'); inp.select(); };
+  const close = () => { list.hidden = true; wrap.classList.remove('open'); inp.value = label(); };
+  const pick = o => {
+    if (o && sel.value !== o.value) { sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+    close();
+  };
+  inp.addEventListener('focus', open);
+  inp.addEventListener('click', open);
+  inp.addEventListener('input', () => { list.hidden = false; wrap.classList.add('open'); render(inp.value); });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); if (list.hidden) open();
+      active = Math.max(0, Math.min(items.length - 1, active + (e.key === 'ArrowDown' ? 1 : -1))); paint();
+    } else if (e.key === 'Enter') { if (!list.hidden) { e.preventDefault(); pick(items[active]); } }
+    else if (e.key === 'Escape') { e.stopPropagation(); close(); }
+    else if (e.key === 'Tab') close();
+  });
+  inp.addEventListener('blur', () => setTimeout(close, 150));
+  list.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const el = e.target.closest('.cb-opt');
+    if (el) pick(items[+el.dataset.i]);
+  });
+  sel.addEventListener('change', () => { if (list.hidden) inp.value = label(); });
+}
+
+// ───────── Number inputs with live thousands separators ─────────
+function groupDigits(raw) {
+  let v = String(raw).replace(/[^\d.\-]/g, '');
+  const neg = v.charAt(0) === '-';
+  v = v.replace(/-/g, '');
+  const dot = v.indexOf('.');
+  let int = dot > -1 ? v.slice(0, dot) : v;
+  const dec = dot > -1 ? '.' + v.slice(dot + 1).replace(/\./g, '') : '';
+  int = int.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (neg ? '-' : '') + int + dec;
+}
+function formatNumInput(el) {
+  const caret = el.selectionStart == null ? el.value.length : el.selectionStart;
+  const keep = el.value.slice(0, caret).replace(/[^\d.\-]/g, '').length;
+  el.value = groupDigits(el.value);
+  let pos = 0, seen = 0;
+  while (pos < el.value.length && seen < keep) { if (/[\d.\-]/.test(el.value[pos])) seen++; pos++; }
+  try { el.setSelectionRange(pos, pos); } catch (e) {}
+}
+const fmtInputNum = v => (v === '' || v == null) ? '' : groupDigits(String(+v === +v ? +v : v));
+
 // ───────── Login ─────────
 function renderLogin(err) {
   $('#root').innerHTML = `
@@ -273,6 +405,7 @@ async function doLogin(form) {
 
 function onLogin(r) {
   S.token = r.token; S.user = r.user; S.settings = r.settings || {}; S.lookups = r.lookups;
+  S.lookups.currencies = S.lookups.currencies || [];
   store.set('crm_token', r.token);
   renderShell();
   const last = store.get('crm_view');
@@ -294,7 +427,7 @@ function renderShell() {
       `<button class="nav-item" data-go="${p.id}"><span><span class="nav-glyph">${p.glyph}</span>${t('p_' + p.id)}</span><span class="badge red" data-badge="${p.id}" hidden></span></button>`).join('')}</nav>`;
   };
   $('#root').innerHTML = `
-  <div class="app">
+  <div class="app ${store.get('crm_sidebar') === 'hidden' ? 'collapsed' : ''}" id="app">
     <aside class="sidebar" id="sidebar">
       <div class="brand"><div class="brand-mark">↗</div><div><p class="brand-name">${esc(S.settings.AppName || t('app'))}</p><p class="brand-caption">${esc(S.settings.CompanyName || t('caption'))}</p></div></div>
       ${nav('workspace')}${nav('reports')}${nav('admin')}
@@ -305,7 +438,7 @@ function renderShell() {
     <div class="scrim" id="scrim" data-act="menu"></div>
     <main class="main">
       <header class="topbar">
-        <button class="icon-button mobile-menu" data-act="menu" aria-label="Menu">☰</button>
+        <button class="icon-button menu-btn" data-act="menu" title="${t('toggleSidebar')}" aria-label="${t('toggleSidebar')}">☰</button>
         <span class="eyebrow">${t('eyebrow')}</span>
         <div class="top-actions">
           ${hasPage('customers') ? `<input class="search" id="gsearch" type="search" placeholder="${t('search')}" aria-label="${t('search')}">` : ''}
@@ -315,20 +448,12 @@ function renderShell() {
       </header>
       <div class="content" id="content"></div>
     </main>
-  </div>
-  <datalist id="dl_customers"></datalist>`;
-  fillDatalist();
+  </div>`;
   Object.keys(S.badges).forEach(k => setBadge(k, S.badges[k]));
-}
-
-function fillDatalist() {
-  const dl = $('#dl_customers');
-  if (dl) dl.innerHTML = S.lookups.customers.map(c => `<option value="${esc(c.account)}">${esc(c.name)}</option>`).join('');
 }
 
 async function refreshLookups() {
   S.lookups = await call('getLookups');
-  fillDatalist();
 }
 
 function setBadge(page, n) {
@@ -353,35 +478,49 @@ function heading(view, actions) {
     <div class="page-actions">${(actions || []).filter(Boolean).join('')}</div></div>`;
 }
 const btn = (act, label, cls, extra) => `<button class="${cls || 'button-primary'}" data-act="${act}" ${extra || ''}>${label}</button>`;
-const reportBtns = () => [btn('export', t('exportCsv'), 'button-ghost'), btn('print', t('print'), 'button-ghost')];
-const setContent = html => { $('#content').innerHTML = html; };
+const exportBtn = () => btn('export', '⬇ ' + t('exportXlsx'), 'button-ghost');
+const reportBtns = () => [exportBtn(), btn('print', t('print'), 'button-ghost')];
+const setContent = html => { $('#content').innerHTML = html; enhance($('#content')); };
 
 // ───────── Generic building blocks ─────────
+/** list items: [value, label] or [value, label, code, name] for "code — name" options */
 function opts(list, value, withAll) {
   return (withAll ? `<option value="">${t('all')}</option>` : '') +
-    list.map(o => `<option value="${esc(o[0])}" ${String(o[0]) === String(value == null ? '' : value) ? 'selected' : ''}>${esc(o[1])}</option>`).join('');
+    list.map(o => `<option value="${esc(o[0])}" ${o[2] ? `data-code="${esc(o[2])}" data-name="${esc(o[3])}"` : ''} ${String(o[0]) === String(value == null ? '' : value) ? 'selected' : ''}>${esc(o[1])}</option>`).join('');
 }
-const groupOpts = () => S.lookups.groups.map(g => [g.id, g.name]);
+const groupOpts = () => S.lookups.groups.map(g => [g.id, g.id + ' — ' + g.name, g.id, g.name]);
 const collectorOpts = () => S.lookups.collectors.map(c => [c.username, c.name]);
 const statusOpts = () => ['Active', 'Inactive', 'Blocked'].map(s => [s, t(s)]);
+const customerOpts = () => S.lookups.customers.map(c => [c.account, c.account + ' — ' + c.name, c.account, c.name]);
+const currencyOpts = extra => {
+  const list = S.lookups.currencies.map(c => [c.code, c.code + (c.name ? ' — ' + c.name : ''), c.code, c.name || '']);
+  [baseCur(), localCur()].concat(extra || []).forEach(c => { if (c && !list.some(x => x[0] === c)) list.push([c, c, c, '']); });
+  return list;
+};
 
-function tool(key, label, type, value, options) {
+function tool(key, label, type, value, options, noAll) {
   let input;
-  if (type === 'select') input = `<select data-f="${key}">${opts(options, value, true)}</select>`;
-  else if (type === 'customer') input = `<input data-f="${key}" list="dl_customers" value="${esc(value)}" placeholder="${t('all')}">`;
+  if (type === 'select') input = `<select data-f="${key}">${opts(options, value, !noAll)}</select>`;
+  else if (type === 'customer') input = `<select data-f="${key}">${opts(customerOpts(), value, true)}</select>`;
   else if (type === 'check') return `<label class="check" style="flex:0 0 auto"><input type="checkbox" data-f="${key}" ${value ? 'checked' : ''}>${label}</label>`;
-  else input = `<input data-f="${key}" type="${type || 'text'}" value="${esc(value)}" ${type === 'search' ? `placeholder="${t('search')}"` : ''}>`;
+  else input = `<input data-f="${key}" type="${type || 'text'}" value="${esc(value)}" ${type === 'search' ? `placeholder="${t('typeToSearch')}"` : ''}>`;
   return `<label class="tool">${esc(label)}${input}</label>`;
 }
+const curTool = f => tool('currency', t('displayCurrency'), 'select', f.currency || baseCur(), currencyOpts(), true);
 function readTools(el) {
   const o = {};
   $$('[data-f]', el).forEach(i => { o[i.dataset.f] = i.type === 'checkbox' ? i.checked : i.value.trim(); });
   return o;
 }
+function missingNotice(r) {
+  if (!r || !r.missingRates || !r.missingRates.length) return '';
+  return `<div class="panel notice">⚠ ${t('missingRates')}: <b>${r.missingRates.map(esc).join('، ')}</b>
+    ${hasPage('currencies') ? `<button class="section-action" data-go="currencies">${t('p_currencies')} ←</button>` : ''}</div>`;
+}
 
 /**
- * cols: [{k, l, f(value,row) → html, num, cls}]
- * opts: { rowClass, actions(row,i) → html, foot: html, select(row) → bool }
+ * cols: [{k, l, f(value,row) → html, num, cls, x(row) → export value}]
+ * opts: { click, actions(row,i) → html, foot: html, select(row) → bool, sortable }
  */
 function table(view, cols, rows, o) {
   o = o || {};
@@ -397,8 +536,9 @@ function table(view, cols, rows, o) {
     (o.select ? `<td class="actions-cell" data-label="">${o.select(r) ? `<label class="check"><input type="checkbox" data-sel="${esc(r.rowId)}"></label>` : ''}</td>` : '') +
     cols.map(c => {
       const v = r[c.k];
-      const html = c.f ? c.f(v, r) : c.num ? numCell(v) : esc(v);
-      return `<td data-label="${esc(c.l)}" class="${c.num ? 'num' : ''} ${c.cls || ''}">${html}</td>`;
+      const html = c.f ? c.f(v, r) : c.num ? numCell(v) : bdi(v);
+      const title = c.cls === 'clip' ? ` title="${esc(v)}"` : '';
+      return `<td data-label="${esc(c.l)}" class="${c.num ? 'num' : ''} ${c.cls || ''}"${title}>${html}</td>`;
     }).join('') +
     (o.actions ? `<td class="actions-cell" data-label=""><div class="row-actions">${o.actions(r, i)}</div></td>` : '') +
     '</tr>').join('');
@@ -406,16 +546,20 @@ function table(view, cols, rows, o) {
     <tbody>${body}</tbody>${o.foot ? `<tfoot>${o.foot}</tfoot>` : ''}</table></div>`;
 }
 
-function footRow(cols, totals, label, lead) {
-  return '<tr>' + (lead ? '<td data-label=""></td>' : '') + cols.map((c, i) =>
-    `<td data-label="${esc(c.l)}" class="${c.num ? 'num' : ''}">${i === 0 ? esc(label) : totals[c.k] !== undefined ? numCell(totals[c.k]) : ''}</td>`).join('') + '</tr>';
+/** Totals row. totals[k] = number, or {html} for custom content. */
+function footRow(cols, totals, label, lead, tail) {
+  return '<tr>' + (lead ? '<td data-label=""></td>' : '') + cols.map((c, i) => {
+    const v = totals[c.k];
+    const html = i === 0 ? esc(label) : v === undefined ? '' : (v && v.html) ? v.html : numCell(v);
+    return `<td data-label="${esc(c.l)}" class="${c.num ? 'num' : ''}">${html}</td>`;
+  }).join('') + (tail ? '<td></td>' : '') + '</tr>';
 }
 
 function pager(view, res) {
   const pages = Math.max(1, Math.ceil(res.total / res.pageSize));
-  return `<div class="pager" data-view="${view}"><span>${res.total} ${t('rowsWord')} · ${t('page')} ${res.page} ${t('of')} ${pages}</span>
+  return `<div class="pager" data-view="${view}"><span>${NI.format(res.total)} ${t('rowsWord')} · ${t('page')} ${res.page} ${t('of')} ${pages}</span>
     <div class="pager-btns">
-      <select data-pagesize>${opts([[25, '25'], [50, '50'], [100, '100'], [250, '250']], res.pageSize)}</select>
+      <select data-pagesize data-plain>${opts([[25, '25'], [50, '50'], [100, '100'], [250, '250']], res.pageSize)}</select>
       <button class="button-ghost" data-act="page" data-p="${res.page - 1}" ${res.page <= 1 ? 'disabled' : ''}>${t('prev')}</button>
       <button class="button-ghost" data-act="page" data-p="${res.page + 1}" ${res.page >= pages ? 'disabled' : ''}>${t('next')}</button>
     </div></div>`;
@@ -426,31 +570,39 @@ function stat(label, value, mark, markCls, foot) {
     <div class="stat-mark ${markCls || ''}">${mark}</div></div>${foot ? `<div class="stat-foot">${foot}</div>` : ''}</article>`;
 }
 
-// ───────── Data lists (customers, transactions, groups, users, follow-ups) ─────────
+// ───────── Data lists ─────────
+const editDel = () => (can('edit') ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') + (can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '');
 const LISTS = {
   customers: {
-    entity: 'Customers', id: 'account', click: r => openCustomer(r.account),
-    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q), tool('group', t('f_group'), 'select', s.filters.group, groupOpts()),
-      tool('collector', t('f_collector'), 'select', s.filters.collector, collectorOpts()), tool('status', t('f_status'), 'select', s.filters.status, statusOpts())],
+    entity: 'Customers', id: 'account', click: true,
+    tools: s => [tool('q', t('searchLbl'), 'search', s.q), tool('group', t('f_group'), 'select', s.filters.group, groupOpts()),
+      tool('collector', t('f_collector'), 'select', s.filters.collector, collectorOpts()), tool('currency', t('f_currency'), 'select', s.filters.currency, currencyOpts()),
+      tool('status', t('f_status'), 'select', s.filters.status, statusOpts())],
     cols: () => [
-      { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name'), cls: 'wrap' },
-      { k: 'group', l: t('f_group'), f: v => esc(groupName(v)) }, { k: 'phone', l: t('f_phone') },
+      { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') },
+      { k: 'group', l: t('f_group'), f: v => bdi(groupName(v)), x: r => groupName(r.group) }, { k: 'currency', l: t('f_currency') },
+      { k: 'creditLimit', l: t('f_creditLimit'), num: true }, { k: 'phone', l: t('f_phone') },
       { k: 'email', l: t('f_email') }, { k: 'city', l: t('f_city') },
-      { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) }, { k: 'status', l: t('f_status'), f: statusPill }],
-    actions: r => (can('edit') ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') + (can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '')
+      { k: 'collector', l: t('f_collector'), f: v => bdi(collectorName(v)), x: r => collectorName(r.collector) },
+      { k: 'status', l: t('f_status'), f: statusPill, x: r => t(r.status || 'Active') }],
+    actions: editDel
   },
   transactions: {
     entity: 'Transactions', id: 'rowId',
-    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q), tool('account', t('f_account'), 'customer', s.filters.account),
+    tools: s => [tool('voucher', t('voucherSearch'), 'search', s.voucher), tool('q', t('searchLbl'), 'search', s.q),
+      tool('account', t('f_account'), 'customer', s.filters.account), tool('group', t('f_group'), 'select', s.filters.group, groupOpts()),
       tool('type', t('f_type'), 'select', s.filters.type, S.lookups.transactionTypes.map(x => [x, x])),
+      tool('currency', t('f_currency'), 'select', s.filters.currency, currencyOpts()),
       tool('postStatus', t('f_postStatus'), 'select', s.filters.postStatus, [['Draft', t('Draft')], ['Posted', t('Posted')]]),
       tool('dateFrom', t('from'), 'date', s.dateFrom), tool('dateTo', t('to'), 'date', s.dateTo)],
     cols: () => [
-      { k: 'voucher', l: t('f_voucher') }, { k: 'date', l: t('f_date') },
-      { k: 'account', l: t('f_name'), cls: 'wrap', f: (v, r) => `${esc(r.customerName)}<br><small style="color:var(--subtle)">${esc(v)}</small>` },
-      { k: 'type', l: t('f_type') }, { k: 'description', l: t('f_description'), cls: 'wrap' }, { k: 'dueDate', l: t('f_dueDate') },
+      { k: 'voucher', l: t('f_voucher') }, { k: 'date', l: t('f_date') }, { k: 'account', l: t('f_account') },
+      { k: 'customerName', l: t('f_name') }, { k: 'type', l: t('f_type') }, { k: 'description', l: t('f_description'), cls: 'clip' },
+      { k: 'dueDate', l: t('f_dueDate') }, { k: 'currency', l: t('f_currency') }, { k: 'amountCur', l: t('f_amountCur'), num: true },
+      { k: 'exchange', l: t('f_exchange'), num: true, f: v => NF6.format(+v || 0) },
       { k: 'debitMST', l: t('debit'), num: true }, { k: 'creditMST', l: t('credit'), num: true },
-      { k: 'postStatus', l: t('f_postStatus'), f: statusPill }],
+      { k: 'balance', l: t('runBalance'), num: true, f: (v, r) => r.postStatus === 'Draft' ? '—' : numCell(v) },
+      { k: 'postStatus', l: t('f_postStatus'), f: statusPill, x: r => t(r.postStatus) }],
     select: r => can('post') && r.postStatus === 'Draft',
     actions: r => {
       const draft = r.postStatus === 'Draft';
@@ -462,13 +614,23 @@ const LISTS = {
   },
   groups: {
     entity: 'CustomerGroups', id: 'groupId',
-    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q)],
+    tools: s => [tool('q', t('searchLbl'), 'search', s.q)],
     cols: () => [{ k: 'groupId', l: t('f_groupId') }, { k: 'groupName', l: t('f_groupName') }],
-    actions: () => (can('edit') ? `<button data-act="rowEdit">✎</button>` : '') + (can('delete') ? `<button data-act="rowDelete">🗑</button>` : '')
+    actions: editDel
+  },
+  currencies: {
+    entity: 'Currencies', id: 'code',
+    tools: s => [tool('q', t('searchLbl'), 'search', s.q)],
+    cols: () => [{ k: 'code', l: t('f_code') }, { k: 'name', l: t('f_curName') },
+      { k: 'rate', l: t('f_rate'), num: true, f: (v, r) => `${NF6.format(+v || 0)} <small class="cur">${esc(baseCur())}</small>` },
+      { k: 'inverse', l: '1 ' + baseCur() + ' =', num: true, f: (v, r) => r.rate > 0 ? `${NF6.format(1 / r.rate)} <small class="cur">${esc(r.code)}</small>` : '—', x: r => r.rate > 0 ? 1 / r.rate : '' },
+      { k: 'active', l: t('f_active'), f: v => pill(v ? t('Active') : t('Inactive'), v ? 'healthy' : 'neutral'), x: r => r.active ? 1 : 0 },
+      { k: 'updatedAt', l: t('f_updatedAt') }],
+    actions: editDel
   },
   users: {
     entity: 'Users', id: 'userId',
-    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q)],
+    tools: s => [tool('q', t('searchLbl'), 'search', s.q)],
     cols: () => [
       { k: 'username', l: t('f_username') }, { k: 'fullName', l: t('f_fullName') }, { k: 'role', l: t('f_role'), f: v => pill(t(v), v === 'Admin' ? 'info' : 'neutral') },
       { k: 'pages', l: t('f_pages'), f: (v, r) => r.role === 'Admin' ? t('all') : t('pagesN', { n: String(v || '').split(',').filter(String).length }) },
@@ -479,19 +641,20 @@ const LISTS = {
   },
   followlog: {
     entity: 'FollowUps', id: 'id',
-    tools: s => [tool('q', t('search').replace('...', ''), 'search', s.q), tool('account', t('f_account'), 'customer', s.filters.account),
+    tools: s => [tool('q', t('searchLbl'), 'search', s.q), tool('account', t('f_account'), 'customer', s.filters.account),
       tool('status', t('f_status'), 'select', s.filters.status, ['Open', 'Done', 'Broken'].map(x => [x, t(x)])),
       tool('dateFrom', t('from'), 'date', s.dateFrom), tool('dateTo', t('to'), 'date', s.dateTo)],
     cols: () => [
-      { k: 'actionDate', l: t('f_actionDate') }, { k: 'customerName', l: t('f_name'), cls: 'wrap' }, { k: 'actionType', l: t('f_actionType'), f: v => esc(t(v)) },
-      { k: 'note', l: t('f_note'), cls: 'wrap' }, { k: 'promiseDate', l: t('f_promiseDate') }, { k: 'promiseAmount', l: t('f_promiseAmount'), num: true },
-      { k: 'status', l: t('f_status'), f: statusPill }, { k: 'createdBy', l: t('f_createdBy') }],
-    actions: () => (can('edit') ? `<button data-act="rowEdit">✎</button>` : '') + (can('delete') ? `<button data-act="rowDelete">🗑</button>` : '')
+      { k: 'actionDate', l: t('f_actionDate') }, { k: 'account', l: t('f_account') }, { k: 'customerName', l: t('f_name') },
+      { k: 'actionType', l: t('f_actionType'), f: v => esc(t(v)), x: r => t(r.actionType) },
+      { k: 'note', l: t('f_note'), cls: 'clip' }, { k: 'promiseDate', l: t('f_promiseDate') }, { k: 'promiseAmount', l: t('f_promiseAmount'), num: true },
+      { k: 'status', l: t('f_status'), f: statusPill, x: r => t(r.status) }, { k: 'createdBy', l: t('f_createdBy') }],
+    actions: editDel
   }
 };
 
 function listState(view) {
-  return S.lists[view] = S.lists[view] || { q: '', filters: {}, page: 1, pageSize: 25, sort: '', desc: undefined, dateFrom: '', dateTo: '' };
+  return S.lists[view] = S.lists[view] || { q: '', voucher: '', filters: {}, page: 1, pageSize: 25, sort: '', desc: undefined, dateFrom: '', dateTo: '' };
 }
 
 function listBlock(view) {
@@ -502,22 +665,29 @@ function listBlock(view) {
 
 async function loadList(view) {
   const cfg = LISTS[view], s = listState(view);
-  const res = await call('listRecords', cfg.entity, { q: s.q, filters: s.filters, page: s.page, pageSize: s.pageSize, sort: s.sort, desc: s.desc, dateFrom: s.dateFrom, dateTo: s.dateTo });
+  const res = await call('listRecords', cfg.entity, { q: s.q, voucher: s.voucher, filters: s.filters, page: s.page, pageSize: s.pageSize, sort: s.sort, desc: s.desc, dateFrom: s.dateFrom, dateTo: s.dateTo });
   s.page = res.page;
   const cols = cfg.cols();
-  const actions = cfg.actions && ((r, i) => cfg.actions(r, i));
-  const foot = view === 'transactions' && res.rows.length ? footRow(cols, { debitMST: res.totals.debit, creditMST: res.totals.credit }, t('all') + ' (' + res.total + ')', cfg.select && can('post')) + '' : '';
+  const sel = can('post') ? cfg.select : null;
+  let foot = '';
+  if (view === 'transactions' && res.rows.length) {
+    const lc = res.totals.localCurrency;
+    foot = footRow(cols, {
+      debitMST: { html: numCell(res.totals.debit) + curTag(lc) }, creditMST: { html: numCell(res.totals.credit) + curTag(lc) },
+      balance: { html: `<small class="cur">${t('net')}</small> ${numCell(res.totals.net)}` }
+    }, t('all') + ' (' + NI.format(res.total) + ')', !!sel, !!cfg.actions);
+  }
   const el = $('#list_' + view);
   if (!el) return;
-  el.innerHTML = table(view, cols, res.rows, { click: !!cfg.click, actions: actions, select: can('post') ? cfg.select : null, foot: foot ? foot.replace('</tr>', actions ? '<td></td></tr>' : '</tr>') : '' }) + pager(view, res);
+  el.innerHTML = table(view, cols, res.rows, { click: !!cfg.click, actions: cfg.actions, select: sel, foot: foot }) + pager(view, res);
   S.exportData = { name: view, cols: cols, rows: res.rows };
 }
 
 function onListTools(view, el) {
   const s = listState(view), v = readTools(el);
-  s.q = v.q || ''; s.dateFrom = v.dateFrom || ''; s.dateTo = v.dateTo || '';
+  s.q = v.q || ''; s.voucher = v.voucher || ''; s.dateFrom = v.dateFrom || ''; s.dateTo = v.dateTo || '';
   s.filters = {};
-  Object.keys(v).forEach(k => { if (['q', 'dateFrom', 'dateTo'].indexOf(k) === -1) s.filters[k] = v[k]; });
+  Object.keys(v).forEach(k => { if (['q', 'voucher', 'dateFrom', 'dateTo'].indexOf(k) === -1) s.filters[k] = v[k]; });
   s.page = 1;
   loadList(view);
 }
@@ -525,19 +695,23 @@ function onListTools(view, el) {
 // ───────── Forms ─────────
 const FORMS = {
   Customers: () => [
-    { k: 'account', req: 1, lock: 1 }, { k: 'name', req: 1 }, { k: 'group', type: 'select', o: groupOpts() }, { k: 'currency' },
+    { k: 'account', req: 1, lock: 1 }, { k: 'name', req: 1 }, { k: 'group', type: 'select', o: groupOpts() },
+    { k: 'currency', type: 'select', o: currencyOpts() },
     { k: 'contactPerson' }, { k: 'phone', type: 'tel' }, { k: 'email', type: 'email' }, { k: 'city' }, { k: 'country' }, { k: 'taxNo' },
     { k: 'creditLimit', type: 'number' }, { k: 'termsDays', type: 'number' },
     { k: 'collector', type: 'select', o: collectorOpts(), hide: !S.user.isAdmin && S.user.scope === 'own' },
     { k: 'status', type: 'select', o: statusOpts(), noAll: 1 }, { k: 'address', type: 'textarea', span: 1 }, { k: 'notes', type: 'textarea', span: 1 }],
   Transactions: () => [
     { k: 'voucher', req: 1 }, { k: 'type', type: 'select', o: S.lookups.transactionTypes.map(x => [x, x]), noAll: 1 },
-    { k: 'account', type: 'customer', req: 1 }, { k: 'date', type: 'date', req: 1 }, { k: 'dueDate', type: 'date' }, { k: 'currency' },
-    { k: 'debitMST', type: 'number' }, { k: 'creditMST', type: 'number' }, { k: 'amountCur', type: 'number', hint: t('amountHint') },
-    { k: 'exchange', type: 'number' }, { k: 'description', type: 'textarea', span: 1 }],
+    { k: 'account', type: 'customer', req: 1, span: 1 }, { k: 'date', type: 'date', req: 1 }, { k: 'dueDate', type: 'date' },
+    { k: 'currency', type: 'select', o: currencyOpts(), noAll: 1 }, { k: 'exchange', type: 'number' },
+    { k: 'amountCur', type: 'number', hint: t('amountHint'), span: 1 },
+    { k: 'debitMST', type: 'number' }, { k: 'creditMST', type: 'number' }, { k: 'description', type: 'textarea', span: 1 }],
   CustomerGroups: () => [{ k: 'groupId', req: 1, lock: 1 }, { k: 'groupName', req: 1 }],
+  Currencies: () => [{ k: 'code', req: 1, lock: 1 }, { k: 'name', label: 'f_curName' },
+    { k: 'rate', type: 'number', req: 1, hint: t('rateOf', { c: (FORM && FORM.rec.code) || '…', b: baseCur() }) }, { k: 'active', type: 'check' }],
   FollowUps: () => [
-    { k: 'account', type: 'customer', req: 1 }, { k: 'voucher' }, { k: 'actionDate', type: 'date', req: 1 },
+    { k: 'account', type: 'customer', req: 1, span: 1 }, { k: 'voucher' }, { k: 'actionDate', type: 'date', req: 1 },
     { k: 'actionType', type: 'select', o: ['Call', 'Email', 'Visit', 'WhatsApp', 'Promise', 'Other'].map(x => [x, t(x)]), noAll: 1 },
     { k: 'promiseDate', type: 'date' }, { k: 'promiseAmount', type: 'number' },
     { k: 'status', type: 'select', o: ['Open', 'Done', 'Broken'].map(x => [x, t(x)]), noAll: 1 }, { k: 'note', type: 'textarea', span: 1, req: 1 }],
@@ -547,19 +721,25 @@ const FORMS = {
     { k: 'scope', type: 'select', o: [['all', t('scope_all')], ['own', t('scope_own')]], noAll: 1 },
     { k: 'active', type: 'check' }, { k: 'isCollector', type: 'check' }, { k: 'actions', type: 'flags', span: 1 }, { k: 'pages', type: 'pages', span: 1 }]
 };
-const ENTITY_TITLE = { Customers: 'p_customers', Transactions: 'p_transactions', CustomerGroups: 'p_groups', FollowUps: 'p_followup', Users: 'p_users' };
+const ENTITY_TITLE = { Customers: 'p_customers', Transactions: 'p_transactions', CustomerGroups: 'p_groups', FollowUps: 'p_followup', Users: 'p_users', Currencies: 'p_currencies' };
+const ID_KEY = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', FollowUps: 'id', Users: 'userId', Currencies: 'code' };
 let FORM = null;
 
 function fieldHtml(f, rec, isNew) {
   const v = rec[f.k] == null ? '' : rec[f.k];
-  const label = t('f_' + f.k) + (f.req ? ' <span class="req">*</span>' : '');
+  const label = t(f.label || ('f_' + f.k)) + (f.req ? ' <span class="req">*</span>' : '');
   const req = f.req ? 'required' : '';
   const cls = 'field' + (f.span ? ' span2' : '');
-  const hint = f.hint ? `<span class="field-hint">${esc(f.hint)}</span>` : '';
+  const hint = f.hint ? `<span class="field-hint" data-hint="${f.k}">${esc(f.hint)}</span>` : '';
   switch (f.type) {
-    case 'select': return `<label class="${cls}">${label}<select name="${f.k}" ${req}>${f.noAll ? '' : '<option value=""></option>'}${opts(f.o, v)}</select>${hint}</label>`;
+    case 'select': {
+      const o = f.o.slice();
+      if (v !== '' && !o.some(x => String(x[0]) === String(v))) o.push([v, v]);
+      return `<label class="${cls}">${label}<select name="${f.k}" ${req}>${f.noAll ? '' : '<option value=""></option>'}${opts(o, v)}</select>${hint}</label>`;
+    }
     case 'textarea': return `<label class="${cls}">${label}<textarea name="${f.k}" ${req}>${esc(v)}</textarea>${hint}</label>`;
-    case 'customer': return `<label class="${cls}">${label}<input name="${f.k}" list="dl_customers" value="${esc(v)}" ${req} autocomplete="off">${hint}</label>`;
+    case 'customer': return `<label class="${cls}">${label}<select name="${f.k}" ${req}><option value=""></option>${opts(customerOpts(), v)}</select>${hint}</label>`;
+    case 'number': return `<label class="${cls}">${label}<input name="${f.k}" type="text" inputmode="decimal" data-num value="${esc(fmtInputNum(v))}" ${req}>${hint}</label>`;
     case 'check': return `<label class="check" style="align-self:end;min-height:34px"><input type="checkbox" name="${f.k}" ${v ? 'checked' : ''}>${t('f_' + f.k)}</label>`;
     case 'flags': return `<div class="${cls}">${label}<div class="check-grid">${['canAdd', 'canEdit', 'canDelete', 'canPost'].map(k =>
       `<label class="check"><input type="checkbox" name="${k}" ${rec[k] ? 'checked' : ''}>${t('f_' + k)}</label>`).join('')}</div></div>`;
@@ -568,14 +748,15 @@ function fieldHtml(f, rec, isNew) {
       return `<div class="${cls}">${label}<div class="check-grid">${PAGES.map(p =>
         `<label class="check"><input type="checkbox" name="page" value="${p.id}" ${sel.indexOf(p.id) > -1 ? 'checked' : ''}>${t('p_' + p.id)}</label>`).join('')}</div></div>`;
     }
-    default: return `<label class="${cls}">${label}<input name="${f.k}" type="${f.type || 'text'}" ${f.type === 'number' ? 'step="any"' : ''} value="${esc(v)}" ${req} ${f.lock && !isNew ? 'readonly' : ''} ${f.type === 'password' ? 'autocomplete="new-password"' : ''}>${hint}</label>`;
+    default: return `<label class="${cls}">${label}<input name="${f.k}" type="${f.type || 'text'}" value="${esc(v)}" ${req} ${f.lock && !isNew ? 'readonly' : ''} ${f.type === 'password' ? 'autocomplete="new-password"' : ''}>${hint}</label>`;
   }
 }
 
 function openForm(entity, rec, isNew) {
   rec = Object.assign({}, rec || {});
+  FORM = { entity, rec, isNew };
   const fields = FORMS[entity]().filter(f => !f.hide);
-  FORM = { entity, rec, isNew, fields };
+  FORM.fields = fields;
   openDrawer(`
     <div class="drawer-head"><h2>${isNew ? '＋ ' : '✎ '}${t(ENTITY_TITLE[entity])}</h2><button class="icon-button" data-act="closeDrawer" aria-label="${t('close')}">×</button></div>
     <form class="form-panel" id="recForm" style="padding:16px 0 0">
@@ -584,26 +765,43 @@ function openForm(entity, rec, isNew) {
     </form>`);
 }
 
+/** Transaction form: amount × rate → debit/credit, currency → exchange rate. */
+function txFormCalc(form, changed) {
+  const E = form.elements, set = (n, v) => { E[n].value = v === '' ? '' : groupDigits(String(Math.round(v * 100) / 100)); };
+  if (changed === 'currency') {
+    const r = rateOf(E.currency.value), l = rateOf(localCur());
+    if (r && l) E.exchange.value = groupDigits(String(+(r / l).toFixed(6)));
+    changed = 'amountCur';
+  }
+  const ex = parseNum(E.exchange.value) || 1;
+  if (changed === 'amountCur' || changed === 'exchange') {
+    const amt = parseNum(E.amountCur.value);
+    if (!amt) return;
+    const local = Math.abs(amt) * ex;
+    if (amt < 0) { set('debitMST', local); set('creditMST', 0); } else { set('creditMST', local); set('debitMST', 0); }
+  } else if (changed === 'debitMST' || changed === 'creditMST') {
+    const d = parseNum(E.debitMST.value), c = parseNum(E.creditMST.value);
+    if (d || c) set('amountCur', (c - d) / ex);
+  }
+}
+
 async function submitForm(form) {
   const { entity, rec, isNew, fields } = FORM;
   const data = {};
-  const idKey = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', FollowUps: 'id', Users: 'userId' }[entity];
-  if (!isNew) data[idKey] = rec[idKey];
+  if (!isNew) data[ID_KEY[entity]] = rec[ID_KEY[entity]];
   fields.forEach(f => {
     if (f.type === 'flags') ['canAdd', 'canEdit', 'canDelete', 'canPost'].forEach(k => { data[k] = form.elements[k].checked; });
     else if (f.type === 'pages') data.pages = $$('input[name=page]:checked', form).map(i => i.value).join(',');
     else if (f.type === 'check') data[f.k] = form.elements[f.k].checked;
+    else if (f.type === 'number') data[f.k] = form.elements[f.k].value.trim() === '' ? '' : parseNum(form.elements[f.k].value);
     else data[f.k] = form.elements[f.k].value.trim();
   });
-  if ((entity === 'Transactions' || entity === 'FollowUps') && !S.lookups.customers.some(c => c.account === data.account)) {
-    toast(t('err_NOT_FOUND') + ': ' + data.account, 'error'); return;
-  }
   const b = form.querySelector('button[type=submit]'); b.disabled = true;
   try {
     await call('saveRecord', entity, data, isNew);
     toast(t('saved'));
     closeDrawer();
-    if (['Customers', 'CustomerGroups', 'Users'].indexOf(entity) > -1) await refreshLookups();
+    if (['Customers', 'CustomerGroups', 'Users', 'Currencies'].indexOf(entity) > -1) await refreshLookups();
     reload();
   } catch (e) { b.disabled = false; }
 }
@@ -613,51 +811,56 @@ function openDrawer(html, wide) {
   const d = $('#drawer');
   d.className = 'drawer' + (wide ? ' wide' : '');
   d.innerHTML = html; d.scrollTop = 0;
+  enhance(d);
   $('#overlay').classList.add('open');
 }
 function closeDrawer() { $('#overlay').classList.remove('open'); }
 
 /** Customer 360: balance, overdue, contact data, statement with running balance, follow-ups. */
-async function openCustomer(account, from, to, keep) {
-  const canStatement = ['customers', 'balances', 'overdue', 'followup', 'collection', 'dashboard', 'paid'].some(hasPage);
-  if (!canStatement) return;
+async function openCustomer(account, from, to, keep, currency) {
+  if (!['customers', 'balances', 'overdue', 'followup', 'collection', 'dashboard', 'paid', 'credit', 'transactions'].some(hasPage)) return;
   if (!keep) openDrawer(`<div class="skeleton">${t('loading')}</div>`, true);
-  const r = await call('customerStatement', account, from || '', to || '');
+  const r = await call('customerStatement', account, from || '', to || '', currency || '');
   const c = r.customer || {};
+  const cc = r.currency;
   const kv = (k, v) => `<div><div class="drawer-label">${t(k)}</div><p>${v || '—'}</p></div>`;
   const cols = [{ k: 'date', l: t('f_date') }, { k: 'voucher', l: t('f_voucher') }, { k: 'type', l: t('f_type') },
-    { k: 'description', l: t('f_description'), cls: 'wrap' }, { k: 'debit', l: t('debit'), num: true }, { k: 'credit', l: t('credit'), num: true }, { k: 'balance', l: t('balance'), num: true }];
-  const openingRow = `<tr><td data-label="">${t('opening')}</td><td></td><td></td><td></td><td></td><td></td><td class="num" data-label="${t('balance')}">${numCell(r.opening)}</td></tr>`;
+    { k: 'description', l: t('f_description'), cls: 'clip' }, { k: 'currency', l: t('f_currency') }, { k: 'amountCur', l: t('f_amountCur'), num: true },
+    { k: 'debit', l: t('debit') + ' ' + cc, num: true }, { k: 'credit', l: t('credit') + ' ' + cc, num: true }, { k: 'balance', l: t('balance') + ' ' + cc, num: true }];
+  const blank = n => '<td></td>'.repeat(n);
   S.exportData = { name: 'statement_' + account, cols: cols, rows: r.lines };
   openDrawer(`
-    <div class="drawer-head"><div><h2>${esc(c.name)}</h2><p style="margin:4px 0 0">${esc(c.account)} · ${esc(groupName(c.group))} · ${statusPill(c.status)}</p></div>
+    <div class="drawer-head"><div><h2>${bdi(c.name)}</h2><p style="margin:4px 0 0">${esc(c.account)} · ${bdi(groupName(c.group))} · ${esc(c.currency || '')} · ${statusPill(c.status)}</p></div>
       <button class="icon-button" data-act="closeDrawer" aria-label="${t('close')}">×</button></div>
+    ${missingNotice(r)}
     <section class="stats four" style="margin:16px 0 0">
-      ${stat(t('balance'), `${money(r.closing)} <small>${esc(cur())}</small>`, '$', 'green')}
-      ${stat(t('openAmount'), money(r.openAmount), '◔', '')}
-      ${stat(t('overdueAmt'), money(r.overdueAmount), '!', 'red')}
-      ${stat(t('maxDays'), r.maxDays + ' <small>' + t('day') + '</small>', '⏱', 'amber')}
+      ${stat(t('balance'), `${money(r.closing)}${curTag(cc)}`, '$', 'green')}
+      ${stat(t('openAmount'), `${money(r.openAmount)}${curTag(cc)}`, '◔', '')}
+      ${stat(t('overdueAmt'), `${money(r.overdueAmount)}${curTag(cc)}`, '!', 'red')}
+      ${stat(t('maxDays'), NI.format(r.maxDays) + ' <small>' + t('day') + '</small>', '⏱', 'amber')}
     </section>
     <div class="panel"><div class="drawer-label" style="margin-bottom:10px">${t('customerInfo')}</div><div class="kv">
-      ${kv('f_contactPerson', esc(c.contactPerson))}${kv('f_phone', c.phone ? `<a style="color:inherit" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : '')}
-      ${kv('f_email', c.email ? `<a style="color:inherit" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}${kv('f_address', esc([c.address, c.city, c.country].filter(Boolean).join('، ')))}
-      ${kv('f_collector', esc(collectorName(c.collector)))}${kv('f_currency', esc(c.currency))}
-      ${kv('f_creditLimit', c.creditLimit ? money(c.creditLimit) : '')}${kv('f_termsDays', esc(c.termsDays))}
+      ${kv('f_contactPerson', bdi(c.contactPerson))}${kv('f_phone', c.phone ? `<a style="color:inherit" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : '')}
+      ${kv('f_email', c.email ? `<a style="color:inherit" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}${kv('f_address', bdi([c.address, c.city, c.country].filter(Boolean).join('، ')))}
+      ${kv('f_collector', bdi(collectorName(c.collector)))}${kv('f_currency', esc(c.currency))}
+      ${kv('f_creditLimit', c.creditLimit ? money(c.creditLimit) + curTag(c.currency) : '')}${kv('f_termsDays', esc(c.termsDays))}
       ${kv('f_taxNo', esc(c.taxNo))}${kv('f_createdAt', esc(c.createdAt))}</div>
       ${c.notes ? `<div class="drawer-label">${t('f_notes')}</div><p>${esc(c.notes)}</p>` : ''}
       <div class="card-actions">
         ${hasPage('customers') && can('edit') ? btn('custEdit', '✎ ' + t('edit'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
         ${hasPage('followup') && can('add') ? btn('newFollow', '☎ ' + t('logAction'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
-        ${btn('export', t('exportCsv'), 'button-ghost')}${btn('print', t('print'), 'button-ghost')}
+        ${exportBtn()}${btn('print', t('print'), 'button-ghost')}
       </div></div>
     <div class="panel flush">
       <div class="section-head"><h3 class="section-title">${t('statement')}</h3></div>
       <div class="view-tools" id="stmtTools" data-acc="${esc(c.account)}" style="margin:0">
         ${tool('from', t('from'), 'date', from || '')}${tool('to', t('to'), 'date', to || '')}
+        ${tool('currency', t('displayCurrency'), 'select', cc, currencyOpts([String(c.currency || '').toUpperCase()]), true)}
         <div class="tool-btns">${btn('stmtApply', t('apply'))}</div></div>
       <div class="table-wrap"><table class="cards"><thead><tr>${cols.map(x => `<th class="${x.num ? 'num' : ''}">${esc(x.l)}</th>`).join('')}</tr></thead>
-        <tbody>${openingRow}${r.lines.map(l => '<tr>' + cols.map(x => `<td data-label="${esc(x.l)}" class="${x.num ? 'num' : ''} ${x.cls || ''}">${x.num ? numCell(l[x.k]) : esc(l[x.k])}</td>`).join('') + '</tr>').join('')}</tbody>
-        <tfoot><tr><td data-label="">${t('closing')}</td><td></td><td></td><td></td><td></td><td></td><td class="num" data-label="${t('balance')}">${numCell(r.closing)}</td></tr></tfoot></table></div></div>
+        <tbody><tr><td data-label="">${t('opening')}</td>${blank(7)}<td class="num" data-label="${t('balance')}">${numCell(r.opening)}</td></tr>
+        ${r.lines.map(l => '<tr>' + cols.map(x => `<td data-label="${esc(x.l)}" class="${x.num ? 'num' : ''} ${x.cls || ''}"${x.cls === 'clip' ? ` title="${esc(l[x.k])}"` : ''}>${x.num ? numCell(l[x.k]) : bdi(l[x.k])}</td>`).join('') + '</tr>').join('')}</tbody>
+        <tfoot><tr><td data-label="">${t('closing')}</td>${blank(7)}<td class="num" data-label="${t('balance')}">${numCell(r.closing)}${curTag(cc)}</td></tr></tfoot></table></div></div>
     ${r.followUps.length ? `<div class="panel"><div class="drawer-label">${t('followLog')}</div>${r.followUps.map(f =>
       `<p><b style="color:var(--text)">${esc(f.actionDate)} · ${esc(t(f.actionType))}</b> ${statusPill(f.status)}<br>${esc(f.note)}${f.promiseDate ? `<br>${t('f_promiseDate')}: ${esc(f.promiseDate)} — ${money(f.promiseAmount)}` : ''}</p>`).join('')}</div>` : ''}
   `, true);
@@ -666,36 +869,52 @@ async function openCustomer(account, from, to, keep) {
 // ───────── Views ─────────
 const VIEWS = {
   async dashboard() {
-    setContent(heading('dashboard', [hasPage('transactions') && can('add') && btn('newTx', '＋ ' + t('addTransaction'))]) + `<div class="skeleton">${t('loading')}</div>`);
-    const d = await call('getDashboard');
-    setBadge('overdue', d.kpi.overdueCustomers); setBadge('followup', d.kpi.overdueCustomers);
+    const f = S.rep.dashboard = S.rep.dashboard || {};
+    const actions = () => [`<div class="view-tools inline-tools" id="dashTools">${curTool(f)}</div>`,
+      hasPage('transactions') && can('add') && btn('newTx', '＋ ' + t('addTransaction'))];
+    setContent(heading('dashboard', actions()) + `<div class="skeleton">${t('loading')}</div>`);
+    const d = await call('getDashboard', f.currency || '');
+    setBadge('overdue', d.kpi.overdueCustomers); setBadge('followup', d.kpi.overdueCustomers); setBadge('credit', d.kpi.creditOver);
     if (S.view !== 'dashboard') return;
+    const cc = d.currency;
     const max = Math.max(1, ...d.months.map(m => Math.max(m.debit, m.credit)));
     const totalB = Object.values(d.buckets).reduce((a, b) => a + b, 0) || 1;
     const pct = k => d.buckets[k] / totalB * 100;
     const p1 = pct('b1'), p2 = p1 + pct('b2'), p3 = p2 + pct('b3');
     const donutBg = Object.values(d.buckets).some(Boolean)
       ? `conic-gradient(var(--green) 0 ${p1}%, var(--amber) ${p1}% ${p2}%, var(--orange) ${p2}% ${p3}%, var(--red) ${p3}% 100%)` : 'var(--surface-raised)';
-    const topCols = [{ k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'account', l: t('f_account') }, { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) },
-      { k: 'balance', l: t('balance'), num: true }, { k: 'overdue', l: t('overdueAmt'), num: true },
+    const topCols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'custCurrency', l: t('f_currency') },
+      { k: 'collector', l: t('f_collector'), f: v => bdi(collectorName(v)), x: r => collectorName(r.collector) },
+      { k: 'balance', l: t('balance') + ' ' + cc, num: true }, { k: 'overdue', l: t('overdueAmt') + ' ' + cc, num: true },
       { k: 'maxDays', l: t('maxDays'), f: v => v ? daysPill(v) : pill('0', 'healthy') }];
-    setContent(heading('dashboard', [hasPage('transactions') && can('add') && btn('newTx', '＋ ' + t('addTransaction'))]) + `
+    S.exportData = { name: 'top_customers', cols: topCols, rows: d.top };
+    setContent(heading('dashboard', actions()) + missingNotice(d) + `
       <section class="stats four">
-        ${stat(t('k_customers'), d.kpi.customers, '♙', '', `<span class="trend">${d.kpi.active}</span><span>${t('activeWord')}</span>`)}
-        ${stat(t('k_receivable'), `${short(d.kpi.receivable)} <small>${esc(cur())}</small>`, '$', 'green', d.kpi.drafts ? `<span class="trend down">${d.kpi.drafts}</span><span>${t('drafts')}</span>` : '')}
-        ${stat(t('k_overdue'), `${short(d.kpi.overdue)} <small>${esc(cur())}</small>`, '!', 'red', `<span class="trend down">${d.kpi.overdueCustomers}</span><span>${t('lateCustomers')} · ${t('avgLate', { n: d.kpi.avgDays })}</span>`)}
-        ${stat(t('k_collected'), `${short(d.kpi.collectedMTD)} <small>${esc(cur())}</small>`, '✓', 'amber')}
+        ${stat(t('k_customers'), NI.format(d.kpi.customers), '♙', '', `<span class="trend">${NI.format(d.kpi.active)}</span><span>${t('activeWord')}</span>`)}
+        ${stat(t('k_receivable'), `${money(d.kpi.receivable)}${curTag(cc)}`, '$', 'green', d.kpi.drafts ? `<span class="trend down">${NI.format(d.kpi.drafts)}</span><span>${t('drafts')}</span>` : '')}
+        ${stat(t('k_overdue'), `${money(d.kpi.overdue)}${curTag(cc)}`, '!', 'red', `<span class="trend down">${NI.format(d.kpi.overdueCustomers)}</span><span>${t('lateCustomers')} · ${t('avgLate', { n: d.kpi.avgDays })}</span>`)}
+        ${stat(t('k_collected'), `${money(d.kpi.collectedMTD)}${curTag(cc)}`, '✓', 'amber')}
       </section>
-      <section class="charts">
+      <div class="section-head" style="padding:0 0 10px;border:0"><h2 class="section-title">${t('byCurrency')}</h2></div>
+      <div class="cur-grid">${d.byCurrency.map(x => `
+        <article class="panel risk-item">
+          <div class="card-head"><h3 style="margin:0;font-size:18px">${esc(x.currency)}</h3><span class="badge">${NI.format(x.customers)} ${t('customersCount')}</span></div>
+          <div class="mini-stats">
+            <div><span>${t('balance')}</span><b>${money(x.balance)}</b></div>
+            <div><span>${t('overdueAmt')}</span><b class="neg">${money(x.overdue)}</b></div>
+            <div><span>${t('overdueCustomers')}</span><b>${NI.format(x.overdueCustomers)}</b></div>
+            <div><span>${t('creditOverN')}</span><b class="${x.creditOver ? 'neg' : ''}">${NI.format(x.creditOver)}</b></div>
+          </div></article>`).join('')}</div>
+      <section class="charts section">
         <article class="panel">
-          <div class="section-head"><h2 class="section-title">${t('monthly')}</h2>
+          <div class="section-head"><h2 class="section-title">${t('monthly')} (${esc(cc)})</h2>
             <div class="legend" style="display:flex;gap:12px"><span class="legend-row"><i class="dot blue"></i>${t('invoicesL')}</span><span class="legend-row"><i class="dot"></i>${t('paymentsL')}</span></div></div>
           <div class="chart-body">${d.months.map(m => `<div class="bar-group" title="${esc(m.key)}: ${money(m.debit)} / ${money(m.credit)}">
             <div class="bar-pair"><div class="bar" style="height:${m.debit / max * 100}%"></div><div class="bar alt" style="height:${m.credit / max * 100}%"></div></div><span>${esc(m.label)}</span></div>`).join('')}</div>
         </article>
         <article class="panel">
           <div class="section-head"><h2 class="section-title">${t('aging')}</h2>${hasPage('overdue') ? `<button class="section-action" data-go="overdue">${t('details')}</button>` : ''}</div>
-          <div class="donut-wrap"><div class="donut" style="background:${donutBg}"><div class="donut-center"><div>${d.kpi.overdueCustomers}<small>${t('lateCustomers')}</small></div></div></div>
+          <div class="donut-wrap"><div class="donut" style="background:${donutBg}"><div class="donut-center"><div>${NI.format(d.kpi.overdueCustomers)}<small>${t('lateCustomers')}</small></div></div></div>
             <div class="legend">${['b1', 'b2', 'b3', 'b4'].map((b, i) => `<div class="legend-row"><i class="dot ${['', 'amber', 'orange', 'red'][i]}"></i>${t(b)} <b>${short(d.buckets[b])}</b></div>`).join('')}</div></div>
         </article>
       </section>
@@ -706,27 +925,52 @@ const VIEWS = {
   },
 
   customers() {
-    setContent(heading('customers', [can('add') && btn('newCustomer', '＋ ' + t('addCustomer')), btn('export', t('exportCsv'), 'button-ghost')]) + listBlock('customers'));
+    setContent(heading('customers', [can('add') && btn('newCustomer', '＋ ' + t('addCustomer')), exportBtn()]) + listBlock('customers'));
     loadList('customers');
   },
 
   transactions() {
     setContent(heading('transactions', [can('post') && btn('postSelected', '⇪ ' + t('postSelected'), 'button-ghost'),
-      can('add') && btn('newTx', '＋ ' + t('addTransaction')), btn('export', t('exportCsv'), 'button-ghost')]) + listBlock('transactions'));
+      can('add') && btn('newTx', '＋ ' + t('addTransaction')), exportBtn()]) + listBlock('transactions'));
     loadList('transactions');
   },
 
   groups() {
-    setContent(heading('groups', [can('add') && btn('newGroup', '＋ ' + t('addGroup'))]) + listBlock('groups'));
+    setContent(heading('groups', [can('add') && btn('newGroup', '＋ ' + t('addGroup')), exportBtn()]) + listBlock('groups'));
     loadList('groups');
+  },
+
+  async currencies() {
+    setContent(heading('currencies', [can('add') && btn('newCurrency', '＋ ' + t('addCurrency')), exportBtn()]) +
+      `<div id="curTop"><div class="skeleton">${t('loading')}</div></div>` + listBlock('currencies'));
+    loadList('currencies');
+    const st = await call('getCurrencyStatus');
+    if (S.view !== 'currencies') return;
+    const s = st.settings;
+    const list = currencyOpts([s.ReportCurrency, s.LocalCurrency].filter(Boolean).map(x => x.toUpperCase()));
+    const dis = can('edit') ? '' : 'disabled';
+    $('#curTop').innerHTML = `
+      ${st.missing.length ? `<div class="panel notice">⚠ ${t('missingRates')}: ${st.missing.map(c =>
+        can('add') ? `<button class="button-ghost" data-act="newCurrency" data-code="${esc(c)}">＋ ${esc(c)}</button>` : `<b>${esc(c)}</b>`).join(' ')}</div>` : ''}
+      <form class="panel form-panel" id="curSettings" style="margin-bottom:16px">
+        <h2 class="section-title">${t('curSettings')}</h2>
+        <p class="subtitle" style="margin:0;line-height:1.7">${t('curHelp')}</p>
+        <div class="form-grid">
+          <label class="field">${t('ReportCurrency')}<select name="ReportCurrency" ${dis}>${opts(list, (s.ReportCurrency || '').toUpperCase())}</select></label>
+          <label class="field">${t('LocalCurrency')}<select name="LocalCurrency" ${dis}>${opts(list, (s.LocalCurrency || '').toUpperCase())}</select></label>
+          <label class="field span2">${t('ConversionBasis')}<select name="ConversionBasis" ${dis}>${opts([['local', t('basis_local')], ['transaction', t('basis_transaction')]], s.ConversionBasis)}</select></label>
+        </div>
+        ${can('edit') ? `<div style="display:flex;justify-content:end"><button class="button-primary" type="submit">${t('save')}</button></div>` : ''}
+      </form>`;
+    enhance($('#curTop'));
   },
 
   users() {
     const st = S.settings;
-    setContent(heading('users', [btn('newUser', '＋ ' + t('addUser'))]) + listBlock('users') + `
+    setContent(heading('users', [btn('newUser', '＋ ' + t('addUser')), exportBtn()]) + listBlock('users') + `
       <form class="panel form-panel section" id="settingsForm">
         <h2 class="section-title">${t('settings')}</h2>
-        <div class="form-grid">${['AppName', 'CompanyName', 'LocalCurrency'].map(k =>
+        <div class="form-grid">${['AppName', 'CompanyName'].map(k =>
           `<label class="field">${t(k)}<input name="${k}" value="${esc(st[k] || '')}"></label>`).join('')}</div>
         <div style="display:flex;justify-content:end"><button class="button-primary" type="submit">${t('save')}</button></div>
       </form>`);
@@ -739,7 +983,8 @@ const VIEWS = {
       <div class="panel view-tools" id="repTools">
         ${tool('dateFrom', t('from'), 'date', f.dateFrom)}${tool('dateTo', t('to'), 'date', f.dateTo)}
         ${tool('group', t('f_group'), 'select', f.group, groupOpts())}${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}
-        ${tool('account', t('f_account'), 'customer', f.account)}${tool('hideZero', t('hideZero'), 'check', f.hideZero)}
+        ${tool('account', t('f_account'), 'customer', f.account)}${tool('custCurrency', t('f_currency'), 'select', f.custCurrency, currencyOpts())}
+        ${curTool(f)}${tool('hideZero', t('hideZero'), 'check', f.hideZero)}
         <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
       <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
     runReport();
@@ -751,7 +996,7 @@ const VIEWS = {
       <div class="panel view-tools" id="repTools">
         ${tool('dateFrom', t('from'), 'date', f.dateFrom)}${tool('dateTo', t('to'), 'date', f.dateTo)}
         ${tool('group', t('f_group'), 'select', f.group, groupOpts())}${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}
-        ${tool('account', t('f_account'), 'customer', f.account)}
+        ${tool('account', t('f_account'), 'customer', f.account)}${curTool(f)}
         <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
       <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
     runReport();
@@ -761,10 +1006,24 @@ const VIEWS = {
     const f = S.rep.overdue = S.rep.overdue || { asOf: today(), minDays: 1, tab: 'inv' };
     setContent(heading('overdue', reportBtns()) + `
       <div class="panel view-tools" id="repTools">
-        ${tool('asOf', t('asOf'), 'date', f.asOf)}${tool('group', t('f_group'), 'select', f.group, groupOpts())}
+        ${tool('asOf', t('asOf'), 'date', f.asOf)}${tool('voucher', t('voucherSearch'), 'search', f.voucher)}
+        ${tool('group', t('f_group'), 'select', f.group, groupOpts())}
         ${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}${tool('account', t('f_account'), 'customer', f.account)}
         ${tool('minDays', t('minDays'), 'number', f.minDays)}
-        ${tool('bucket', t('bucket'), 'select', f.bucket, ['b1', 'b2', 'b3', 'b4'].map(b => [b, t(b)]))}
+        ${tool('bucket', t('bucket'), 'select', f.bucket, ['b1', 'b2', 'b3', 'b4'].map(b => [b, t(b)]))}${curTool(f)}
+        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
+      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
+    runReport();
+  },
+
+  credit() {
+    const f = S.rep.credit = S.rep.credit || { asOf: today(), threshold: 100 };
+    setContent(heading('credit', reportBtns()) + `
+      <div class="panel view-tools" id="repTools">
+        ${tool('asOf', t('asOf'), 'date', f.asOf)}${tool('group', t('f_group'), 'select', f.group, groupOpts())}
+        ${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}${tool('account', t('f_account'), 'customer', f.account)}
+        ${tool('custCurrency', t('f_currency'), 'select', f.custCurrency, currencyOpts())}
+        ${tool('threshold', t('threshold'), 'number', f.threshold)}${tool('includeNoLimit', t('includeNoLimit'), 'check', f.includeNoLimit)}
         <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
       <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
     runReport();
@@ -775,10 +1034,10 @@ const VIEWS = {
     setContent(heading('followup', [can('add') && btn('newFollow', '＋ ' + t('newFollowUp'))]) + `
       <div class="panel view-tools" id="repTools">
         ${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}${tool('group', t('f_group'), 'select', f.group, groupOpts())}
-        ${tool('minDays', t('minDays'), 'number', f.minDays)}
+        ${tool('minDays', t('minDays'), 'number', f.minDays)}${curTool(f)}
         <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
       <div id="repOut"><div class="skeleton">${t('loading')}</div></div>
-      <section class="section"><div class="section-head panel" style="border-radius:8px 8px 0 0;border-bottom:0"><h2 class="section-title">${t('followLog')}</h2></div>
+      <section class="section"><div class="section-head panel" style="border-radius:8px 8px 0 0;border-bottom:0"><h2 class="section-title">${t('followLog')}</h2>${exportBtn()}</div>
         ${listBlock('followlog').replace('class="panel view-tools"', 'class="panel view-tools" style="border-radius:0;margin:0;border-bottom:0"')}</section>`);
     runReport();
     loadList('followlog');
@@ -789,7 +1048,7 @@ const VIEWS = {
     setContent(heading('collection', reportBtns()) + `
       <div class="panel view-tools" id="repTools">
         ${tool('asOf', t('asOf'), 'date', f.asOf)}${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}
-        ${tool('group', t('f_group'), 'select', f.group, groupOpts())}
+        ${tool('group', t('f_group'), 'select', f.group, groupOpts())}${curTool(f)}
         <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
       <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
     runReport();
@@ -800,12 +1059,12 @@ const VIEWS = {
       <section class="panel form-panel">
         <p class="subtitle" style="margin:0;line-height:1.7">${t('imp_help')}</p>
         <div class="form-grid">
-          <label class="field">${t('imp_entity')}<select id="impEntity">${opts([['Customers', t('p_customers')], ['Transactions', t('p_transactions')], ['CustomerGroups', t('p_groups')]], 'Customers')}</select></label>
+          <label class="field">${t('imp_entity')}<select id="impEntity">${opts([['Customers', t('p_customers')], ['Transactions', t('p_transactions')], ['CustomerGroups', t('p_groups')], ['Currencies', t('p_currencies')]], 'Customers')}</select></label>
           <label class="field">${t('imp_mode')}<select id="impMode">${opts([['append', t('append')], ['upsert', t('upsert')]].concat(can('delete') ? [['replace', t('replace')]] : []), 'upsert')}</select></label>
           <label class="field span2">${t('chooseFile')}<input type="file" id="impFile" accept=".xlsx,.xls,.csv"></label>
         </div>
         <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          ${btn('impTemplate', t('template'), 'button-ghost')}${btn('impRun', t('importNow'), 'button-primary', 'id="impRun" disabled')}</div>
+          ${btn('impTemplate', '⬇ ' + t('template'), 'button-ghost')}${btn('impRun', t('importNow'), 'button-primary', 'id="impRun" disabled')}</div>
       </section>
       <div id="impPreview"></div>`);
   }
@@ -814,101 +1073,126 @@ const VIEWS = {
 // Report runner — reads the tool bar, calls the matching server report, renders it.
 async function runReport() {
   const view = S.view;
-  const tools = $('#repTools');
-  const f = Object.assign(S.rep[view], readTools(tools));
+  const f = Object.assign(S.rep[view], readTools($('#repTools')));
   const out = () => $('#repOut');
+  const collCol = { k: 'collector', l: t('f_collector'), f: v => bdi(collectorName(v)), x: r => collectorName(r.collector) };
   if (view === 'balances') {
     const r = await call('reportBalances', f);
     if (S.view !== view) return;
-    const cols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'group', l: t('f_group'), f: v => esc(groupName(v)) },
-      { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) },
+    const cc = r.currency;
+    const cols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'group', l: t('f_group'), f: v => bdi(groupName(v)), x: r => groupName(r.group) },
+      { k: 'custCurrency', l: t('f_currency') }, collCol,
       { k: 'opening', l: t('opening'), num: true }, { k: 'debit', l: t('debit'), num: true }, { k: 'credit', l: t('credit'), num: true }, { k: 'closing', l: t('closing'), num: true }];
-    S.exportData = { name: 'balances_' + r.from + '_' + r.to, cols, rows: r.rows };
-    out().innerHTML = `<section class="stats four">
-        ${stat(t('opening'), short(r.totals.opening), '◐', '')}${stat(t('debit'), short(r.totals.debit), '↑', 'amber')}
-        ${stat(t('credit'), short(r.totals.credit), '↓', 'green')}${stat(t('closing'), short(r.totals.closing), '$', 'red', `<span>${r.rows.length} ${t('customersCount')}</span>`)}</section>
-      <section class="panel">${table('balances', cols, r.rows, { click: true, sortable: false, foot: footRow(cols, r.totals, t('all')) })}</section>`;
+    S.exportData = { name: 'balances_' + r.from + '_' + r.to + '_' + cc, cols, rows: r.rows, totals: r.totals };
+    out().innerHTML = missingNotice(r) + `<section class="stats four">
+        ${stat(t('opening'), money(r.totals.opening) + curTag(cc), '◐', '')}${stat(t('debit'), money(r.totals.debit) + curTag(cc), '↑', 'amber')}
+        ${stat(t('credit'), money(r.totals.credit) + curTag(cc), '↓', 'green')}${stat(t('closing'), money(r.totals.closing) + curTag(cc), '$', 'red', `<span>${NI.format(r.rows.length)} ${t('customersCount')}</span>`)}</section>
+      <section class="panel">${table('balances', cols, r.rows, { click: true, sortable: false, foot: footRow(cols, r.totals, t('all') + ' (' + cc + ')') })}</section>`;
   } else if (view === 'paid') {
     const r = await call('reportPaidInvoices', f);
     if (S.view !== view) return;
-    const cols = [{ k: 'voucher', l: t('f_voucher') }, { k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'date', l: t('f_date') }, { k: 'dueDate', l: t('f_dueDate') },
-      { k: 'paidDate', l: t('paidDate') }, { k: 'amount', l: t('amount'), num: true },
-      { k: 'lateDays', l: t('lateDays'), f: v => v ? daysPill(v) : pill(t('onTime'), 'healthy') }, { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) }];
-    S.exportData = { name: 'paid_invoices', cols, rows: r.rows };
-    out().innerHTML = `<section class="stats four">
-        ${stat(t('paidCount'), r.totals.count, '✓', 'green')}${stat(t('totalPaid'), short(r.totals.amount), '$', '')}
-        ${stat(t('onTime'), r.totals.onTime, '◷', 'green')}${stat(t('late'), r.totals.late, '!', 'red')}</section>
+    const cc = r.currency;
+    const cols = [{ k: 'voucher', l: t('f_voucher') }, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'date', l: t('f_date') }, { k: 'dueDate', l: t('f_dueDate') },
+      { k: 'paidDate', l: t('paidDate') }, { k: 'amount', l: t('amount') + ' ' + cc, num: true },
+      { k: 'lateDays', l: t('lateDays'), f: v => v ? daysPill(v) : pill(t('onTime'), 'healthy') }, collCol];
+    S.exportData = { name: 'paid_invoices', cols, rows: r.rows, totals: { amount: r.totals.amount } };
+    out().innerHTML = missingNotice(r) + `<section class="stats four">
+        ${stat(t('paidCount'), NI.format(r.totals.count), '✓', 'green')}${stat(t('totalPaid'), money(r.totals.amount) + curTag(cc), '$', '')}
+        ${stat(t('onTime'), NI.format(r.totals.onTime), '◷', 'green')}${stat(t('late'), NI.format(r.totals.late), '!', 'red')}</section>
       <section class="panel">${table('paid', cols, r.rows, { click: true, sortable: false, foot: footRow(cols, { amount: r.totals.amount }, t('all')) })}</section>`;
   } else if (view === 'overdue') {
     const r = await call('reportOverdue', f);
     if (S.view !== view) return;
-    setBadge('overdue', f.account || f.group || f.collector ? S.badges.overdue : r.totals.customers);
+    const cc = r.currency;
+    if (!f.account && !f.group && !f.collector && !f.voucher) setBadge('overdue', r.totals.customers);
     const rows = f.bucket ? r.rows.filter(x => x.bucket === f.bucket) : r.rows;
-    const invCols = [{ k: 'voucher', l: t('f_voucher') }, { k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'date', l: t('f_date') }, { k: 'dueDate', l: t('f_dueDate') },
-      { k: 'amount', l: t('amount'), num: true }, { k: 'remaining', l: t('remaining'), num: true }, { k: 'days', l: t('days'), f: daysPill },
-      { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) }, { k: 'lastFollowUp', l: t('lastFollowUp') }];
+    const invCols = [{ k: 'voucher', l: t('f_voucher') }, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'date', l: t('f_date') }, { k: 'dueDate', l: t('f_dueDate') },
+      { k: 'amount', l: t('amount') + ' ' + cc, num: true }, { k: 'remaining', l: t('remaining') + ' ' + cc, num: true }, { k: 'days', l: t('days'), f: daysPill },
+      collCol, { k: 'lastFollowUp', l: t('lastFollowUp') }];
     const custRows = f.bucket ? groupCustomers(rows) : r.customers;
-    const custCols = [{ k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'account', l: t('f_account') }, { k: 'count', l: t('invoices') },
-      { k: 'remaining', l: t('overdueAmt'), num: true }, { k: 'maxDays', l: t('maxDays'), f: daysPill }, { k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) },
+    const custCols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'count', l: t('invoices'), num: true, f: v => NI.format(v) },
+      { k: 'remaining', l: t('overdueAmt') + ' ' + cc, num: true }, { k: 'maxDays', l: t('maxDays'), f: daysPill }, collCol,
       { k: 'phone', l: t('f_phone') }, { k: 'lastFollowUp', l: t('lastFollowUp') }, { k: 'promiseDate', l: t('f_promiseDate') }];
     const byCust = f.tab === 'cust';
-    S.exportData = byCust ? { name: 'overdue_customers', cols: custCols, rows: custRows } : { name: 'overdue_invoices', cols: invCols, rows };
     const sumRem = rows.reduce((a, x) => a + x.remaining, 0);
-    out().innerHTML = `<section class="stats four">
-        ${stat(t('overdueAmt'), `${short(sumRem)} <small>${esc(cur())}</small>`, '!', 'red')}${stat(t('overdueInvoices'), rows.length, '▤', 'amber')}
-        ${stat(t('overdueCustomers'), custRows.length, '♙', '')}${stat(t('avgDays'), r.totals.avgDays + ' <small>' + t('day') + '</small>', '⏱', 'amber')}</section>
-      <section class="panel" style="padding:14px 16px;margin-bottom:16px"><div class="legend" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+    S.exportData = byCust ? { name: 'overdue_customers', cols: custCols, rows: custRows, totals: { remaining: sumRem } }
+      : { name: 'overdue_invoices', cols: invCols, rows, totals: { remaining: sumRem } };
+    out().innerHTML = missingNotice(r) + `<section class="stats four">
+        ${stat(t('overdueAmt'), money(sumRem) + curTag(cc), '!', 'red')}${stat(t('overdueInvoices'), NI.format(rows.length), '▤', 'amber')}
+        ${stat(t('overdueCustomers'), NI.format(custRows.length), '♙', '')}${stat(t('avgDays'), NI.format(r.totals.avgDays) + ' <small>' + t('day') + '</small>', '⏱', 'amber')}</section>
+      <section class="panel" style="padding:14px 16px;margin-bottom:16px"><div class="legend" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         ${['b1', 'b2', 'b3', 'b4'].map((b, i) => `<div><div class="legend-row"><i class="dot ${['', 'amber', 'orange', 'red'][i]}"></i>${t(b)} <b style="color:var(--text)">${money(r.buckets[b])}</b></div>
           <div class="meter"><i style="width:${r.totals.remaining ? r.buckets[b] / r.totals.remaining * 100 : 0}%;background:var(--${['green', 'amber', 'orange', 'red'][i]})"></i></div></div>`).join('')}</div></section>
       <div class="panel tabs"><button class="tab ${byCust ? '' : 'active'}" data-act="odTab" data-tab="inv">${t('byInvoice')}</button><button class="tab ${byCust ? 'active' : ''}" data-act="odTab" data-tab="cust">${t('byCustomer')}</button></div>
       <section class="panel">${byCust
         ? table('overdueCust', custCols, custRows, { click: true, sortable: false, foot: footRow(custCols, { remaining: sumRem }, t('all')) })
         : table('overdue', invCols, rows, { click: true, sortable: false, foot: footRow(invCols, { remaining: sumRem, amount: rows.reduce((a, x) => a + x.amount, 0) }, t('all')) })}</section>`;
+  } else if (view === 'credit') {
+    const r = await call('reportCreditLimit', f);
+    if (S.view !== view) return;
+    if (!f.account && !f.group && !f.collector && !f.custCurrency) setBadge('credit', r.totals.exceeded);
+    const pctPill = v => pill(v >= 999 ? '∞' : NI.format(v) + '%', v >= 100 ? 'risk' : v >= 80 ? 'watch' : 'healthy');
+    const cols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'currency', l: t('f_currency') },
+      { k: 'creditLimit', l: t('f_creditLimit'), num: true }, { k: 'balance', l: t('balance'), num: true },
+      { k: 'excess', l: t('excess'), num: true, f: v => v > 0 ? `<span class="neg">${money(v)}</span>` : money(0) },
+      { k: 'available', l: t('available'), num: true }, { k: 'pct', l: t('usedPct'), f: pctPill, x: r => r.pct / 100 },
+      { k: 'overdue', l: t('overdueAmt'), num: true }, { k: 'maxDays', l: t('maxDays'), f: v => v ? daysPill(v) : '' }, collCol,
+      { k: 'group', l: t('f_group'), f: v => bdi(groupName(v)), x: r => groupName(r.group) }];
+    S.exportData = { name: 'credit_limit', cols, rows: r.rows };
+    out().innerHTML = missingNotice(r) + `<section class="stats">
+        ${stat(t('listed'), NI.format(r.totals.customers), '♙', '')}
+        ${stat(t('exceededN'), NI.format(r.totals.exceeded), '⚑', 'red')}
+        ${stat(t('excessTotal'), money(r.totals.excessBase) + curTag(r.base), '!', 'amber')}</section>
+      ${r.byCurrency.length > 1 ? `<div class="cur-grid" style="margin-bottom:16px">${r.byCurrency.map(x => `<article class="panel risk-item">
+        <div class="card-head"><h3 style="margin:0">${esc(x.currency)}</h3><span class="badge">${NI.format(x.customers)}</span></div>
+        <div class="mini-stats"><div><span>${t('f_creditLimit')}</span><b>${money(x.limit)}</b></div><div><span>${t('excess')}</span><b class="neg">${money(x.excess)}</b></div></div></article>`).join('')}</div>` : ''}
+      <section class="panel">${table('credit', cols, r.rows, { click: true, sortable: false })}</section>`;
   } else if (view === 'followup') {
     const r = await call('getFollowUpBoard', f);
     if (S.view !== view) return;
+    const cc = r.currency;
     setBadge('followup', r.totals.customers);
-    S.rows.followCards = r.customers;
-    out().innerHTML = `<section class="stats">
-        ${stat(t('overdueCustomers'), r.totals.customers, '♙', 'red')}${stat(t('overdueAmt'), `${short(r.totals.remaining)} <small>${esc(cur())}</small>`, '!', 'amber')}
-        ${stat(t('promisesDue'), r.promisesDue, '☎', '')}</section>
-      ${r.customers.length ? `<div class="risk-grid">${r.customers.map((c, i) => `
+    out().innerHTML = missingNotice(r) + `<section class="stats">
+        ${stat(t('overdueCustomers'), NI.format(r.totals.customers), '♙', 'red')}${stat(t('overdueAmt'), money(r.totals.remaining) + curTag(cc), '!', 'amber')}
+        ${stat(t('promisesDue'), NI.format(r.promisesDue), '☎', '')}</section>
+      ${r.customers.length ? `<div class="risk-grid">${r.customers.map(c => `
         <article class="panel risk-item">
           <div class="card-head">${daysPill(c.maxDays)}<small style="color:var(--subtle)">${esc(c.account)}</small></div>
-          <h3>${esc(c.name)}</h3>
-          <p>${t('f_collector')}: ${esc(collectorName(c.collector))}</p>
-          <div class="mini-stats"><div><span>${t('overdueAmt')}</span><b>${money(c.remaining)}</b></div><div><span>${t('invoices')}</span><b>${c.count}</b></div></div>
+          <h3>${bdi(c.name)}</h3>
+          <p>${t('f_collector')}: ${bdi(collectorName(c.collector))}</p>
+          <div class="mini-stats"><div><span>${t('overdueAmt')} ${esc(cc)}</span><b>${money(c.remaining)}</b></div><div><span>${t('invoices')}</span><b>${NI.format(c.count)}</b></div></div>
           <p>${t('lastFollowUp')}: ${esc(c.lastFollowUp || '—')}${c.promiseDate ? `<br>${t('f_promiseDate')}: <b style="color:var(--text)">${esc(c.promiseDate)}</b>` : ''}</p>
           <div class="card-actions">
             ${can('add') ? btn('newFollow', '☎ ' + t('logAction'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
             ${btn('openCust', t('statement'), 'button-ghost', `data-acc="${esc(c.account)}"`)}
-            ${c.phone ? `<a class="button-ghost" style="display:inline-grid;place-items:center;text-decoration:none" href="tel:${esc(c.phone)}">${t('call')}</a>` : ''}
-            ${c.email ? `<a class="button-ghost" style="display:inline-grid;place-items:center;text-decoration:none" href="mailto:${esc(c.email)}">${t('mail')}</a>` : ''}
+            ${c.phone ? `<a class="button-ghost link-btn" href="tel:${esc(c.phone)}">${t('call')}</a>` : ''}
+            ${c.email ? `<a class="button-ghost link-btn" href="mailto:${esc(c.email)}">${t('mail')}</a>` : ''}
           </div></article>`).join('')}</div>` : `<div class="panel empty">${t('noOverdue')}</div>`}`;
   } else if (view === 'collection') {
     const r = await call('reportCollection', f);
     if (S.view !== view) return;
+    const cc = r.currency;
     S.rows.collectors = r.rows;
     const flat = [];
     r.rows.forEach(m => m.companies.forEach(c => flat.push(Object.assign({ collector: m.collector }, c))));
-    const cols = [{ k: 'collector', l: t('f_collector'), f: v => esc(collectorName(v)) }, { k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'account', l: t('f_account') },
-      { k: 'balance', l: t('balance'), num: true }, { k: 'remaining', l: t('overdueAmt'), num: true }, { k: 'count', l: t('invoices') },
+    const cols = [collCol, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') },
+      { k: 'balance', l: t('balance') + ' ' + cc, num: true }, { k: 'remaining', l: t('overdueAmt') + ' ' + cc, num: true }, { k: 'count', l: t('invoices'), num: true, f: v => NI.format(v) },
       { k: 'maxDays', l: t('maxDays'), f: daysPill }, { k: 'lastFollowUp', l: t('lastFollowUp') }];
     S.exportData = { name: 'collection_team', cols, rows: flat };
-    out().innerHTML = `<section class="stats">
-        ${stat(t('receivable'), `${short(r.totals.balance)} <small>${esc(cur())}</small>`, '$', '')}
-        ${stat(t('overdueAmt'), `${short(r.totals.overdue)} <small>${esc(cur())}</small>`, '!', 'red')}
-        ${stat(t('collectedMTD'), `${short(r.totals.collectedMTD)} <small>${esc(cur())}</small>`, '✓', 'green')}</section>
+    out().innerHTML = missingNotice(r) + `<section class="stats">
+        ${stat(t('receivable'), money(r.totals.balance) + curTag(cc), '$', '')}
+        ${stat(t('overdueAmt'), money(r.totals.overdue) + curTag(cc), '!', 'red')}
+        ${stat(t('collectedMTD'), money(r.totals.collectedMTD) + curTag(cc), '✓', 'green')}</section>
       <div class="section-head" style="padding:0 0 10px;border:0"><h2 class="section-title">${t('team')}</h2></div>
       <div class="risk-grid">${r.rows.map((m, i) => `
         <article class="panel risk-item">
           <div class="card-head"><div style="display:flex;gap:10px;align-items:center"><div class="avatar">${esc((m.name || '?')[0].toUpperCase())}</div>
-            <div><h3 style="margin:0">${esc(m.name || t('unassigned'))}</h3><p style="margin:0">${m.customers} ${t('companies')}</p></div></div>
+            <div><h3 style="margin:0">${bdi(m.name || t('unassigned'))}</h3><p style="margin:0">${NI.format(m.customers)} ${t('companies')}</p></div></div>
             ${m.maxDays ? daysPill(m.maxDays) : pill('0', 'healthy')}</div>
           <div class="mini-stats">
-            <div><span>${t('balance')}</span><b>${short(m.balance)}</b></div><div><span>${t('overdueAmt')}</span><b class="neg">${short(m.overdue)}</b></div>
-            <div><span>${t('overdueCustomers')}</span><b>${m.overdueCustomers}</b></div><div><span>${t('avgDays')}</span><b>${m.avgDays}</b></div>
-            <div><span>${t('overdueInvoices')}</span><b>${m.overdueInvoices}</b></div><div><span>${t('collectedMTD')}</span><b class="pos">${short(m.collectedMTD)}</b></div></div>
+            <div><span>${t('balance')}</span><b>${money(m.balance)}</b></div><div><span>${t('overdueAmt')}</span><b class="neg">${money(m.overdue)}</b></div>
+            <div><span>${t('overdueCustomers')}</span><b>${NI.format(m.overdueCustomers)}</b></div><div><span>${t('avgDays')}</span><b>${NI.format(m.avgDays)}</b></div>
+            <div><span>${t('overdueInvoices')}</span><b>${NI.format(m.overdueInvoices)}</b></div><div><span>${t('collectedMTD')}</span><b class="pos">${money(m.collectedMTD)}</b></div></div>
           <p>${t('overdueAmt')} ${m.balance > 0 ? Math.round(m.overdue / m.balance * 100) : 0}% ${t('ofBalance')}</p>
           <div class="meter"><i style="width:${m.balance > 0 ? Math.min(100, m.overdue / m.balance * 100) : 0}%"></i></div>
           <div class="card-actions">${btn('collCompanies', t('companiesOf'), 'button-ghost', `data-i="${i}"`)}</div>
@@ -948,9 +1232,9 @@ function readImportFile(file) {
     const heads = IMP.rows.length ? Object.keys(IMP.rows[0]) : [];
     const sample = IMP.rows.slice(0, 5);
     $('#impPreview').innerHTML = `<section class="panel section">
-      <div class="section-head"><h2 class="section-title">${t('previewTitle')}</h2><span class="badge blue">${t('rowsFound')}: ${IMP.rows.length}</span></div>
+      <div class="section-head"><h2 class="section-title">${t('previewTitle')}</h2><span class="badge blue">${t('rowsFound')}: ${NI.format(IMP.rows.length)}</span></div>
       <div class="table-wrap"><table><thead><tr>${heads.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
-      <tbody>${sample.map(r => '<tr>' + heads.map(h => `<td>${esc(r[h])}</td>`).join('') + '</tr>').join('')}</tbody></table></div></section>`;
+      <tbody>${sample.map(r => '<tr>' + heads.map(h => `<td>${typeof r[h] === 'number' ? money(r[h]) : bdi(r[h])}</td>`).join('') + '</tr>').join('')}</tbody></table></div></section>`;
     $('#impRun').disabled = !IMP.rows.length;
   };
   reader.readAsArrayBuffer(file);
@@ -965,55 +1249,77 @@ async function runImport() {
   const size = 2000;
   try {
     for (let i = 0; i < IMP.rows.length; i += size) {
-      b.textContent = `${t('importNow')} ${Math.min(i + size, IMP.rows.length)}/${IMP.rows.length}`;
+      b.textContent = `${t('importNow')} ${NI.format(Math.min(i + size, IMP.rows.length))}/${NI.format(IMP.rows.length)}`;
       const r = await call('importRows', entity, IMP.rows.slice(i, i + size), i === 0 ? mode : (mode === 'replace' ? 'append' : mode));
       total.inserted += r.inserted; total.updated += r.updated; total.skipped += r.skipped;
     }
-    toast(t('importedMsg', { i: total.inserted, u: total.updated, s: total.skipped }));
+    toast(t('importedMsg', { i: NI.format(total.inserted), u: NI.format(total.updated), s: NI.format(total.skipped) }));
     await refreshLookups();
   } finally { b.disabled = false; b.textContent = t('importNow'); }
 }
 
-// ───────── Export ─────────
-function exportCsv() {
+// ───────── Export to Excel (.xlsx) ─────────
+function exportXlsx() {
   const d = S.exportData;
   if (!d || !d.rows.length) { toast(t('noData'), 'error'); return; }
-  const q = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-  const csv = [d.cols.map(c => q(c.l)).join(',')].concat(d.rows.map(r => d.cols.map(c => q(r[c.k])).join(','))).join('\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = d.name + '_' + today() + '.csv';
-  document.body.appendChild(a); a.click(); a.remove();
+  if (typeof XLSX === 'undefined') { toast(t('xlsxMissing'), 'error'); return; }
+  const val = (c, r) => {
+    const v = c.x ? c.x(r) : r[c.k];
+    if (c.num) return v === '' || v == null ? '' : (+v || 0);
+    return v == null ? '' : v;
+  };
+  const aoa = [d.cols.map(c => c.l)].concat(d.rows.map(r => d.cols.map(c => val(c, r))));
+  if (d.totals) aoa.push(d.cols.map((c, i) => i === 0 ? t('all') : d.totals[c.k] !== undefined ? +d.totals[c.k] : ''));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const rows = aoa.length;
+  d.cols.forEach((c, ci) => {
+    if (!c.num && c.k !== 'pct') return;
+    for (let r = 1; r < rows; r++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c: ci })];
+      if (cell && cell.t === 'n') cell.z = c.k === 'pct' ? '0%' : c.k === 'rate' || c.k === 'exchange' || c.k === 'inverse' ? '#,##0.######' : '#,##0.00';
+    }
+  });
+  ws['!cols'] = d.cols.map((c, ci) => ({ wch: Math.min(60, Math.max(10, ...aoa.slice(0, 500).map(row => String(row[ci] == null ? '' : row[ci]).length + 3))) }));
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: d.rows.length, c: d.cols.length - 1 } }) };
+  const wb = XLSX.utils.book_new();
+  if (S.lang === 'ar') wb.Workbook = { Views: [{ RTL: true }] };
+  XLSX.utils.book_append_sheet(wb, ws, String(d.name).replace(/[\\\/?*\[\]:]/g, '_').slice(0, 31));
+  XLSX.writeFile(wb, d.name + '_' + today() + '.xlsx');
 }
 
 // ───────── Events ─────────
 const ACT = {
-  menu() { $('#sidebar').classList.toggle('open'); $('#scrim').classList.toggle('open'); },
+  menu() {
+    if (window.innerWidth <= 680) { $('#sidebar').classList.toggle('open'); $('#scrim').classList.toggle('open'); return; }
+    const hidden = $('#app').classList.toggle('collapsed');
+    store.set('crm_sidebar', hidden ? 'hidden' : 'shown');
+  },
   theme() { const l = !document.documentElement.classList.contains('light'); document.documentElement.classList.toggle('light', l); store.set('crm_theme', l ? 'light' : 'dark'); },
   lang() { store.set('crm_lang', S.lang === 'ar' ? 'en' : 'ar'); applyPrefs(); if (S.user) { renderShell(); go(S.view); } else renderLogin(); },
   async logout() { try { await run('logout', S.token); } catch (e) {} signOutLocal(); },
   closeDrawer,
-  export: exportCsv,
+  export: exportXlsx,
   print() { window.print(); },
   runReport,
   page(el) { const v = el.closest('.pager').dataset.view; listState(v).page = +el.dataset.p; loadList(v); },
-  newCustomer() { openForm('Customers', { status: 'Active', currency: cur(), termsDays: 30, collector: S.user.isCollector ? S.user.username : '' }, true); },
-  newTx() { openForm('Transactions', { date: today(), type: 'Invoice', currency: cur(), exchange: 1 }, true); },
+  newCustomer() { openForm('Customers', { status: 'Active', currency: localCur(), termsDays: 30, collector: S.user.isCollector ? S.user.username : '' }, true); },
+  newTx() { openForm('Transactions', { date: today(), type: 'Invoice', currency: localCur(), exchange: 1 }, true); },
   newGroup() { openForm('CustomerGroups', {}, true); },
+  newCurrency(el) { openForm('Currencies', { code: (el && el.dataset.code) || '', active: true }, true); },
   newUser() { openForm('Users', { role: 'User', scope: 'all', active: true, pages: 'dashboard,customers' }, true); },
   newFollow(el) { openForm('FollowUps', { account: el.dataset.acc || '', actionDate: today(), actionType: 'Call', status: 'Open' }, true); },
   openCust(el) { openCustomer(el.dataset.acc); },
   custEdit(el) {
     call('listRecords', 'Customers', { filters: { account: el.dataset.acc }, pageSize: 5 }).then(r => r.rows[0] && openForm('Customers', r.rows[0], false));
   },
-  stmtApply() { const tl = $('#stmtTools'); const v = readTools(tl); openCustomer(tl.dataset.acc, v.from, v.to, true); },
+  stmtApply() { const tl = $('#stmtTools'); const v = readTools(tl); openCustomer(tl.dataset.acc, v.from, v.to, true, v.currency); },
   rowEdit(el) { const { view, row } = rowOf(el); openForm(LISTS[view].entity, row, false); },
   async rowDelete(el) {
     const { view, row } = rowOf(el);
     if (!confirm(t('confirmDelete'))) return;
     await call('deleteRecord', LISTS[view].entity, row[LISTS[view].id]);
     toast(t('deleted'));
-    if (['customers', 'groups', 'users'].indexOf(view) > -1) await refreshLookups();
+    if (['customers', 'groups', 'users', 'currencies'].indexOf(view) > -1) await refreshLookups();
     loadList(view);
   },
   async rowPost(el) { const { row } = rowOf(el); const n = await call('postTransactions', [row.rowId], false); toast(t('postedN', { n })); loadList('transactions'); },
@@ -1027,16 +1333,17 @@ const ACT = {
   odTab(el) { S.rep.overdue.tab = el.dataset.tab; runReport(); },
   collCompanies(el) {
     const m = S.rows.collectors[+el.dataset.i];
-    const cols = [{ k: 'name', l: t('f_name'), cls: 'wrap' }, { k: 'account', l: t('f_account') }, { k: 'balance', l: t('balance'), num: true },
-      { k: 'remaining', l: t('overdueAmt'), num: true }, { k: 'count', l: t('invoices') }, { k: 'maxDays', l: t('maxDays'), f: daysPill }, { k: 'lastFollowUp', l: t('lastFollowUp') }];
-    openDrawer(`<div class="drawer-head"><h2>${esc(m.name || t('unassigned'))} — ${t('companies')}</h2><button class="icon-button" data-act="closeDrawer">×</button></div>
+    const cols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'balance', l: t('balance'), num: true },
+      { k: 'remaining', l: t('overdueAmt'), num: true }, { k: 'count', l: t('invoices'), num: true, f: v => NI.format(v) }, { k: 'maxDays', l: t('maxDays'), f: daysPill }, { k: 'lastFollowUp', l: t('lastFollowUp') }];
+    S.exportData = { name: 'collector_' + (m.collector || 'unassigned'), cols, rows: m.companies };
+    openDrawer(`<div class="drawer-head"><h2>${bdi(m.name || t('unassigned'))} — ${t('companies')}</h2><div style="display:flex;gap:8px">${exportBtn()}<button class="icon-button" data-act="closeDrawer">×</button></div></div>
       <div class="panel flush">${table('collDrawer', cols, m.companies, { click: true, sortable: false })}</div>`, true);
   },
   impTemplate() {
     const entity = $('#impEntity').value;
     call('getTemplateHeaders', entity).then(h => {
       S.exportData = { name: entity + '_template', cols: h.map(x => ({ k: x, l: x })), rows: [{}] };
-      exportCsv();
+      exportXlsx();
     });
   },
   impRun: runImport
@@ -1049,7 +1356,7 @@ function rowOf(el) {
 }
 
 // Rows that open the customer 360 drawer when clicked.
-const ROW_CUSTOMER_VIEWS = ['customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'collFlat', 'collDrawer'];
+const ROW_CUSTOMER_VIEWS = ['customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'credit', 'collFlat', 'collDrawer'];
 
 document.addEventListener('click', e => {
   const goEl = e.target.closest('[data-go]');
@@ -1061,7 +1368,7 @@ document.addEventListener('click', e => {
     const view = th.closest('table').dataset.view, s = listState(view);
     s.desc = s.sort === th.dataset.sort ? !s.desc : false; s.sort = th.dataset.sort; loadList(view); return;
   }
-  if (e.target.closest('input,label,a,button,select')) return;
+  if (e.target.closest('input,label,a,button,select,.cb')) return;
   const tr = e.target.closest('tbody tr[data-i]');
   if (tr) {
     const view = tr.closest('table').dataset.view;
@@ -1073,13 +1380,24 @@ document.addEventListener('click', e => {
 
 let searchTimer;
 document.addEventListener('input', e => {
+  if (e.target.matches('input[data-num]')) {
+    formatNumInput(e.target);
+    if (FORM && FORM.entity === 'Transactions' && e.target.form && e.target.form.id === 'recForm') txFormCalc(e.target.form, e.target.name);
+    return;
+  }
   const tools = e.target.closest('[data-list]');
-  if (tools && (e.target.type === 'search' || e.target.dataset.f === 'account')) {
+  if (tools && e.target.type === 'search') {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => onListTools(tools.dataset.list, tools), 400);
   }
 });
 document.addEventListener('change', e => {
+  if (e.target.classList.contains('cb-input') || e.target.matches('input[data-num]')) return;
+  if (e.target.form && e.target.form.id === 'recForm' && FORM && FORM.entity === 'Transactions' && e.target.name === 'currency') { txFormCalc(e.target.form, 'currency'); return; }
+  if (e.target.form && e.target.form.id === 'recForm' && FORM && FORM.entity === 'Currencies' && e.target.name === 'code') {
+    const h = $('[data-hint="rate"]'); if (h) h.textContent = t('rateOf', { c: e.target.value.toUpperCase(), b: baseCur() }); return;
+  }
+  if (e.target.closest('#dashTools')) { S.rep.dashboard.currency = e.target.value; VIEWS.dashboard(); return; }
   const tools = e.target.closest('[data-list]');
   if (tools && e.target.type !== 'search') { onListTools(tools.dataset.list, tools); return; }
   if (e.target.matches('[data-pagesize]')) {
@@ -1099,8 +1417,13 @@ document.addEventListener('submit', async e => {
   if (e.target.id === 'loginForm') doLogin(e.target);
   else if (e.target.id === 'recForm') submitForm(e.target);
   else if (e.target.id === 'settingsForm') {
-    const fd = {}; ['AppName', 'CompanyName', 'LocalCurrency'].forEach(k => { fd[k] = e.target.elements[k].value.trim(); });
+    const fd = {}; ['AppName', 'CompanyName'].forEach(k => { fd[k] = e.target.elements[k].value.trim(); });
     S.settings = await call('saveSettings', fd); toast(t('settingsSaved')); renderShell(); go('users');
+  } else if (e.target.id === 'curSettings') {
+    const E = e.target.elements;
+    S.settings = await call('saveCurrencySettings', { ReportCurrency: E.ReportCurrency.value, LocalCurrency: E.LocalCurrency.value, ConversionBasis: E.ConversionBasis.value });
+    await refreshLookups();
+    toast(t('settingsSaved')); go('currencies');
   }
 });
 

@@ -43,19 +43,24 @@ const SCHEMA = {
     ['promiseDate', 'Promise Date'], ['promiseAmount', 'Promise Amount'], ['status', 'Status'],
     ['createdBy', 'Created By'], ['createdAt', 'Created At']
   ],
+  Currencies: [['code', 'Code'], ['name', 'Name'], ['rate', 'Rate to reporting currency'], ['active', 'Active'], ['updatedAt', 'Updated At']],
   Settings: [['key', 'Key'], ['value', 'Value']]
 };
 
-const ID_FIELD = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', Users: 'userId', FollowUps: 'id' };
+const ID_FIELD = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', Users: 'userId', FollowUps: 'id', Currencies: 'code' };
 const DATE_FIELDS = ['date', 'dueDate', 'createdAt', 'updatedAt', 'postedAt', 'lastLogin', 'actionDate', 'promiseDate'];
-const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'creditLimit', 'termsDays', 'promiseAmount'];
+const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'creditLimit', 'termsDays', 'promiseAmount', 'rate'];
 const BOOL_FIELDS = ['isDeleted', 'canAdd', 'canEdit', 'canDelete', 'canPost', 'isCollector', 'active'];
 
 const ALL_PAGES = ['dashboard', 'customers', 'transactions', 'groups', 'balances', 'paid',
-  'overdue', 'followup', 'collection', 'import', 'users'];
+  'overdue', 'credit', 'followup', 'collection', 'currencies', 'import', 'users'];
 
 // Which entity each page edits (used for permission checks on writes).
-const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users' };
+const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies' };
+
+// Per-execution read cache: every server call re-reads the sheet once at most.
+const MEMO = {};
+function invalidate_() { Object.keys(MEMO).forEach(function (k) { delete MEMO[k]; }); }
 
 const SESSION_HOURS = 8;
 const TZ = Session.getScriptTimeZone();
@@ -108,7 +113,7 @@ function setup() {
     }]);
   }
   const settings = readTable('Settings');
-  const defaults = { AppName: 'CRM Console', LocalCurrency: 'SAR', CompanyName: 'My Company' };
+  const defaults = { AppName: 'CRM Console', LocalCurrency: 'SAR', ReportCurrency: 'SAR', ConversionBasis: 'local', CompanyName: 'My Company' };
   const toAdd = Object.keys(defaults).filter(function (k) {
     return !settings.some(function (s) { return s.key === k; });
   }).map(function (k) { return { key: k, value: defaults[k] }; });
@@ -120,7 +125,13 @@ function setup() {
 
 // ───────────────────────────── Sheet helpers ─────────────────────────────
 function sheet_(name) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(name);
+  if (!sh && SCHEMA[name]) { // new tables added in later versions are created on first use
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, SCHEMA[name].length).setValues([SCHEMA[name].map(function (f) { return f[1]; })]);
+    sh.setFrozenRows(1);
+  }
   if (!sh) throw new Error('Sheet "' + name + '" not found. Run setup() first.');
   return sh;
 }
@@ -140,6 +151,12 @@ function fieldIndex_(name, hm) {
 
 /** Reads a sheet into plain objects (dates → yyyy-MM-dd strings for transport). */
 function readTable(name, keepDates) {
+  const key = name + (keepDates ? '#d' : '');
+  if (!MEMO[key]) MEMO[key] = readTableRaw_(name, keepDates);
+  return MEMO[key];
+}
+
+function readTableRaw_(name, keepDates) {
   const sh = sheet_(name);
   const lastRow = sh.getLastRow();
   if (lastRow < 2) return [];
@@ -210,6 +227,7 @@ function toSheetValue_(key, v) {
 
 function appendRows(name, objs) {
   if (!objs.length) return;
+  invalidate_();
   const sh = sheet_(name);
   const hm = headerMap_(sh);
   const idx = fieldIndex_(name, hm);
@@ -237,6 +255,7 @@ function findRow_(name, id) {
 }
 
 function updateRow_(name, rowNum, patch) {
+  invalidate_();
   const sh = sheet_(name);
   const hm = headerMap_(sh);
   const idx = fieldIndex_(name, hm);
@@ -249,7 +268,7 @@ function updateRow_(name, rowNum, patch) {
 function withLock_(fn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
-  try { return fn(); } finally { lock.releaseLock(); }
+  try { return fn(); } finally { invalidate_(); lock.releaseLock(); }
 }
 
 function getSettings_() {
@@ -330,6 +349,7 @@ function lookups_(user) {
     collectors: users.filter(function (u) { return u.isCollector && u.active; })
       .map(function (u) { return { username: u.username, name: u.fullName || u.username }; }),
     customers: visibleCustomers_(user).map(function (c) { return { account: c.account, name: c.name }; }),
+    currencies: readTable('Currencies').map(function (c) { return { code: String(c.code).toUpperCase(), name: c.name, rate: c.rate }; }),
     transactionTypes: ['Invoice', 'Payment', 'Credit note', 'Debit note', 'Settlement', 'Opening balance', 'Adjustment']
   };
 }
@@ -343,7 +363,7 @@ function getLookups(token) { return lookups_(auth_(token)); }
  */
 function listRecords(token, entity, opts) {
   opts = opts || {};
-  const page = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', Users: 'users', FollowUps: 'followup' }[entity];
+  const page = ENTITY_PAGE[entity];
   if (!page) throw new Error('Unknown entity');
   const user = auth_(token, page);
   if (entity === 'Users' && !user.isAdmin) throw new Error('NO_PERMISSION');
@@ -354,13 +374,29 @@ function listRecords(token, entity, opts) {
 
   if (entity === 'Transactions' || entity === 'FollowUps') {
     const allowed = {};
-    visibleCustomers_(user).forEach(function (c) { allowed[c.account] = c.name; });
-    rows = rows.filter(function (r) { return allowed[r.account] !== undefined; });
-    rows.forEach(function (r) { r.customerName = allowed[r.account]; });
+    visibleCustomers_(user).forEach(function (c) { allowed[c.account] = c; });
+    rows = rows.filter(function (r) { return allowed[r.account] !== undefined; }).map(function (r0) {
+      const r = Object.assign({}, r0), c = allowed[r.account];
+      r.customerName = c.name; r.group = c.group; r.custCurrency = c.currency;
+      return r;
+    });
     if (entity === 'Transactions') {
       rows.forEach(function (r) { if (!r.postStatus) r.postStatus = 'Posted'; });
       if (!opts.showDeleted) rows = rows.filter(function (r) { return !r.isDeleted; });
+      // Running customer balance (local currency, posted rows, date order).
+      const byCust = {};
+      rows.forEach(function (r) { if (r.postStatus !== 'Draft') (byCust[r.account] = byCust[r.account] || []).push(r); });
+      Object.keys(byCust).forEach(function (a) {
+        let run = 0;
+        byCust[a].sort(function (x, y) {
+          return x.date < y.date ? -1 : x.date > y.date ? 1 : String(x.createdAt).localeCompare(String(y.createdAt)) || String(x.voucher).localeCompare(String(y.voucher), undefined, { numeric: true });
+        }).forEach(function (r) { run = round2_(run + (+r.debitMST || 0) - (+r.creditMST || 0)); r.balance = run; });
+      });
     }
+  }
+  if (opts.voucher) {
+    const v = String(opts.voucher).trim().toLowerCase();
+    rows = rows.filter(function (r) { return String(r.voucher).toLowerCase().indexOf(v) > -1; });
   }
   if (entity === 'Users') rows = rows.map(function (u) { const o = Object.assign({}, u); delete o.passwordHash; delete o.salt; return o; });
 
@@ -391,6 +427,8 @@ function listRecords(token, entity, opts) {
   if (entity === 'Transactions') {
     totals.debit = sum_(rows, 'debitMST');
     totals.credit = sum_(rows, 'creditMST');
+    totals.net = round2_(totals.debit - totals.credit);
+    totals.localCurrency = getSettings_().LocalCurrency || '';
   }
   const size = Math.min(Math.max(+opts.pageSize || 25, 5), 500);
   const total = rows.length;
@@ -455,6 +493,15 @@ function saveRecord(token, entity, record, isNew) {
     } else if (entity === 'Users') {
       if (!user.isAdmin) throw new Error('NO_PERMISSION');
       return saveUser_(rec, isNew);
+    } else if (entity === 'Currencies') {
+      rec.code = String(rec.code || '').trim().toUpperCase();
+      if (!rec.code) throw new Error('REQUIRED_FIELDS');
+      const s = getSettings_();
+      if (rec.code === String(s.ReportCurrency || '').toUpperCase()) rec.rate = 1;
+      if (!(toNum_(rec.rate) > 0)) throw new Error('RATE_REQUIRED');
+      if (isNew && findRow_(entity, rec.code) > -1) throw new Error('DUPLICATE_ID');
+      rec.active = rec.active === undefined ? true : rec.active;
+      rec.updatedAt = now;
     }
 
     if (isNew) appendRows(entity, [rec]);
@@ -524,8 +571,12 @@ function deleteRecord(token, entity, id) {
       if (!user.isAdmin) throw new Error('NO_PERMISSION');
       if (id === user.userId) throw new Error('CANNOT_DELETE_SELF');
     }
+    if (entity === 'Currencies' && String(id).toUpperCase() === String(getSettings_().ReportCurrency || '').toUpperCase()) {
+      throw new Error('IN_USE');
+    }
     const rowNum = findRow_(entity, id);
     if (rowNum < 0) throw new Error('NOT_FOUND');
+    invalidate_();
     sheet_(entity).deleteRow(rowNum);
     return true;
   });
@@ -571,7 +622,7 @@ function importRows(token, entity, rows, mode) {
   const user = auth_(token, 'import');
   requireAction_(user, 'add');
   if (mode === 'replace') requireAction_(user, 'delete');
-  if (['Customers', 'Transactions', 'CustomerGroups'].indexOf(entity) === -1) throw new Error('Unknown entity');
+  if (['Customers', 'Transactions', 'CustomerGroups', 'Currencies'].indexOf(entity) === -1) throw new Error('Unknown entity');
   const norm = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9؀-ۿ]/g, ''); };
   const aliases = {
     account: ['customeraccount', 'account', 'custaccount', 'accountnum', 'رقمالعميل'],
@@ -622,8 +673,12 @@ function importRows(token, entity, rows, mode) {
         const amt = toNum_(o.amountCur) * (toNum_(o.exchange) || 1);
         if (amt < 0) o.debitMST = -amt; else o.creditMST = amt;
       }
-      o.debitMST = Math.abs(toNum_(o.debitMST));
-      o.creditMST = Math.abs(toNum_(o.creditMST));
+      // A negative debit is really a credit (and vice versa).
+      let d = toNum_(o.debitMST), c = toNum_(o.creditMST);
+      if (d < 0) { c -= d; d = 0; }
+      if (c < 0) { d -= c; c = 0; }
+      o.debitMST = d; o.creditMST = c;
+      if (o.currency) o.currency = String(o.currency).trim().toUpperCase();
     }
     if (entity === 'Customers') {
       o.status = o.status || 'Active';
@@ -691,30 +746,133 @@ function saveSettings(token, values) {
   });
 }
 
+// ───────────────────────────── Currencies ─────────────────────────────
+/**
+ * Currency converter. Rates in the Currencies sheet = value of 1 unit in the
+ * reporting (base) currency, so the base currency always has rate 1.
+ * `display` = currency the numbers are shown in (defaults to the base).
+ */
+function fx_(display) {
+  const s = getSettings_();
+  const local = String(s.LocalCurrency || '').trim().toUpperCase();
+  const base = String(s.ReportCurrency || local).trim().toUpperCase();
+  const rates = {};
+  readTable('Currencies').forEach(function (c) { if (c.code && c.rate > 0) rates[String(c.code).toUpperCase()] = c.rate; });
+  if (base) rates[base] = 1;
+  const disp = String(display || base).trim().toUpperCase();
+  const missing = {};
+  function rate(c) {
+    c = String(c || local).trim().toUpperCase();
+    if (rates[c]) return rates[c];
+    missing[c] = true;
+    return 1;
+  }
+  const fx = {
+    local: local, base: base, display: disp, basis: s.ConversionBasis || 'local', missing: missing, rate: rate,
+    /** amount in currency c → display currency */
+    conv: function (a, c) { c = String(c || local).trim().toUpperCase(); return !a || c === disp ? a : a * rate(c) / rate(disp); },
+    /** amount in display currency → currency c */
+    to: function (a, c) { c = String(c || local).trim().toUpperCase(); return !a || c === disp ? a : a * rate(disp) / rate(c); }
+  };
+  fx.fromLocal = function (a) { return fx.conv(a, local); };
+  return fx;
+}
+
+/** Debit / credit of a transaction in the display currency. Negative D365 amounts flip side. */
+function txAmounts_(t, fx) {
+  let dr = +t.debitMST || 0, cr = +t.creditMST || 0;
+  if (dr < 0) { cr -= dr; dr = 0; }
+  if (cr < 0) { dr -= cr; cr = 0; }
+  if (fx.basis === 'transaction' && +t.amountCur && t.currency) {
+    const isDebit = (dr || cr) ? dr > cr : +t.amountCur < 0;
+    const v = fx.conv(Math.abs(+t.amountCur), t.currency);
+    return isDebit ? { dr: v, cr: 0 } : { dr: 0, cr: v };
+  }
+  return { dr: fx.fromLocal(dr), cr: fx.fromLocal(cr) };
+}
+
+function fxInfo_(fx) {
+  return { currency: fx.display, base: fx.base, local: fx.local, missingRates: Object.keys(fx.missing) };
+}
+
+/** Currencies used in customers / transactions that have no rate yet. */
+function getCurrencyStatus(token) {
+  auth_(token, 'currencies');
+  const s = getSettings_();
+  const base = String(s.ReportCurrency || s.LocalCurrency || '').toUpperCase();
+  const known = {};
+  readTable('Currencies').forEach(function (c) { if (c.rate > 0) known[String(c.code).toUpperCase()] = true; });
+  known[base] = true;
+  const used = {};
+  readTable('Customers').forEach(function (c) { if (c.currency) used[String(c.currency).toUpperCase()] = true; });
+  readTable('Transactions').forEach(function (t) { if (t.currency) used[String(t.currency).toUpperCase()] = true; });
+  if (s.LocalCurrency) used[String(s.LocalCurrency).toUpperCase()] = true;
+  return {
+    settings: { ReportCurrency: s.ReportCurrency || '', LocalCurrency: s.LocalCurrency || '', ConversionBasis: s.ConversionBasis || 'local' },
+    missing: Object.keys(used).filter(function (c) { return !known[c]; })
+  };
+}
+
+/** Saves reporting / local currency. Changing the reporting currency re-bases every rate. */
+function saveCurrencySettings(token, vals) {
+  const user = auth_(token, 'currencies');
+  requireAction_(user, 'edit');
+  return withLock_(function () {
+    const s = getSettings_();
+    const oldBase = String(s.ReportCurrency || s.LocalCurrency || '').toUpperCase();
+    const newBase = String(vals.ReportCurrency || '').trim().toUpperCase();
+    const cur = readTable('Currencies');
+    if (newBase && newBase !== oldBase) {
+      const nb = cur.filter(function (c) { return String(c.code).toUpperCase() === newBase; })[0];
+      const factor = nb && nb.rate > 0 ? nb.rate : 0;
+      if (!factor) throw new Error('RATE_REQUIRED');
+      cur.forEach(function (c) { if (c.rate > 0) updateRow_('Currencies', c._row, { rate: c.rate / factor, updatedAt: new Date() }); });
+      if (oldBase && !cur.some(function (c) { return String(c.code).toUpperCase() === oldBase; })) {
+        appendRows('Currencies', [{ code: oldBase, name: oldBase, rate: 1 / factor, active: true, updatedAt: new Date() }]);
+      }
+    }
+    const rows = readTable('Settings');
+    ['ReportCurrency', 'LocalCurrency', 'ConversionBasis'].forEach(function (k) {
+      if (vals[k] === undefined) return;
+      const v = k === 'ConversionBasis' ? vals[k] : String(vals[k]).trim().toUpperCase();
+      const r = rows.filter(function (x) { return x.key === k; })[0];
+      if (r) updateRow_('Settings', r._row, { value: v }); else appendRows('Settings', [{ key: k, value: v }]);
+    });
+    return getSettings_();
+  });
+}
+
 // ───────────────────────────── Ledger engine ─────────────────────────────
 /**
- * Loads posted, non-deleted transactions for visible customers and settles credits
- * against debits FIFO (oldest invoice first) to get open amounts, paid dates and aging.
+ * Loads posted, non-deleted transactions for visible customers (amounts converted to
+ * the display currency as t.dr / t.cr) and settles credits against debits FIFO
+ * (oldest invoice first) to get open amounts, paid dates and aging.
  */
-function ledger_(user, asOf) {
+function ledger_(user, asOf, display) {
+  const fx = fx_(display);
   const custs = visibleCustomers_(user);
   const cmap = {};
   custs.forEach(function (c) { cmap[c.account] = c; });
-  const tx = readTable('Transactions').filter(function (t) {
-    return !t.isDeleted && t.postStatus !== 'Draft' && cmap[t.account] && t.date && (!asOf || t.date <= asOf);
+  const tx = [];
+  readTable('Transactions').forEach(function (t0) {
+    if (t0.isDeleted || t0.postStatus === 'Draft' || !cmap[t0.account] || !t0.date || (asOf && t0.date > asOf)) return;
+    const t = Object.assign({}, t0);
+    const a = txAmounts_(t, fx);
+    t.dr = a.dr; t.cr = a.cr;
+    tx.push(t);
   });
   const byCust = {};
   tx.forEach(function (t) { (byCust[t.account] = byCust[t.account] || []).push(t); });
   const invoices = [];
   Object.keys(byCust).forEach(function (acc) {
     const list = byCust[acc].sort(function (a, b) {
-      return a.date < b.date ? -1 : a.date > b.date ? 1 : (b.debitMST - a.debitMST);
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : (b.dr - a.dr);
     });
     const queue = [];
     let unapplied = 0;
     const terms = +cmap[acc].termsDays || 0;
     list.forEach(function (t) {
-      const net = round2_((+t.debitMST || 0) - (+t.creditMST || 0));
+      const net = round2_(t.dr - t.cr);
       if (net > 0) {
         const inv = {
           account: acc, voucher: t.voucher, type: t.type, date: t.date, description: t.description,
@@ -724,7 +882,7 @@ function ledger_(user, asOf) {
           const a = Math.min(unapplied, inv.remaining);
           inv.remaining = round2_(inv.remaining - a); unapplied = round2_(unapplied - a);
           inv.lastPaymentDate = t.date;
-          if (inv.remaining <= 0.005) inv.paidDate = t.date;
+          if (inv.remaining <= 0.005) { inv.remaining = 0; inv.paidDate = t.date; }
         }
         invoices.push(inv);
         if (inv.remaining > 0.005) queue.push(inv);
@@ -741,7 +899,16 @@ function ledger_(user, asOf) {
       }
     });
   });
-  return { customers: custs, cmap: cmap, tx: tx, invoices: invoices };
+  const balance = {};
+  tx.forEach(function (t) { balance[t.account] = (balance[t.account] || 0) + t.dr - t.cr; });
+  return { customers: custs, cmap: cmap, tx: tx, invoices: invoices, balance: balance, fx: fx };
+}
+
+/** Payments = credit lines whose type looks like a payment; falls back to all credits. */
+function paymentTest_(tx) {
+  const re = /pay|receipt|دفع|سداد|تحصيل|قبض/i;
+  const any = tx.some(function (t) { return t.cr > 0 && re.test(t.type); });
+  return function (t) { return t.cr > 0 && (!any || re.test(t.type)); };
 }
 
 function addDays_(ymd, days) {
@@ -757,10 +924,12 @@ function daysBetween_(fromYmd, toYmd) {
 function today_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'); }
 
 function customerFilter_(c, f) {
+  if (!c) return false;
   if (f.group && c.group !== f.group) return false;
   if (f.collector && c.collector !== f.collector) return false;
   if (f.account && c.account !== f.account) return false;
   if (f.status && c.status !== f.status) return false;
+  if (f.custCurrency && String(c.currency).toUpperCase() !== String(f.custCurrency).toUpperCase()) return false;
   return true;
 }
 
@@ -774,59 +943,58 @@ function reportBalances(token, f) {
   const user = auth_(token, 'balances');
   f = f || {};
   const from = f.dateFrom || '1900-01-01', to = f.dateTo || today_();
-  const L = ledger_(user, to);
+  const L = ledger_(user, to, f.currency);
   const agg = {};
   L.tx.forEach(function (t) {
     const a = agg[t.account] = agg[t.account] || { opening: 0, debit: 0, credit: 0 };
-    const net = (+t.debitMST || 0) - (+t.creditMST || 0);
-    if (t.date < from) a.opening += net;
-    else { a.debit += +t.debitMST || 0; a.credit += +t.creditMST || 0; }
+    if (t.date < from) a.opening += t.dr - t.cr;
+    else { a.debit += t.dr; a.credit += t.cr; }
   });
   const rows = L.customers.filter(function (c) { return customerFilter_(c, f); }).map(function (c) {
     const a = agg[c.account] || { opening: 0, debit: 0, credit: 0 };
     return {
-      account: c.account, name: c.name, group: c.group, collector: c.collector, currency: c.currency,
+      account: c.account, name: c.name, group: c.group, collector: c.collector, custCurrency: c.currency,
       opening: round2_(a.opening), debit: round2_(a.debit), credit: round2_(a.credit),
       closing: round2_(a.opening + a.debit - a.credit)
     };
   }).filter(function (r) { return !f.hideZero || r.opening || r.debit || r.credit || r.closing; })
     .sort(function (a, b) { return b.closing - a.closing; });
-  return {
+  return Object.assign(fxInfo_(L.fx), {
     rows: rows, from: from, to: to,
     totals: { opening: sum_(rows, 'opening'), debit: sum_(rows, 'debit'), credit: sum_(rows, 'credit'), closing: sum_(rows, 'closing') }
-  };
+  });
 }
 
 /** Customer statement of account with running balance. */
-function customerStatement(token, account, dateFrom, dateTo) {
+function customerStatement(token, account, dateFrom, dateTo, currency) {
   const user = auth_(token);
-  const pages = ['customers', 'balances', 'paid', 'overdue', 'followup', 'collection', 'dashboard'];
+  const pages = ['customers', 'balances', 'paid', 'overdue', 'followup', 'collection', 'dashboard', 'credit', 'transactions'];
   if (!pages.some(function (p) { return user.pageList.indexOf(p) > -1; })) throw new Error('NO_PERMISSION');
   assertCustomerVisible_(user, account);
   const from = dateFrom || '1900-01-01', to = dateTo || today_();
-  const L = ledger_(user, to);
+  const L = ledger_(user, to, currency || getSettings_().LocalCurrency);
   const cust = L.cmap[account];
   let opening = 0;
   const lines = [];
   L.tx.filter(function (t) { return t.account === account; })
     .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; })
     .forEach(function (t) {
-      const net = (+t.debitMST || 0) - (+t.creditMST || 0);
-      if (t.date < from) { opening += net; return; }
-      lines.push({ date: t.date, voucher: t.voucher, type: t.type, description: t.description, dueDate: t.dueDate, debit: t.debitMST, credit: t.creditMST });
+      if (t.date < from) { opening += t.dr - t.cr; return; }
+      lines.push({ date: t.date, voucher: t.voucher, type: t.type, description: t.description, dueDate: t.dueDate,
+        currency: t.currency, amountCur: t.amountCur, debit: round2_(t.dr), credit: round2_(t.cr) });
     });
   let run = opening;
-  lines.forEach(function (l) { run = round2_(run + (+l.debit || 0) - (+l.credit || 0)); l.balance = run; });
+  lines.forEach(function (l) { run = round2_(run + l.debit - l.credit); l.balance = run; });
   const today = today_();
   const open = L.invoices.filter(function (i) { return i.account === account && i.remaining > 0; });
   const overdue = open.filter(function (i) { return i.dueDate < today; });
-  return {
+  return Object.assign(fxInfo_(L.fx), {
     customer: cust, opening: round2_(opening), closing: round2_(run), lines: lines,
     openAmount: sum_(open, 'remaining'), overdueAmount: sum_(overdue, 'remaining'),
     maxDays: overdue.reduce(function (m, i) { return Math.max(m, daysBetween_(i.dueDate, today)); }, 0),
     followUps: readTable('FollowUps').filter(function (x) { return x.account === account; })
       .sort(function (a, b) { return a.actionDate < b.actionDate ? 1 : -1; }).slice(0, 20)
-  };
+  });
 }
 
 /** Invoices fully settled within the period. */
@@ -834,7 +1002,7 @@ function reportPaidInvoices(token, f) {
   const user = auth_(token, 'paid');
   f = f || {};
   const from = f.dateFrom || '1900-01-01', to = f.dateTo || today_();
-  const L = ledger_(user, to);
+  const L = ledger_(user, to, f.currency);
   const rows = L.invoices.filter(function (i) {
     return i.paidDate && i.paidDate >= from && i.paidDate <= to && customerFilter_(L.cmap[i.account], f);
   }).map(function (i) {
@@ -846,7 +1014,7 @@ function reportPaidInvoices(token, f) {
     };
   }).sort(function (a, b) { return a.paidDate < b.paidDate ? 1 : -1; });
   const onTime = rows.filter(function (r) { return r.lateDays === 0; }).length;
-  return { rows: rows, totals: { amount: sum_(rows, 'amount'), count: rows.length, onTime: onTime, late: rows.length - onTime } };
+  return Object.assign(fxInfo_(L.fx), { rows: rows, totals: { amount: sum_(rows, 'amount'), count: rows.length, onTime: onTime, late: rows.length - onTime } });
 }
 
 /** Open invoices past their expected collection (due) date. */
@@ -855,9 +1023,9 @@ function reportOverdue(token, f) {
   return overdue_(user, f || {});
 }
 
-function overdue_(user, f) {
+function overdue_(user, f, L) {
   const asOf = f.asOf || today_();
-  const L = ledger_(user, asOf);
+  L = L || ledger_(user, asOf, f.currency);
   const minDays = +f.minDays || 1;
   const lastFollow = {};
   readTable('FollowUps').forEach(function (x) {
@@ -875,11 +1043,10 @@ function overdue_(user, f) {
       lastFollowUp: lastFollow[i.account] ? lastFollow[i.account].actionDate : '',
       promiseDate: lastFollow[i.account] ? lastFollow[i.account].promiseDate : ''
     };
-  }).filter(function (r) { return r.days >= minDays; })
+  }).filter(function (r) { return r.days >= minDays && (!f.voucher || String(r.voucher).toLowerCase().indexOf(String(f.voucher).toLowerCase()) > -1); })
     .sort(function (a, b) { return b.days - a.days; });
   const buckets = { b1: 0, b2: 0, b3: 0, b4: 0 };
   rows.forEach(function (r) { buckets[r.bucket] = round2_(buckets[r.bucket] + r.remaining); });
-  // Per customer summary
   const byCust = {};
   rows.forEach(function (r) {
     const s = byCust[r.account] = byCust[r.account] || {
@@ -890,38 +1057,35 @@ function overdue_(user, f) {
   });
   const customers = Object.keys(byCust).map(function (k) { return byCust[k]; })
     .sort(function (a, b) { return b.remaining - a.remaining; });
-  return {
+  return Object.assign(fxInfo_(L.fx), {
     asOf: asOf, rows: rows, customers: customers, buckets: buckets,
     totals: { remaining: sum_(rows, 'remaining'), count: rows.length, customers: customers.length,
       avgDays: rows.length ? Math.round(rows.reduce(function (s, r) { return s + r.days; }, 0) / rows.length) : 0 }
-  };
+  });
 }
 
-/** Follow-up page: overdue customers + their follow-up log. */
+/** Follow-up page: overdue customers + promises due. */
 function getFollowUpBoard(token, f) {
   const user = auth_(token, 'followup');
   const od = overdue_(user, f || {});
   const today = today_();
-  const fu = readTable('FollowUps');
-  const due = fu.filter(function (x) { return x.status === 'Open' && x.promiseDate && x.promiseDate <= today; });
-  return { customers: od.customers, totals: od.totals, promisesDue: due.length };
+  const due = readTable('FollowUps').filter(function (x) { return x.status === 'Open' && x.promiseDate && x.promiseDate <= today; });
+  return Object.assign(fxInfo_(fx_(f && f.currency)), { customers: od.customers, totals: od.totals, promisesDue: due.length });
 }
 
 /** Collection team dashboard: per collector → companies, overdue, days late. */
 function reportCollection(token, f) {
   const user = auth_(token, 'collection');
   f = f || {};
-  const od = overdue_(user, { asOf: f.asOf, group: f.group });
-  const L = ledger_(user, f.asOf || today_());
+  const asOf = f.asOf || today_();
+  const L = ledger_(user, asOf, f.currency);
+  const od = overdue_(user, { asOf: asOf, group: f.group }, L);
   const users = {};
   readTable('Users').forEach(function (u) { users[u.username] = u.fullName || u.username; });
-  const balance = {};
-  L.tx.forEach(function (t) { balance[t.account] = (balance[t.account] || 0) + (+t.debitMST || 0) - (+t.creditMST || 0); });
-  const monthStart = (f.asOf || today_()).slice(0, 8) + '01';
+  const monthStart = asOf.slice(0, 8) + '01';
+  const isPay = paymentTest_(L.tx);
   const collected = {};
-  L.tx.forEach(function (t) {
-    if (t.date >= monthStart && +t.creditMST > 0) collected[t.account] = (collected[t.account] || 0) + (+t.creditMST);
-  });
+  L.tx.forEach(function (t) { if (t.date >= monthStart && isPay(t)) collected[t.account] = (collected[t.account] || 0) + t.cr; });
   const team = {};
   L.customers.filter(function (c) { return !f.group || c.group === f.group; }).forEach(function (c) {
     const key = c.collector || '';
@@ -930,7 +1094,7 @@ function reportCollection(token, f) {
       overdueInvoices: 0, overdueCustomers: 0, maxDays: 0, sumDays: 0, collectedMTD: 0, companies: []
     };
     m.customers++;
-    m.balance = round2_(m.balance + (balance[c.account] || 0));
+    m.balance = round2_(m.balance + (L.balance[c.account] || 0));
     m.collectedMTD = round2_(m.collectedMTD + (collected[c.account] || 0));
   });
   od.customers.forEach(function (oc) {
@@ -940,7 +1104,8 @@ function reportCollection(token, f) {
     m.overdueInvoices += oc.count;
     m.overdueCustomers++;
     m.maxDays = Math.max(m.maxDays, oc.maxDays);
-    m.companies.push({ account: oc.account, name: oc.name, remaining: oc.remaining, maxDays: oc.maxDays, count: oc.count, lastFollowUp: oc.lastFollowUp, balance: round2_(balance[oc.account] || 0) });
+    m.companies.push({ account: oc.account, name: oc.name, remaining: oc.remaining, maxDays: oc.maxDays, count: oc.count,
+      lastFollowUp: oc.lastFollowUp, balance: round2_(L.balance[oc.account] || 0) });
   });
   od.rows.forEach(function (r) { const m = team[r.collector || '']; if (m) m.sumDays += r.days; });
   const rows = Object.keys(team).map(function (k) {
@@ -951,16 +1116,56 @@ function reportCollection(token, f) {
     return m;
   }).filter(function (m) { return !f.collector || m.collector === f.collector; })
     .sort(function (a, b) { return b.overdue - a.overdue; });
-  return { rows: rows, buckets: od.buckets, totals: { overdue: sum_(rows, 'overdue'), balance: sum_(rows, 'balance'), collectedMTD: sum_(rows, 'collectedMTD') } };
+  return Object.assign(fxInfo_(L.fx), { rows: rows, buckets: od.buckets,
+    totals: { overdue: sum_(rows, 'overdue'), balance: sum_(rows, 'balance'), collectedMTD: sum_(rows, 'collectedMTD') } });
 }
 
-/** Main dashboard KPIs. */
-function getDashboard(token) {
+/** Customers whose balance (in the customer's own currency) exceeds the credit limit. */
+function reportCreditLimit(token, f) {
+  const user = auth_(token, 'credit');
+  f = f || {};
+  const asOf = f.asOf || today_();
+  // Work from local-currency amounts (exact for local-currency customers, one conversion for others).
+  const L = ledger_(user, asOf, getSettings_().LocalCurrency);
+  const fb = fx_();
+  const od = overdue_(user, { asOf: asOf }, L);
+  const odMap = {};
+  od.customers.forEach(function (c) { odMap[c.account] = c; });
+  const threshold = f.threshold === '' || f.threshold === undefined ? 100 : +f.threshold;
+  const rows = L.customers.filter(function (c) { return customerFilter_(c, f) && (+c.creditLimit > 0 || f.includeNoLimit); }).map(function (c) {
+    const ccy = String(c.currency || L.fx.local).toUpperCase();
+    const bal = round2_(L.fx.to(L.balance[c.account] || 0, ccy));
+    const limit = +c.creditLimit || 0;
+    const o = odMap[c.account];
+    return {
+      account: c.account, name: c.name, group: c.group, collector: c.collector, currency: ccy, creditLimit: limit,
+      balance: bal, excess: round2_(Math.max(0, bal - limit)), available: round2_(limit - bal),
+      pct: limit ? Math.round(bal / limit * 100) : (bal > 0 ? 999 : 0),
+      overdue: o ? round2_(L.fx.to(o.remaining, ccy)) : 0, maxDays: o ? o.maxDays : 0, status: c.status
+    };
+  }).filter(function (r) { return r.pct >= threshold; })
+    .sort(function (a, b) { return b.pct - a.pct; });
+  const byCcy = {};
+  rows.forEach(function (r) {
+    const x = byCcy[r.currency] = byCcy[r.currency] || { currency: r.currency, customers: 0, excess: 0, limit: 0, balance: 0 };
+    x.customers++; x.excess = round2_(x.excess + r.excess); x.limit = round2_(x.limit + r.creditLimit); x.balance = round2_(x.balance + r.balance);
+  });
+  const excessBase = round2_(rows.reduce(function (s, r) { return s + fb.conv(r.excess, r.currency); }, 0));
+  const info = fxInfo_(fb);
+  info.missingRates = Object.keys(Object.assign({}, L.fx.missing, fb.missing));
+  return Object.assign(info, {
+    rows: rows, byCurrency: Object.keys(byCcy).map(function (k) { return byCcy[k]; }),
+    totals: { customers: rows.length, exceeded: rows.filter(function (r) { return r.excess > 0; }).length, excessBase: excessBase }
+  });
+}
+
+/** Main dashboard KPIs (display currency) + cards per customer currency. */
+function getDashboard(token, currency) {
   const user = auth_(token, 'dashboard');
   const today = today_();
-  const L = ledger_(user, today);
-  const od = overdue_(user, { asOf: today });
-  const receivable = L.tx.reduce(function (s, t) { return s + (+t.debitMST || 0) - (+t.creditMST || 0); }, 0);
+  const L = ledger_(user, today, currency);
+  const od = overdue_(user, { asOf: today }, L);
+  const receivable = Object.keys(L.balance).reduce(function (s, a) { return s + L.balance[a]; }, 0);
   const monthStart = today.slice(0, 8) + '01';
   const months = [];
   const base = toDate_(monthStart);
@@ -970,31 +1175,50 @@ function getDashboard(token) {
   }
   const mIdx = {};
   months.forEach(function (m, i) { mIdx[m.key] = i; });
+  const isPay = paymentTest_(L.tx);
   let collectedMTD = 0;
   L.tx.forEach(function (t) {
     const i = mIdx[t.date.slice(0, 7)];
-    if (i !== undefined) { months[i].debit += +t.debitMST || 0; months[i].credit += +t.creditMST || 0; }
-    if (t.date >= monthStart) collectedMTD += +t.creditMST || 0;
+    if (i !== undefined) { months[i].debit += t.dr; if (isPay(t)) months[i].credit += t.cr; }
+    if (t.date >= monthStart && isPay(t)) collectedMTD += t.cr;
   });
   months.forEach(function (m) { m.debit = round2_(m.debit); m.credit = round2_(m.credit); });
   const drafts = readTable('Transactions').filter(function (t) { return !t.isDeleted && t.postStatus === 'Draft' && L.cmap[t.account]; }).length;
-  const balances = {};
-  L.tx.forEach(function (t) { balances[t.account] = (balances[t.account] || 0) + (+t.debitMST || 0) - (+t.creditMST || 0); });
-  const top = Object.keys(balances).map(function (a) {
-    const c = L.cmap[a];
-    const o = od.customers.filter(function (x) { return x.account === a; })[0];
-    return { account: a, name: c.name, collector: c.collector, group: c.group, balance: round2_(balances[a]),
+  const odMap = {};
+  od.customers.forEach(function (x) { odMap[x.account] = x; });
+  const top = Object.keys(L.balance).map(function (a) {
+    const c = L.cmap[a], o = odMap[a];
+    return { account: a, name: c.name, collector: c.collector, group: c.group, custCurrency: c.currency, balance: round2_(L.balance[a]),
       overdue: o ? o.remaining : 0, maxDays: o ? o.maxDays : 0 };
   }).sort(function (a, b) { return b.balance - a.balance; }).slice(0, 10);
-  return {
+  // Cards per customer currency: balances shown in each customer's own currency,
+  // converted from local-currency amounts to avoid double-conversion rounding.
+  const LL = L.fx.display === L.fx.local ? L : ledger_(user, today, L.fx.local);
+  const odL = LL === L ? odMap : {};
+  if (LL !== L) overdue_(user, { asOf: today }, LL).customers.forEach(function (x) { odL[x.account] = x; });
+  const byCcy = {};
+  LL.customers.forEach(function (c) {
+    const ccy = String(c.currency || LL.fx.local || LL.fx.base).toUpperCase();
+    const x = byCcy[ccy] = byCcy[ccy] || { currency: ccy, customers: 0, balance: 0, overdue: 0, overdueCustomers: 0, creditOver: 0 };
+    const bal = LL.fx.to(LL.balance[c.account] || 0, ccy);
+    x.customers++;
+    x.balance += bal;
+    if (odL[c.account]) { x.overdue += LL.fx.to(odL[c.account].remaining, ccy); x.overdueCustomers++; }
+    if (+c.creditLimit > 0 && bal > +c.creditLimit) x.creditOver++;
+  });
+  const byCurrency = Object.keys(byCcy).map(function (k) {
+    const x = byCcy[k]; x.balance = round2_(x.balance); x.overdue = round2_(x.overdue); return x;
+  }).sort(function (a, b) { return b.customers - a.customers; });
+  return Object.assign(fxInfo_(L.fx), {
     kpi: {
       customers: L.customers.length,
       active: L.customers.filter(function (c) { return c.status !== 'Blocked' && c.status !== 'Inactive'; }).length,
       receivable: round2_(receivable), overdue: od.totals.remaining, overdueCustomers: od.totals.customers,
-      collectedMTD: round2_(collectedMTD), drafts: drafts, avgDays: od.totals.avgDays
+      collectedMTD: round2_(collectedMTD), drafts: drafts, avgDays: od.totals.avgDays,
+      creditOver: byCurrency.reduce(function (s, x) { return s + x.creditOver; }, 0)
     },
-    months: months, buckets: od.buckets, top: top
-  };
+    months: months, buckets: od.buckets, top: top, byCurrency: byCurrency
+  });
 }
 
 // ───────────────────────────── Demo data ─────────────────────────────
@@ -1002,6 +1226,8 @@ function loadDemoData() {
   setup();
   const groups = [{ groupId: 'CORP', groupName: 'Corporate' }, { groupId: 'GOV', groupName: 'Government' }, { groupId: 'RET', groupName: 'Retail' }];
   appendRows('CustomerGroups', groups);
+  appendRows('Currencies', [{ code: 'SAR', name: 'Saudi Riyal', rate: 1, active: true }, { code: 'USD', name: 'US Dollar', rate: 3.75, active: true },
+    { code: 'EUR', name: 'Euro', rate: 4.05, active: true }]);
   const salt = Utilities.getUuid();
   appendRows('Users', [{
     userId: Utilities.getUuid(), username: 'collector1', fullName: 'Ahmed Collector', email: '',
@@ -1012,7 +1238,7 @@ function loadDemoData() {
   const names = ['Al Noor Trading', 'Gulf Steel Co.', 'Riyadh Medical', 'Desert Foods', 'Blue Sea Logistics', 'Najd Contracting', 'Ministry Supplies', 'Smart Retail'];
   const custs = names.map(function (n, i) {
     return {
-      account: 'C' + (1001 + i), name: n, group: groups[i % 3].groupId, currency: 'SAR', contactPerson: 'Contact ' + (i + 1),
+      account: 'C' + (1001 + i), name: n, group: groups[i % 3].groupId, currency: ['SAR', 'SAR', 'USD'][i % 3], contactPerson: 'Contact ' + (i + 1),
       phone: '05' + (50000000 + i * 1111), email: 'ar' + (i + 1) + '@example.com', address: 'Street ' + (i + 10),
       city: ['Riyadh', 'Jeddah', 'Dammam'][i % 3], country: 'SA', creditLimit: 100000, termsDays: 30,
       collector: i % 2 ? 'collector1' : 'admin', status: 'Active', createdAt: new Date(2025, 0, 1 + i)

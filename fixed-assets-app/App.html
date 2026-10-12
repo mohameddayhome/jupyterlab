@@ -659,10 +659,13 @@
     { id: 'assets', icon: 'box', ar: 'الأصول الثابتة', en: 'Fixed assets', perm: 'assets' },
     { id: 'books', icon: 'book', ar: 'دفاتر الأصول', en: 'Books', perm: 'books' },
     { id: 'journal', icon: 'journal', ar: 'يومية الأصول الثابتة', en: 'Fixed asset journal', perm: 'journal' },
+    { id: 'transactions', icon: 'list', ar: 'حركات الأصول الثابتة', en: 'Fixed asset transactions', perm: 'journal' },
     { id: 'transfers', icon: 'transfer', ar: 'نقل الأصول', en: 'Asset transfers', perm: 'transfers' },
     { id: 'barcodes', icon: 'barcode', ar: 'طباعة الباركود', en: 'Barcode labels', perm: 'assets' },
     { id: 'depreciation', icon: 'clock', ar: 'الإهلاك التلقائي', en: 'Depreciation', perm: 'depreciation' },
     { id: 'reports', icon: 'chart', ar: 'التقارير', en: 'Reports', perm: 'reports' },
+    { h: 1, ar: 'المحاسبة', en: 'Accounting' },
+    { id: 'gl', icon: 'book', ar: 'القيود المحاسبية', en: 'Journal entries', perm: 'gl' },
     { h: 1, ar: 'البيانات الأساسية', en: 'Master data' },
     { id: 'units', icon: 'tree', ar: 'الوحدات التشغيلية', en: 'Operating units', perm: 'masterdata' },
     { id: 'locations', icon: 'pin', ar: 'المواقع والمسؤولون', en: 'Locations & responsibility', perm: 'masterdata' },
@@ -724,6 +727,8 @@
         case 'depreciation': return await pageDepreciation();
         case 'transfers': return await (S.view.doc ? pageTransferDoc() : pageTransfers());
         case 'barcodes': return await pageBarcodes();
+        case 'transactions': return await pageTransactions();
+        case 'gl': return await (S.view.voucher ? pageGLVoucher() : pageGL());
         case 'reports': return await pageReports();
         default: return await pageDashboard();
       }
@@ -887,7 +892,7 @@
       !isNew && can(s.perm, 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: "FA.deleteCurrent('" + e + "')", cls: 'danger' },
       e === 'assets' && !isNew && '|',
       e === 'assets' && !isNew && can('books') && { icon: 'book', ar: 'الدفاتر', en: 'Books', on: "FA.go('books',{asset:" + jsArg(id) + "})" },
-      e === 'assets' && !isNew && can('journal') && { icon: 'journal', ar: 'المعاملات', en: 'Transactions', on: "FA.assetTrans(" + jsArg(id) + ")" },
+      e === 'assets' && !isNew && can('journal') && { icon: 'journal', ar: 'المعاملات', en: 'Transactions', on: "FA.go('transactions',{asset:" + jsArg(id) + "})" },
       e === 'assets' && !isNew && can('transfers', 'add') && { icon: 'transfer', ar: 'نقل الأصل', en: 'Transfer', on: "FA.trfNew([" + jsArg(id) + "])" },
       e === 'assets' && !isNew && can('transfers') && { icon: 'clock', ar: 'سجل النقل', en: 'Transfer history', on: "FA.assetTrfHistory(" + jsArg(id) + ")" },
       e === 'assets' && !isNew && { icon: 'barcode', ar: 'طباعة الملصق', en: 'Print label', on: "FA.go('barcodes',{only:[" + jsArg(id) + "]})" }
@@ -1101,6 +1106,8 @@
       can('journal', 'approve') && { icon: 'undo', ar: 'إلغاء الاعتماد', en: 'Reject / unapprove', on: "FA.jAction('unapprove')", dis: status !== 'Approved' },
       can('journal', 'post') && { icon: 'send', ar: 'ترحيل', en: 'Post', on: "FA.jAction('post')", dis: status !== 'Approved' },
       '|',
+      { icon: 'list', ar: 'طباعة القيد', en: 'Print journal entry', on: 'FA.faPrintEntry()', dis: !lines.length },
+      lines[0] && lines[0].GLVOUCHER && can('gl') && { icon: 'book', ar: 'القيد المحاسبي ' + lines[0].GLVOUCHER, en: 'GL voucher ' + lines[0].GLVOUCHER, on: "FA.go('gl',{voucher:" + jsArg(lines[0].GLVOUCHER) + "})" },
       { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: "FA.exportRowsBatch()" },
       draft && (can('journal', 'add') || can('journal', 'edit')) && { icon: 'upload', ar: 'استيراد أسطر', en: 'Import lines', on: "FA.importStart('journal',{JOURNALBATCHNUMBER:" + jsArg(b) + ",JOURNALNAME:" + jsArg(jname) + "})" }
     ]) + phead('<a onclick="FA.go(\'journal\')">' + esc(L(s.title)) + '</a> | ' + esc(jname),
@@ -2024,6 +2031,285 @@
     printHtml(labelsSheet(list, S.bc), L0.roll ? 'size: ' + L0.w + 'mm ' + L0.h + 'mm; margin: 0;' : 'size: A4 portrait; margin: 0;');
   }
 
+  /* ======================= Fixed asset transactions ======================= */
+  var TRX_COLS = ['JOURNALBATCHNUMBER', 'TRANSDATE', 'JOURNALNAME', 'TRANSACTIONTYPE', 'FIXEDASSETNUMBER', 'ASSETNAME', 'BOOKID', 'TEXT',
+    'DEBITAMOUNT', 'CREDITAMOUNT', 'OFFSETACCOUNTTYPE', 'OFFSETACCOUNT', 'OFFSET_OPERATINGUNIT', 'OFFSET_SUB1_OPERATINGUNIT',
+    'OFFSET_SUB2_OPERATINGUNIT', 'OFFSETACCOUNTDISPLAYVALUE'];
+  function offType(r) { return r.VENDORACCOUNT ? 'Vendor' : 'Ledger'; }
+
+  async function pageTransactions() {
+    crumbs([S.b.settings.ORGNAME, T('حركات الأصول الثابتة', 'Fixed asset transactions')]);
+    await load('journal');
+    var f = S.trxF = S.trxF || { asset: '', type: '', status: '', from: '', to: '' };
+    if (S.view.asset !== undefined) { f.asset = S.view.asset; S.view.asset = undefined; }
+    var opt = function (list, v) { return list.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === v ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
+    var tools = '<input class="inp" style="width:150px" list="dl_trxassets" dir="ltr" placeholder="' + T('رقم الأصل', 'Asset') + '" value="' + esc(f.asset) + '" onchange="FA.trxFilter(\'asset\', this.value)">' +
+      '<datalist id="dl_trxassets">' + datalistOpts('@assets', null, {}) + '</datalist>' +
+      '<select class="inp" style="width:auto" onchange="FA.trxFilter(\'type\', this.value)">' + opt([['', T('كل الأنواع', 'All types')]].concat(fld('journal', 'TRANSACTIONTYPE').opts.map(function (o) { return [o.v, L(o)]; })), f.type) + '</select>' +
+      '<select class="inp" style="width:auto" onchange="FA.trxFilter(\'status\', this.value)">' + opt([['', T('كل الحالات', 'All statuses')]].concat(fld('journal', 'STATUS').opts.map(function (o) { return [o.v, L(o)]; })), f.status) + '</select>' +
+      '<label>' + T('من', 'From') + ' <input class="inp" style="width:auto" type="date" value="' + esc(f.from) + '" onchange="FA.trxFilter(\'from\', this.value)"></label>' +
+      '<label>' + T('إلى', 'To') + ' <input class="inp" style="width:auto" type="date" value="' + esc(f.to) + '" onchange="FA.trxFilter(\'to\', this.value)"></label>';
+    var cols = TRX_COLS.map(function (k) {
+      if (k === 'OFFSETACCOUNTTYPE') return { k: k, label: T('نوع الحساب المقابل', 'Offset account type'), text: function (r) { return offType(r) === 'Vendor' ? T('مورد', 'Vendor') : T('دفتر الأستاذ', 'Ledger'); } };
+      var fd = fld('journal', k);
+      var c = { k: k, label: L(fd), num: fd.type === 'number', text: function (r) { return displayVal(fd, r[k]); } };
+      if (k === 'DEBITAMOUNT' || k === 'CREDITAMOUNT') c.total = true;
+      return c;
+    }).concat([
+      { k: 'STATUS', label: T('الحالة', 'Status'), html: function (r) { return badge('journal', r.STATUS); }, text: function (r) { return r.STATUS; } },
+      { k: 'GLVOUCHER', label: T('القيد المحاسبي', 'GL voucher') }
+    ]);
+    $('#main').innerHTML = apane([
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('journal')" },
+      { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: 'FA.trxExport()' },
+      { icon: 'list', ar: 'طباعة', en: 'Print', on: 'window.print()' }
+    ]) + '<div class="print-head"><b>' + esc(S.b.settings.ORGNAME) + '</b> — ' + T('حركات الأصول الثابتة', 'Fixed asset transactions') + ' — ' + today() + '</div>' +
+      phead(T('الأصول الثابتة', 'Fixed assets'), T('حركات الأصول الثابتة', 'Fixed asset transactions')) +
+      '<div class="content"><div class="card">' + grid('trx', {
+        rows: trxRows, key: function (r) { return r.LINEID; }, cols: cols, tools: tools,
+        open: function (r) { go('journal', { batch: r.JOURNALBATCHNUMBER }); }
+      }) + '</div></div>';
+    gridRender('trx');
+  }
+  function trxRows() {
+    var f = S.trxF;
+    return (S.data.journal || []).filter(function (r) {
+      return (!f.asset || low(r.FIXEDASSETNUMBER) === low(f.asset)) && (!f.type || r.TRANSACTIONTYPE === f.type) && (!f.status || r.STATUS === f.status) &&
+        (!f.from || String(r.TRANSDATE) >= f.from) && (!f.to || String(r.TRANSDATE) <= f.to);
+    }).sort(function (a, b) { return String(a.TRANSDATE).localeCompare(String(b.TRANSDATE)) || String(a.JOURNALBATCHNUMBER).localeCompare(String(b.JOURNALBATCHNUMBER)); });
+  }
+  function trxFilter(k, v) { S.trxF[k] = v; render(); }
+  function trxExport() {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    var g = S.grids.trx;
+    var data = (g.visible || g.rows()).map(function (r) {
+      var o = {};
+      TRX_COLS.forEach(function (k) { o[k] = k === 'OFFSETACCOUNTTYPE' ? offType(r) : (r[k] === undefined ? '' : r[k]); });
+      return o;
+    });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data, { header: TRX_COLS }), 'Transactions');
+    XLSX.writeFile(wb, 'FixedAssetTransactions_' + today() + '.xlsx');
+  }
+
+  /* ======================= Journal entry printing ======================= */
+  function unitText(ou, s1, s2) {
+    var c = s2 || s1 || ou;
+    if (!c) return '';
+    var n = s2 ? lookupName('Sub2_OperatingUnit', s2) : s1 ? lookupName('Sub1_OperatingUnit', s1) : lookupName('OperatingUnit', ou);
+    return c + (n ? ' — ' + n : '');
+  }
+
+  /** طرفا القيد لسطر يومية الأصول (نفس منطق الخادم): حساب الأصل والحساب المقابل. */
+  function faLegsClient(l) {
+    var a = refFind(S.b.refs.assets, l.FIXEDASSETNUMBER) || {};
+    var g = refFind(S.b.refs.groups, a.g) || {};
+    var ledger = l.LEDGERACCOUNT || (DEP_TYPES[l.TRANSACTIONTYPE] ? g.ad : g.a) || '';
+    var amt = (Number(l.DEBITAMOUNT) || 0) - (Number(l.CREDITAMOUNT) || 0);
+    var note = (l.TEXT ? l.TEXT + ' — ' : '') + l.FIXEDASSETNUMBER;
+    var assetLeg = { acc: ledger, units: unitText(a.ou, a.s1, a.s2), note: note };
+    var offLeg = { acc: l.OFFSETACCOUNT, units: unitText(l.OFFSET_OPERATINGUNIT, l.OFFSET_SUB1_OPERATINGUNIT, l.OFFSET_SUB2_OPERATINGUNIT), note: note };
+    return amt >= 0
+      ? [Object.assign({ debit: amt, credit: 0 }, assetLeg), Object.assign({ debit: 0, credit: amt }, offLeg)]
+      : [Object.assign({ debit: -amt, credit: 0 }, offLeg), Object.assign({ debit: 0, credit: -amt }, assetLeg)];
+  }
+
+  function printVoucher(title, meta, legs) {
+    var dr = 0, cr = 0;
+    legs.forEach(function (x) { dr += Number(x.debit) || 0; cr += Number(x.credit) || 0; });
+    var html = '<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(title) +
+      '<table class="meta"><tr><td>' + T('رقم القيد: ', 'Voucher: ') + '<b>' + esc(meta.number) + '</b></td><td>' + T('التاريخ: ', 'Date: ') + '<b>' + esc(meta.date || '') + '</b></td><td>' +
+      T('نوع اليومية: ', 'Journal: ') + '<b>' + esc(meta.journal || '') + '</b></td><td>' + T('الحالة: ', 'Status: ') + '<b>' + esc(displayVal(fld('journal', 'STATUS'), meta.status)) + '</b></td></tr>' +
+      '<tr><td colspan="3">' + T('البيان: ', 'Description: ') + esc(meta.desc || '') + '</td><td>' + T('المرجع: ', 'Reference: ') + esc(meta.ref || '') + '</td></tr></table>' +
+      '<table class="lines"><thead><tr><th>#</th><th>' + T('رقم الحساب', 'Account') + '</th><th>' + T('اسم الحساب', 'Account name') + '</th><th>' + T('الوحدة', 'Unit') + '</th><th>' +
+      T('البيان', 'Description') + '</th><th>' + T('مدين', 'Debit') + '</th><th>' + T('دائن', 'Credit') + '</th></tr></thead><tbody>' +
+      legs.map(function (x, i) {
+        return '<tr><td>' + (i + 1) + '</td><td dir="ltr">' + esc(x.acc || '—') + '</td><td>' + esc(lookupName('@allAccounts', x.acc)) + '</td><td>' + esc(x.units || '') + '</td><td>' + esc(x.note || '') +
+          '</td><td class="n">' + (x.debit ? fmtNum(x.debit, 3) : '') + '</td><td class="n">' + (x.credit ? fmtNum(x.credit, 3) : '') + '</td></tr>';
+      }).join('') + '</tbody><tfoot><tr><th colspan="5">' + T('الإجمالي', 'Total') + (Math.abs(dr - cr) > 0.0005 ? ' — <span style="color:#c50f1f">' + T('غير متوازن', 'not balanced') + '</span>' : '') +
+      '</th><th class="n">' + fmtNum(dr, 3) + '</th><th class="n">' + fmtNum(cr, 3) + '</th></tr></tfoot></table>' +
+      '<div class="signs">' + [T('أعدّه', 'Prepared by'), T('راجعه', 'Reviewed by'), T('المدير المالي', 'Finance manager'), T('المعتمد', 'Approved by')].map(function (x) {
+        return '<div><b>' + esc(x) + '</b><span>' + T('الاسم:', 'Name:') + '</span><span>' + T('التوقيع:', 'Signature:') + '</span></div>';
+      }).join('') + '</div></div>';
+    printHtml(html, 'size: A4 portrait; margin: 12mm;');
+  }
+
+  function faPrintEntry() {
+    var b = S.view.batch, lines = batchLines(b);
+    if (!lines.length) return;
+    var info = batches().filter(function (x) { return x.JOURNALBATCHNUMBER === b; })[0] || {};
+    var legs = [];
+    lines.forEach(function (l) { faLegsClient(l).forEach(function (x) { legs.push(x); }); });
+    if (legs.some(function (x) { return !x.acc; })) toast(T('بعض الأسطر بدون حساب أصل أو حساب مقابل — راجع حسابات مجموعة الأصل', 'Some legs have no account — check the asset group accounts'), 'err');
+    var st = info.STATUS === 'Mixed' ? 'Draft' : info.STATUS;
+    printVoucher(T('قيد يومية — يومية الأصول الثابتة', 'Journal entry — fixed asset journal'),
+      { number: (lines[0].GLVOUCHER ? lines[0].GLVOUCHER + ' / ' : '') + b, date: info.TRANSDATE, journal: info.JOURNALNAME, status: st, desc: lines[0].TEXT || '', ref: b }, legs);
+  }
+
+  /* ======================= General ledger vouchers ======================= */
+  async function pageGL() {
+    var s = sch('glheaders');
+    crumbs([S.b.settings.ORGNAME, L(s.title)]);
+    await Promise.all([load('glheaders'), load('gllines')]);
+    $('#main').innerHTML = apane([
+      can('gl', 'add') && { icon: 'plus', ar: 'قيد جديد', en: 'New voucher', on: "FA.go('gl',{voucher:'@new'})" },
+      can('gl', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: 'FA.glDeleteSelected()', cls: 'danger' },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.glReload()' },
+      { icon: 'download', ar: 'تصدير السطور', en: 'Export lines', on: "FA.glExport()" }
+    ]) + phead(T('المحاسبة', 'Accounting'), esc(L(s.title))) +
+      '<div class="content"><div class="card">' + grid('glv', {
+        rows: function () { return (S.data.glheaders || []).slice().sort(function (a, b) { return String(b.VOUCHER).localeCompare(String(a.VOUCHER), undefined, { numeric: true }); }); },
+        key: function (r) { return r.VOUCHER; }, select: true, open: function (r) { go('gl', { voucher: r.VOUCHER }); },
+        cols: schemaCols('glheaders').map(function (c) {
+          if (c.k === 'STATUS') c.html = function (r) { return badge('journal', r.STATUS); };
+          if (c.k === 'TOTALDEBIT' || c.k === 'TOTALCREDIT') c.total = true;
+          return c;
+        })
+      }) + '</div></div>';
+    gridRender('glv');
+  }
+  async function glReload() { await Promise.all([load('glheaders', true), load('gllines', true)]); await refreshRefs(); render(); }
+
+  async function glDeleteSelected() {
+    var rows = selected('glv');
+    if (!rows.length) return toast(T('حدد قيداً واحداً على الأقل', 'Select at least one voucher'));
+    if (rows.some(function (r) { return r.STATUS !== 'Draft'; })) return toast(T('يمكن حذف القيود في حالة مسودة فقط', 'Only draft vouchers can be deleted'), 'err');
+    if (!(await confirmBox(T('حذف ', 'Delete ') + rows.length + T(' قيد؟', ' voucher(s)?'), T('حذف', 'Delete'), true))) return;
+    try {
+      for (var i = 0; i < rows.length; i++) await api('glAction', S.token, rows[i].VOUCHER, 'delete');
+      S.grids.glv.sel = {}; await glReload();
+    } catch (e) { fail(e); }
+  }
+
+  function glExport() {
+    exportRows('gllines', S.data.gllines || [], 'GLJournalLines');
+  }
+
+  async function pageGLVoucher() {
+    var s = sch('glheaders');
+    await Promise.all([load('glheaders'), load('gllines')]);
+    var v = S.view.voucher, isNew = v === '@new';
+    var head = isNew ? { TRANSDATE: today(), JOURNALNAME: ((S.b.lookups.JournalName || [])[0] || {}).c || '', SOURCE: 'Manual', STATUS: 'Draft' }
+      : (S.data.glheaders || []).filter(function (h) { return h.VOUCHER === v; })[0];
+    if (!head) { go('gl'); return; }
+    var lines = isNew ? [{}, {}] : (S.data.gllines || []).filter(function (l) { return l.VOUCHER === v; })
+      .sort(function (a, b) { return (Number(a.LINENUM) || 0) - (Number(b.LINENUM) || 0); });
+    var manual = !head.SOURCE || head.SOURCE === 'Manual';
+    var editable = head.STATUS === 'Draft' && manual && can('gl', isNew ? 'add' : 'edit');
+    S.glLines = lines.map(function (l) { return Object.assign({}, l); });
+    crumbs([S.b.settings.ORGNAME, L(s.title), isNew ? T('جديد', 'New') : v]);
+    $('#main').innerHTML = apane([
+      { icon: 'back', ar: 'رجوع', en: 'Back', on: "FA.go('gl')", cls: 'back' },
+      editable && { icon: 'save', ar: 'حفظ', en: 'Save', on: 'FA.glSave(' + (isNew ? 1 : 0) + ')' },
+      editable && { icon: 'plus', ar: 'إضافة سطر', en: 'Add line', on: 'FA.glAddLine()' },
+      '|',
+      !isNew && manual && can('gl', 'approve') && { icon: 'check', ar: 'اعتماد', en: 'Approve', on: "FA.glAct('approve')", dis: head.STATUS !== 'Draft' },
+      !isNew && manual && can('gl', 'approve') && { icon: 'undo', ar: 'إلغاء الاعتماد', en: 'Unapprove', on: "FA.glAct('unapprove')", dis: head.STATUS !== 'Approved' },
+      !isNew && manual && can('gl', 'post') && { icon: 'send', ar: 'ترحيل', en: 'Post', on: "FA.glAct('post')", dis: head.STATUS !== 'Approved' },
+      !isNew && '|',
+      !isNew && { icon: 'list', ar: 'طباعة القيد', en: 'Print voucher', on: 'FA.glPrint()' },
+      !isNew && manual && head.STATUS === 'Draft' && can('gl', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: "FA.glAct('delete')", cls: 'danger' }
+    ]) + phead('<a onclick="FA.go(\'gl\')">' + esc(L(s.title)) + '</a>' + (!manual ? ' | ' + esc(displayVal(fld('glheaders', 'SOURCE'), head.SOURCE)) + ' ' + esc(head.SOURCEREF || '') : ''),
+      (isNew ? T('قيد جديد', 'New voucher') : esc(v)) + ' ' + badge('journal', head.STATUS)) +
+      '<div class="content">' + formHtml('glheaders', head, isNew, !editable, { hide: isNew ? ['VOUCHER', 'SOURCE', 'SOURCEREF', 'TOTALDEBIT', 'TOTALCREDIT', 'STATUS', 'APPROVEDBY', 'POSTEDBY', 'POSTEDON'] : [] }) +
+      '<div class="card"><div class="ftab-h" style="cursor:default"><h3>' + T('تفاصيل القيد', 'Voucher lines') + '</h3></div><div class="gridwrap" style="max-height:none">' +
+      '<table class="grid gl-lines"><thead><tr><th>#</th><th>' + T('رقم الحساب', 'Account') + '</th><th>' + T('الوحدة (الفرعية 2)', 'Unit (sub 2)') + '</th><th class="n">' +
+      T('مدين', 'Debit') + '</th><th class="n">' + T('دائن', 'Credit') + '</th><th>' + T('ملاحظة', 'Note') + '</th><th>' + T('المرجع', 'Reference') + '</th>' + (editable ? '<th></th>' : '') +
+      '</tr></thead><tbody id="glBody"></tbody><tfoot id="glFoot"></tfoot></table></div></div>' +
+      '<datalist id="dl_glacc">' + datalistOpts('@accounts', null, {}) + '</datalist><datalist id="dl_glsub2">' + datalistOpts('Sub2_OperatingUnit', null, {}) + '</datalist></div>';
+    S.glEditable = editable;
+    drawGLLines();
+  }
+
+  function drawGLLines() {
+    var ed = S.glEditable;
+    $('#glBody').innerHTML = S.glLines.map(function (l, i) {
+      if (!ed) {
+        return '<tr><td>' + (l.LINENUM || i + 1) + '</td><td><bdi>' + esc(l.MAINACCOUNTID) + '</bdi> <small style="color:#605e5c">' + esc(l.ACCOUNTNAME || lookupName('@allAccounts', l.MAINACCOUNTID)) + '</small></td>' +
+          '<td>' + esc(unitText(l.OPERATINGUNIT, l.SUB1_OPERATINGUNIT, l.SUB2_OPERATINGUNIT)) + '</td><td class="n">' + (Number(l.DEBITAMOUNT) ? fmtNum(l.DEBITAMOUNT, 3) : '') +
+          '</td><td class="n">' + (Number(l.CREDITAMOUNT) ? fmtNum(l.CREDITAMOUNT, 3) : '') + '</td><td>' + esc(l.NOTE) + '</td><td>' + esc(l.REFERENCE) + '</td></tr>';
+      }
+      var inp = function (k, attrs, cls) { return '<input class="inp ' + (cls || '') + '" data-gl="' + k + '" data-i="' + i + '" value="' + esc(k === 'DEBITAMOUNT' || k === 'CREDITAMOUNT' ? (Number(l[k]) ? l[k] : '') : (l[k] || '')) + '" ' + (attrs || '') + ' onchange="FA.glCell(this)">'; };
+      return '<tr><td>' + (i + 1) + '</td><td><div class="lk">' + inp('MAINACCOUNTID', 'list="dl_glacc" dir="ltr" style="max-width:110px"') +
+        '<span class="gl-name">' + esc(lookupName('@accounts', l.MAINACCOUNTID)) + '</span></div></td>' +
+        '<td><div class="lk">' + inp('SUB2_OPERATINGUNIT', 'list="dl_glsub2" dir="ltr" style="max-width:130px"') + '<span class="gl-name">' + esc(lookupName('Sub2_OperatingUnit', l.SUB2_OPERATINGUNIT)) + '</span></div></td>' +
+        '<td>' + inp('DEBITAMOUNT', 'inputmode="decimal" style="max-width:120px"', 'num') + '</td><td>' + inp('CREDITAMOUNT', 'inputmode="decimal" style="max-width:120px"', 'num') + '</td>' +
+        '<td>' + inp('NOTE') + '</td><td>' + inp('REFERENCE', 'style="max-width:110px"') + '</td>' +
+        '<td><button class="ib red" title="' + T('حذف السطر', 'Remove line') + '" onclick="FA.glDelLine(' + i + ')">' + icon('trash') + '</button></td></tr>';
+    }).join('');
+    drawGLFoot();
+  }
+
+  function drawGLFoot() {
+    var dr = 0, cr = 0;
+    S.glLines.forEach(function (l) { dr += Number(parseNum(l.DEBITAMOUNT)) || 0; cr += Number(parseNum(l.CREDITAMOUNT)) || 0; });
+    var diff = Math.round((dr - cr) * 1000) / 1000;
+    $('#glFoot').innerHTML = '<tr><td colspan="3">' + T('الإجمالي', 'Total') + ' ' + (diff ? '<span class="badge b-err">' + T('الفرق: ', 'Difference: ') + fmtNum(diff, 3) + '</span>' :
+      (dr ? '<span class="badge b-ok">' + T('متوازن', 'Balanced') + '</span>' : '')) + '</td><td class="n">' + fmtNum(dr, 3) + '</td><td class="n">' + fmtNum(cr, 3) + '</td><td colspan="' + (S.glEditable ? 3 : 2) + '"></td></tr>';
+  }
+
+  function glCell(el) {
+    var i = Number(el.getAttribute('data-i')), k = el.getAttribute('data-gl');
+    var v = el.value;
+    if (k === 'DEBITAMOUNT' || k === 'CREDITAMOUNT') {
+      v = parseNum(v);
+      if (v !== '' && Number(v) > 0) {
+        var other = k === 'DEBITAMOUNT' ? 'CREDITAMOUNT' : 'DEBITAMOUNT';
+        S.glLines[i][other] = '';
+        var o = $('[data-gl="' + other + '"][data-i="' + i + '"]');
+        if (o) o.value = '';
+      }
+    }
+    S.glLines[i][k] = v;
+    var nm = el.parentNode.querySelector('.gl-name');
+    if (nm) nm.textContent = k === 'MAINACCOUNTID' ? lookupName('@accounts', v) : lookupName('Sub2_OperatingUnit', v);
+    drawGLFoot();
+  }
+  function glAddLine() {
+    var last = S.glLines[S.glLines.length - 1] || {};
+    S.glLines.push({ SUB2_OPERATINGUNIT: last.SUB2_OPERATINGUNIT || '', NOTE: last.NOTE || '' });
+    drawGLLines();
+  }
+  function glDelLine(i) { S.glLines.splice(i, 1); drawGLLines(); }
+
+  async function glSave(isNew) {
+    var form = $('[data-form="glheaders"]');
+    if (!validateForm(form)) return;
+    var head = readForm(form);
+    if (!isNew) head.VOUCHER = S.view.voucher;
+    var lines = S.glLines.map(function (l) {
+      return { MAINACCOUNTID: l.MAINACCOUNTID || '', SUB2_OPERATINGUNIT: l.SUB2_OPERATINGUNIT || '', DEBITAMOUNT: parseNum(l.DEBITAMOUNT),
+        CREDITAMOUNT: parseNum(l.CREDITAMOUNT), NOTE: l.NOTE || '', REFERENCE: l.REFERENCE || '' };
+    });
+    try {
+      var r = await api('saveGLVoucher', S.token, head, lines, !!isNew);
+      toast(T('تم حفظ القيد ', 'Voucher saved ') + r.voucher + (Math.abs(r.debit - r.credit) > 0.0005 ? T(' — تنبيه: القيد غير متوازن', ' — warning: not balanced') : ''), Math.abs(r.debit - r.credit) > 0.0005 ? 'err' : 'ok');
+      await Promise.all([load('glheaders', true), load('gllines', true)]);
+      go('gl', { voucher: r.voucher });
+    } catch (e) { fail(e); }
+  }
+
+  async function glAct(action) {
+    var msgs = { approve: T('اعتماد القيد؟', 'Approve the voucher?'), unapprove: T('إلغاء الاعتماد؟', 'Unapprove?'),
+      post: T('ترحيل القيد؟ لا يمكن التراجع.', 'Post the voucher? This cannot be undone.'), delete: T('حذف القيد؟', 'Delete the voucher?') };
+    if (!(await confirmBox(msgs[action], null, action === 'delete'))) return;
+    try {
+      await api('glAction', S.token, S.view.voucher, action);
+      toast(T('تم', 'Done'), 'ok');
+      await Promise.all([load('glheaders', true), load('gllines', true)]);
+      if (action === 'delete') go('gl'); else render();
+    } catch (e) { fail(e); }
+  }
+
+  function glPrint() {
+    var v = S.view.voucher;
+    var h = (S.data.glheaders || []).filter(function (x) { return x.VOUCHER === v; })[0];
+    var legs = (S.data.gllines || []).filter(function (l) { return l.VOUCHER === v; }).sort(function (a, b) { return (Number(a.LINENUM) || 0) - (Number(b.LINENUM) || 0); })
+      .map(function (l) { return { acc: l.MAINACCOUNTID, units: unitText(l.OPERATINGUNIT, l.SUB1_OPERATINGUNIT, l.SUB2_OPERATINGUNIT), note: l.NOTE, debit: Number(l.DEBITAMOUNT) || 0, credit: Number(l.CREDITAMOUNT) || 0 }; });
+    printVoucher(T('قيد يومية', 'Journal voucher'), { number: v, date: h.TRANSDATE, journal: h.JOURNALNAME, status: h.STATUS, desc: h.DESCRIPTION, ref: h.REFERENCE }, legs);
+  }
+
   /* ======================= Users ======================= */
   function roleTemplate(role) {
     var p = {};
@@ -2031,13 +2317,13 @@
     var set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
     var data = ['assets', 'books', 'journal', 'vendors', 'masterdata'];
     if (role === 'SuperAdmin' || role === 'Admin') set(S.b.permPages, S.b.permActions);
-    else if (role === 'Accountant') { set(data.concat(['transfers']), ['view', 'add', 'edit']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
-    else set(data.concat(['reports', 'transfers']), ['view']);
+    else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
+    else set(data.concat(['reports', 'transfers', 'gl']), ['view']);
     return p;
   }
   var PAGE_NAMES = { assets: ['الأصول الثابتة', 'Fixed assets'], books: ['دفاتر الأصول', 'Books'], journal: ['يومية الأصول', 'FA journal'],
     vendors: ['الموردون', 'Vendors'], users: ['المستخدمون', 'Users'], settings: ['الإعدادات', 'Settings'],
-    depreciation: ['الإهلاك التلقائي', 'Depreciation'], transfers: ['نقل الأصول', 'Asset transfers'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'] };
+    depreciation: ['الإهلاك التلقائي', 'Depreciation'], transfers: ['نقل الأصول', 'Asset transfers'], gl: ['القيود المحاسبية', 'Journal entries'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'] };
   var ACT_NAMES = { view: ['دخول للصفحة', 'View'], add: ['إضافة', 'Add'], edit: ['تعديل', 'Edit'], delete: ['حذف', 'Delete'], approve: ['اعتماد', 'Approve'], post: ['ترحيل', 'Post'] };
 
   async function pageUsers() {
@@ -2319,6 +2605,8 @@
       trfNew(sel.map(function (r) { return r.FIXEDASSETNUMBER; }));
     },
     bcSelectedAssets: function () { go('barcodes', { only: selected('list_assets').map(function (r) { return r.FIXEDASSETNUMBER; }) }); },
+    trxFilter: trxFilter, trxExport: trxExport, faPrintEntry: faPrintEntry, glReload: glReload, glDeleteSelected: glDeleteSelected,
+    glExport: glExport, glCell: glCell, glAddLine: glAddLine, glDelLine: glDelLine, glSave: glSave, glAct: glAct, glPrint: glPrint,
     accSearch: accSearch, accToggle: accToggle, accAll: accAll, exportRowsAcc: exportRowsAcc,
     depCalc: depCalc, depCreate: depCreate, depExport: depExport, repFilter: repFilter, repRefresh: repRefresh, repExport: repExport
   };

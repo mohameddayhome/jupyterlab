@@ -10,24 +10,24 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '4.0.0';
-const SETUP_VERSION = '4';
+const APP_VERSION = '5.0.0';
+const SETUP_VERSION = '5';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
 const AUDIT = ['CREATEDBY', 'CREATEDON', 'MODIFIEDBY', 'MODIFIEDON'];
-const PERM_PAGES = ['assets', 'books', 'journal', 'transfers', 'depreciation', 'reports', 'masterdata', 'vendors', 'users', 'settings'];
+const PERM_PAGES = ['assets', 'books', 'journal', 'transfers', 'gl', 'depreciation', 'reports', 'masterdata', 'vendors', 'users', 'settings'];
 const PERM_ACTIONS = ['view', 'add', 'edit', 'delete', 'approve', 'post'];
 const USER_COLS = ['USERNAME', 'FULLNAME', 'EMAIL', 'PASSWORDHASH', 'SALT', 'ROLE', 'PERMISSIONS', 'STATUS',
   'MUSTCHANGE', 'LASTLOGIN', 'CREATEDBY', 'CREATEDON', 'MODIFIEDBY', 'MODIFIEDON'];
 const SESSION_COLS = ['SESSIONID', 'USERNAME', 'CREATEDON', 'LASTSEEN', 'ACTIVE', 'CLIENT'];
 const SETTING_DEFAULTS = {
   ORGNAME: 'إدارة الأصول الثابتة', ORGEMAIL: '', CURRENCY: 'DJF', SESSIONTIMEOUT: '60',
-  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0',
+  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ',
   DEPJOURNALNAME: 'FADEP', DEPOFFSETACCOUNT: '', DEPMONTHS: '3'
 };
 const PUBLIC_SETTINGS = ['ORGNAME', 'ORGEMAIL', 'CURRENCY', 'SESSIONTIMEOUT', 'MAXSESSIONS', 'DATEFORMAT', 'LOGO', 'JOURNALPREFIX',
-  'DEPJOURNALNAME', 'DEPOFFSETACCOUNT', 'DEPMONTHS', 'TRANSFERPREFIX'];
+  'DEPJOURNALNAME', 'DEPOFFSETACCOUNT', 'DEPMONTHS', 'TRANSFERPREFIX', 'GLPREFIX', 'TRFJOURNALNAME'];
 
 /* ============================== Schemas ============================== */
 
@@ -57,6 +57,7 @@ const TRANS_TYPES = [
 ];
 
 const JOURNAL_STATUS = [o('Draft', 'مسودة'), o('Approved', 'معتمد'), o('Posted', 'مُرحّل')];
+const GL_SOURCES = [o('Manual', 'يدوي', 'Manual'), o('FAJournal', 'يومية الأصول', 'Fixed asset journal'), o('Transfer', 'نقل أصول', 'Asset transfer')];
 
 const ACCOUNT_TYPES = [o('ProfitAndLoss', 'أرباح وخسائر', 'Profit and loss'), o('Revenue', 'إيرادات', 'Revenue'),
   o('Expense', 'مصروفات', 'Expense'), o('BalanceSheet', 'الميزانية العمومية', 'Balance sheet'), o('Asset', 'أصول', 'Asset'),
@@ -235,7 +236,8 @@ const SCHEMAS = {
       F('APPROVEDBY', 'اعتمد بواسطة', 'Approved by', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
       F('APPROVEDON', 'تاريخ الاعتماد', 'Approved on', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
       F('POSTEDBY', 'رحّل بواسطة', 'Posted by', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
-      F('POSTEDON', 'تاريخ الترحيل', 'Posted on', 'text', { sys: 1, sec: 'wf', grp: 'wf' })
+      F('POSTEDON', 'تاريخ الترحيل', 'Posted on', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
+      F('GLVOUCHER', 'رقم القيد المحاسبي', 'GL voucher', 'text', { sys: 1, sec: 'wf', grp: 'wf', list: 1 })
     ])
   },
 
@@ -273,8 +275,49 @@ const SCHEMAS = {
         F('APPROVEDBY', 'اعتمد بواسطة', 'Approved by', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
         F('APPROVEDON', 'تاريخ الاعتماد', 'Approved on', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
         F('POSTEDBY', 'رحّل بواسطة', 'Posted by', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
-        F('POSTEDON', 'تاريخ الترحيل', 'Posted on', 'text', { sys: 1, sec: 'wf', grp: 'wf' })
+        F('POSTEDON', 'تاريخ الترحيل', 'Posted on', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
+      F('GLVOUCHER', 'رقم القيد المحاسبي', 'GL voucher', 'text', { sys: 1, sec: 'wf', grp: 'wf', list: 1 })
       ])
+  },
+
+  glheaders: {
+    sheet: 'GLJournals', perm: 'gl', key: ['VOUCHER'], title: { ar: 'القيود المحاسبية', en: 'Journal entries' },
+    sections: [{ id: 'hdr', ar: 'رأس القيد', en: 'Voucher header', groups: [
+      { id: 'h1', ar: 'القيد', en: 'Voucher' }, { id: 'h2', ar: 'البيان', en: 'Description' }, { id: 'h3', ar: 'المصدر', en: 'Source' }] }],
+    fields: [
+      F('VOUCHER', 'رقم القيد', 'Voucher', 'text', { key: 1, sec: 'hdr', grp: 'h1', list: 1, aliases: ['Journal batch number', 'JOURNALBATCHNUMBER'] }),
+      F('TRANSDATE', 'التاريخ', 'Date', 'date', { req: 1, dflt: '@today', sec: 'hdr', grp: 'h1', list: 1, aliases: ['Transaction date', 'ACCOUNTINGDATE'] }),
+      F('JOURNALNAME', 'نوع اليومية', 'Journal name', 'lookup', { lk: 'JournalName', req: 1, sec: 'hdr', grp: 'h1', list: 1 }),
+      F('DESCRIPTION', 'البيان', 'Description', 'text', { sec: 'hdr', grp: 'h2', list: 1, aliases: ['Text', 'TEXT'] }),
+      F('REFERENCE', 'المرجع', 'Reference', 'text', { sec: 'hdr', grp: 'h2', list: 1, aliases: ['Document', 'DOCUMENT'] }),
+      F('SOURCE', 'المصدر', 'Source', 'select', { opts: GL_SOURCES, sys: 1, sec: 'hdr', grp: 'h3', list: 1 }),
+      F('SOURCEREF', 'مستند المصدر', 'Source document', 'text', { sys: 1, sec: 'hdr', grp: 'h3', list: 1 }),
+      F('TOTALDEBIT', 'إجمالي المدين', 'Total debit', 'number', { dec: 3, sys: 1, sec: 'hdr', grp: 'h3', list: 1 }),
+      F('TOTALCREDIT', 'إجمالي الدائن', 'Total credit', 'number', { dec: 3, sys: 1, sec: 'hdr', grp: 'h3', list: 1 }),
+      F('STATUS', 'الحالة', 'Status', 'select', { opts: JOURNAL_STATUS, sys: 1, sec: 'hdr', grp: 'h3', list: 1 }),
+      F('APPROVEDBY', 'اعتمد بواسطة', 'Approved by', 'text', { sys: 1, sec: 'hdr', grp: 'h3' }),
+      F('POSTEDBY', 'رحّل بواسطة', 'Posted by', 'text', { sys: 1, sec: 'hdr', grp: 'h3' }),
+      F('POSTEDON', 'تاريخ الترحيل', 'Posted on', 'text', { sys: 1, sec: 'hdr', grp: 'h3' })
+    ]
+  },
+
+  gllines: {
+    sheet: 'GLJournalLines', perm: 'gl', key: ['LINEID'], autoId: 'LINEID', title: { ar: 'سطور القيود', en: 'Journal entry lines' },
+    sections: [{ id: 'l', ar: 'السطر', en: 'Line', groups: [{ id: 'l1', ar: 'الحساب', en: 'Account' }, { id: 'l2', ar: 'المبلغ', en: 'Amount' }] }],
+    fields: [
+      F('LINEID', 'معرّف السطر', 'Line ID', 'text', { key: 1, sys: 1, sec: 'l', grp: 'l1' }),
+      F('VOUCHER', 'رقم القيد', 'Voucher', 'text', { req: 1, sec: 'l', grp: 'l1', list: 1 }),
+      F('LINENUM', 'سطر القيد', 'Line number', 'number', { dec: 0, sec: 'l', grp: 'l1', list: 1 }),
+      F('MAINACCOUNTID', 'رقم الحساب', 'Main account', 'lookup', { lk: '@accounts', req: 1, sec: 'l', grp: 'l1', list: 1, aliases: ['Account', 'MAINACCOUNT'] }),
+      F('ACCOUNTNAME', 'اسم الحساب', 'Account name', 'text', { calc: 1, sec: 'l', grp: 'l1', list: 1 })
+    ].concat(unitFields_('', 'l', 'l1')).concat([
+      F('DEBITAMOUNT', 'مدين', 'Debit', 'number', { dec: 3, sec: 'l', grp: 'l2', list: 1 }),
+      F('CREDITAMOUNT', 'دائن', 'Credit', 'number', { dec: 3, sec: 'l', grp: 'l2', list: 1 }),
+      F('NOTE', 'ملاحظة', 'Note', 'text', { sec: 'l', grp: 'l2', list: 1, aliases: ['Text', 'TEXT'] }),
+      F('REFERENCE', 'المرجع', 'Reference', 'text', { sec: 'l', grp: 'l2', list: 1 }),
+      F('LEDGERDIMENSIONDISPLAYVALUE', 'الحساب والأبعاد', 'Ledger account display value', 'text', { calc: 1, sec: 'l', grp: 'l1', list: 1,
+        aliases: ['ACCOUNTDISPLAYVALUE'] })
+    ])
   },
 
   vendors: {
@@ -707,8 +750,8 @@ function roleTemplate_(role) {
   const set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
   const data = ['assets', 'books', 'journal', 'vendors', 'masterdata'];
   if (role === 'SuperAdmin' || role === 'Admin') set(PERM_PAGES, PERM_ACTIONS);
-  else if (role === 'Accountant') { set(data.concat(['transfers']), ['view', 'add', 'edit']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
-  else if (role !== 'none') set(data.concat(['reports', 'transfers']), ['view']);
+  else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
+  else if (role !== 'none') set(data.concat(['reports', 'transfers', 'gl']), ['view']);
   return p;
 }
 
@@ -1041,6 +1084,7 @@ function ctx_(s, entity) {
       return i === undefined ? null : ctx.table(e).rows[i];
     },
     asset: function (n) { return ctx.find('assets', n); },
+    resetIndex: function (e) { delete index[e]; },
     dirty: {},
     touch: function (e, row) {
       const i = ctx.table(e).rows.indexOf(row);
@@ -1272,9 +1316,31 @@ const HOOKS = {
     if (!rec.OFFSET_OPERATINGUNIT && !rec.OFFSET_SUB1_OPERATINGUNIT && !rec.OFFSET_SUB2_OPERATINGUNIT) copyUnits_(a, rec, 'OFFSET_');
     deriveChain_(ctx, rec, OFFSET_CHAIN);
     rec.OFFSETACCOUNTDISPLAYVALUE = dimJoin_([rec.OFFSETACCOUNT, rec.OFFSET_OPERATINGUNIT, rec.OFFSET_SUB1_OPERATINGUNIT, rec.OFFSET_SUB2_OPERATINGUNIT]);
-    if (rec.TRANSACTIONTYPE === 'Depreciation' && rec.DEPRECIATIONMONTHS === '') rec.DEPRECIATIONMONTHS = 1;
+    if (rec.TRANSACTIONTYPE === 'Depreciation') {
+      if (rec.DEPRECIATIONMONTHS === '') rec.DEPRECIATIONMONTHS = 1;
+      checkDepDuplicate_(ctx, rec);
+    }
     if (!rec.STATUS) rec.STATUS = 'Draft';
   }
+};
+
+HOOKS.glheaders = function (rec, ex, ctx) {
+  if (ex && ex.STATUS && ex.STATUS !== 'Draft') throw new Error('لا يمكن تعديل قيد معتمد أو مُرحّل');
+  if (!rec.VOUCHER) rec.VOUCHER = '@pending'; // الرقم يُعطى عند الكتابة فقط حتى لا تضيع أرقام عند فشل الحفظ
+  checkLk_(ctx, rec, 'JOURNALNAME', 'JournalName');
+  if (!rec.STATUS) rec.STATUS = 'Draft';
+};
+
+HOOKS.gllines = function (rec, ex, ctx) {
+  rec.MAINACCOUNTID = postingAccount_(ctx, rec.MAINACCOUNTID, 'سطر ' + (rec.LINENUM || '') + ' — رقم الحساب');
+  rec.ACCOUNTNAME = (ctx.find('accounts', rec.MAINACCOUNTID) || {}).NAME || '';
+  deriveChain_(ctx, rec, UNIT_CHAIN);
+  const d = num_(rec.DEBITAMOUNT), c = num_(rec.CREDITAMOUNT);
+  if (d < 0 || c < 0) throw new Error('سطر ' + rec.LINENUM + ': المبالغ لا يمكن أن تكون سالبة');
+  if (d > 0 && c > 0) throw new Error('سطر ' + rec.LINENUM + ': أدخل مديناً أو دائناً فقط');
+  if (!d && !c) throw new Error('سطر ' + rec.LINENUM + ': أدخل مبلغاً');
+  rec.DEBITAMOUNT = d; rec.CREDITAMOUNT = c;
+  rec.LEDGERDIMENSIONDISPLAYVALUE = dimJoin_([rec.MAINACCOUNTID, rec.OPERATINGUNIT, rec.SUB1_OPERATINGUNIT, rec.SUB2_OPERATINGUNIT]);
 };
 
 HOOKS.transfers = function (rec, ex, ctx) {
@@ -1303,6 +1369,21 @@ HOOKS.transfers = function (rec, ex, ctx) {
   }
   if (!rec.STATUS) rec.STATUS = 'Draft';
 };
+
+/** منع تكرار الإهلاك: لا يُقبل إهلاك لفترة سبق إهلاكها، ولا سطر إهلاك ثانٍ غير مُرحّل لنفس الأصل والدفتر. */
+function checkDepDuplicate_(ctx, rec) {
+  const b = ctx.table('books').rows.filter(function (x) {
+    return low_(x.FIXEDASSETNUMBER) === low_(rec.FIXEDASSETNUMBER) && low_(x.BOOKID) === low_(rec.BOOKID || 'General');
+  })[0];
+  if (b && b.LASTDEPRECIATIONDATE && ym_(rec.TRANSDATE) <= ym_(b.LASTDEPRECIATIONDATE)) {
+    throw new Error('تم احتساب إهلاك الأصل ' + rec.FIXEDASSETNUMBER + ' حتى ' + b.LASTDEPRECIATIONDATE + ' — لا يمكن تكرار الإهلاك لنفس الفترة');
+  }
+  const other = ctx.table('journal').rows.filter(function (j) {
+    return j.TRANSACTIONTYPE === 'Depreciation' && j.STATUS !== 'Posted' && j.LINEID !== rec.LINEID &&
+      low_(j.FIXEDASSETNUMBER) === low_(rec.FIXEDASSETNUMBER) && low_(j.BOOKID || 'General') === low_(rec.BOOKID || 'General');
+  })[0];
+  if (other) throw new Error('يوجد إهلاك غير مُرحّل للأصل ' + rec.FIXEDASSETNUMBER + ' في اليومية ' + other.JOURNALBATCHNUMBER + ' — رحّله أو احذفه أولاً');
+}
 
 /** بعد حفظ الأصل: تحديث أبعاد دفاتره (الأبعاد على الدفتر نسخة من الأصل). */
 const AFTER = {
@@ -1542,8 +1623,13 @@ function journalAction(token, batch, action) {
     } else if (action === 'post') {
       if (lines.some(function (l) { return l.STATUS === 'Posted'; })) throw new Error('اليومية مُرحّلة مسبقاً');
       if (lines.some(function (l) { return l.STATUS !== 'Approved'; })) throw new Error('يجب اعتماد اليومية قبل الترحيل');
+      const legs = [];
+      lines.forEach(function (l) { faLegs_(ctx, l).forEach(function (x) { legs.push(x); }); });
+      const v = autoVoucher_(ctx, { TRANSDATE: lines[0].TRANSDATE, JOURNALNAME: lines[0].JOURNALNAME, DESCRIPTION: 'قيد يومية الأصول ' + batch,
+        REFERENCE: batch, SOURCE: 'FAJournal', SOURCEREF: batch }, legs);
       postToBooks_(lines, ctx);
-      lines.forEach(function (l) { l.STATUS = 'Posted'; l.POSTEDBY = s.username; l.POSTEDON = now; });
+      writeVoucher_(ctx, v);
+      lines.forEach(function (l) { l.STATUS = 'Posted'; l.POSTEDBY = s.username; l.POSTEDON = now; l.GLVOUCHER = v.head.rec.VOUCHER; });
     } else {
       throw new Error('إجراء غير معروف');
     }
@@ -1570,7 +1656,10 @@ function postToBooks_(lines, ctx) {
         if (!b.STATUS || b.STATUS === 'NoAcquisition') b.STATUS = 'Open';
         break;
       case 'Depreciation':
-        if (!b.LASTDEPRECIATIONDATE || String(l.TRANSDATE) > String(b.LASTDEPRECIATIONDATE)) b.LASTDEPRECIATIONDATE = l.TRANSDATE;
+        if (b.LASTDEPRECIATIONDATE && ym_(l.TRANSDATE) <= ym_(b.LASTDEPRECIATIONDATE)) {
+          throw new Error('تكرار إهلاك: الأصل ' + l.FIXEDASSETNUMBER + ' تم إهلاكه حتى ' + b.LASTDEPRECIATIONDATE + ' ولا يمكن ترحيل إهلاك بتاريخ ' + l.TRANSDATE);
+        }
+        b.LASTDEPRECIATIONDATE = l.TRANSDATE;
         if (b.DEPRECIATIONPERIODSREMAINING !== '') {
           b.DEPRECIATIONPERIODSREMAINING = Math.max(0, num_(b.DEPRECIATIONPERIODSREMAINING) - (num_(l.DEPRECIATIONMONTHS) || 1));
         }
@@ -1691,8 +1780,15 @@ function transferAction(token, number, action) {
           }
         });
       });
+      const legs = [];
+      lines.forEach(function (l) { transferLegs_(ctx, l).forEach(function (x) { legs.push(x); }); });
+      const st = getSettings_();
+      const v = legs.length ? autoVoucher_(ctx, { TRANSDATE: lines[0].TRANSFERDATE, JOURNALNAME: st.TRFJOURNALNAME || 'FAJ',
+        DESCRIPTION: 'قيد نقل أصول بين الوحدات ' + number, REFERENCE: number, SOURCE: 'Transfer', SOURCEREF: number }, legs) : null;
+      if (v) writeVoucher_(ctx, v);
       lines.forEach(function (l) {
         const a = ctx.asset(l.FIXEDASSETNUMBER);
+        if (v) l.GLVOUCHER = v.head.rec.VOUCHER;
         TRF_FIELDS.forEach(function (k) { a[k] = l['TO_' + k] || ''; });
         a.MODIFIEDBY = s.username; a.MODIFIEDON = now;
         writeRow_(at, at.rows.indexOf(a), a);
@@ -1704,6 +1800,171 @@ function transferAction(token, number, action) {
     }
     idxs.forEach(function (i) { writeRow_(t, i, t.rows[i]); });
     return lines.length;
+  });
+}
+
+/* ============================== General ledger vouchers ============================== */
+
+/**
+ * أطراف القيد لسطر يومية أصول: حساب الأصل (من المجموعة) والحساب المقابل هو الطرف الثاني.
+ * مبلغ مدين في يومية الأصول = مدين حساب الأصل / دائن الحساب المقابل، والعكس.
+ */
+function faLegs_(ctx, l) {
+  const a = ctx.asset(l.FIXEDASSETNUMBER);
+  if (!a) throw new Error('الأصل غير موجود: ' + l.FIXEDASSETNUMBER);
+  const g = ctx.find('groups', a.FIXEDASSETGROUPID);
+  const ledger = ledgerAccountFor_(l.TRANSACTIONTYPE, g);
+  if (!ledger) throw new Error('مجموعة الأصل ' + a.FIXEDASSETGROUPID + ' ليس لها ' + (DEP_TYPES[l.TRANSACTIONTYPE] ? 'حساب مجمع إهلاك' : 'حساب أصل') + ' — حدده في صفحة مجموعات الأصول');
+  if (!l.OFFSETACCOUNT) throw new Error('سطر الأصل ' + l.FIXEDASSETNUMBER + ' بدون حساب مقابل');
+  l.LEDGERACCOUNT = ledger;
+  const amt = round_(num_(l.DEBITAMOUNT) - num_(l.CREDITAMOUNT), 3);
+  const assetSide = { acc: ledger, ou: a.OPERATINGUNIT, s1: a.SUB1_OPERATINGUNIT, s2: a.SUB2_OPERATINGUNIT };
+  const offSide = { acc: l.OFFSETACCOUNT, ou: l.OFFSET_OPERATINGUNIT, s1: l.OFFSET_SUB1_OPERATINGUNIT, s2: l.OFFSET_SUB2_OPERATINGUNIT };
+  const note = (l.TEXT || '') + (l.TEXT ? ' — ' : '') + l.FIXEDASSETNUMBER;
+  const leg = function (side, dr, cr) { return Object.assign({ debit: dr, credit: cr, note: note, ref: l.FIXEDASSETNUMBER }, side); };
+  return amt >= 0 ? [leg(assetSide, amt, 0), leg(offSide, 0, amt)] : [leg(offSide, -amt, 0), leg(assetSide, 0, -amt)];
+}
+
+/** قيد إعادة التبويب عند نقل الأصل بين الوحدات: التكلفة ومجمع الإهلاك تنتقل من الوحدات القديمة إلى الجديدة. */
+function transferLegs_(ctx, l) {
+  if (TRF_UNIT.every(function (k) { return low_(l['FROM_' + k]) === low_(l['TO_' + k]); })) return [];
+  const a = ctx.asset(l.FIXEDASSETNUMBER);
+  const b = primaryBooks_(ctx.table('books').rows)[low_(l.FIXEDASSETNUMBER)];
+  if (!b) return [];
+  const cost = round_(num_(b.ACQUISITIONPRICE), 3), accum = round_(num_(b.ACCUMULATEDDEPRECIATION), 3);
+  if (!cost && !accum) return [];
+  const g = ctx.find('groups', a.FIXEDASSETGROUPID);
+  if (cost && !(g && g.ASSETACCOUNT)) throw new Error('مجموعة الأصل ' + a.FIXEDASSETGROUPID + ' ليس لها حساب أصل — لا يمكن إنشاء قيد النقل');
+  if (accum && !(g && g.ACCUMDEPACCOUNT)) throw new Error('مجموعة الأصل ' + a.FIXEDASSETGROUPID + ' ليس لها حساب مجمع إهلاك — لا يمكن إنشاء قيد النقل');
+  const from = { ou: l.FROM_OPERATINGUNIT, s1: l.FROM_SUB1_OPERATINGUNIT, s2: l.FROM_SUB2_OPERATINGUNIT };
+  const to = { ou: l.TO_OPERATINGUNIT, s1: l.TO_SUB1_OPERATINGUNIT, s2: l.TO_SUB2_OPERATINGUNIT };
+  const note = 'نقل ' + a.FIXEDASSETNUMBER + ' بين الوحدات';
+  const legs = [];
+  const leg = function (acc, units, dr, cr, what) { legs.push(Object.assign({ acc: acc, debit: dr, credit: cr, note: note + ' (' + what + ')', ref: a.FIXEDASSETNUMBER }, units)); };
+  if (cost) { leg(g.ASSETACCOUNT, to, cost, 0, 'التكلفة'); leg(g.ASSETACCOUNT, from, 0, cost, 'التكلفة'); }
+  if (accum) { leg(g.ACCUMDEPACCOUNT, from, accum, 0, 'مجمع الإهلاك'); leg(g.ACCUMDEPACCOUNT, to, 0, accum, 'مجمع الإهلاك'); }
+  return legs;
+}
+
+/** يجهّز قيداً (رأس + سطور) ويتحقق منه دون كتابة. */
+function prepareVoucher_(ctx, head, legs, mode) {
+  const t = ctx.table('glheaders');
+  if (!legs.length) throw new Error('القيد لا يحتوي على سطور');
+  const ph = prepare_('glheaders', head, mode, ctx);
+  const lines = legs.map(function (x, i) {
+    return prepare_('gllines', {
+      VOUCHER: ph.rec.VOUCHER, LINENUM: i + 1, MAINACCOUNTID: x.acc, OPERATINGUNIT: x.ou || '', SUB1_OPERATINGUNIT: x.s1 || '',
+      SUB2_OPERATINGUNIT: x.s2 || '', DEBITAMOUNT: x.debit || 0, CREDITAMOUNT: x.credit || 0, NOTE: x.note || '', REFERENCE: x.ref || ''
+    }, 'add', ctx);
+  });
+  let dr = 0, cr = 0;
+  lines.forEach(function (p) { dr += num_(p.rec.DEBITAMOUNT); cr += num_(p.rec.CREDITAMOUNT); });
+  ph.rec.TOTALDEBIT = round_(dr, 3);
+  ph.rec.TOTALCREDIT = round_(cr, 3);
+  return { head: ph, lines: lines, t: t };
+}
+
+function writeVoucher_(ctx, v) {
+  if (v.head.rec.VOUCHER === '@pending') {
+    const no = nextSeq_('GLSEQ', 'GLPREFIX', 'JV-');
+    v.head.rec.VOUCHER = no;
+    v.lines.forEach(function (p) { p.rec.VOUCHER = no; });
+  }
+  commit_('glheaders', v.head, ctx);
+  v.lines.forEach(function (p) { commit_('gllines', p, ctx); });
+}
+
+function balanced_(v) { return Math.abs(v.head.rec.TOTALDEBIT - v.head.rec.TOTALCREDIT) < 0.0005; }
+
+/** قيد تلقائي مُرحّل (من يومية الأصول أو النقل). */
+function autoVoucher_(ctx, head, legs) {
+  head.SOURCE = head.SOURCE || 'FAJournal';
+  const v = prepareVoucher_(ctx, head, legs, 'add');
+  if (!balanced_(v)) throw new Error('القيد التلقائي غير متوازن');
+  const now = stamp_();
+  v.head.rec.SOURCE = head.SOURCE; v.head.rec.SOURCEREF = head.SOURCEREF || '';
+  v.head.rec.STATUS = 'Posted'; v.head.rec.APPROVEDBY = ctx.s.username; v.head.rec.POSTEDBY = ctx.s.username; v.head.rec.POSTEDON = now;
+  return v;
+}
+
+function newGLVoucherNumber(token) {
+  const s = auth_(token);
+  need_(s, 'gl', 'add');
+  return withLock_(function () { return nextSeq_('GLSEQ', 'GLPREFIX', 'JV-'); });
+}
+
+/** حفظ قيد يدوي: الرأس + كل السطور (تُستبدل سطور القيد بالكامل). */
+function saveGLVoucher(token, head, lines, isNew) {
+  const s = auth_(token);
+  need_(s, 'gl', isNew ? 'add' : 'edit');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    head = head || {};
+    if (!isNew) {
+      const ex = ctx.find('glheaders', head.VOUCHER);
+      if (!ex) throw new Error('القيد غير موجود');
+      if (ex.STATUS !== 'Draft') throw new Error('لا يمكن تعديل قيد معتمد أو مُرحّل');
+      if (ex.SOURCE && ex.SOURCE !== 'Manual') throw new Error('هذا قيد تلقائي ولا يمكن تعديله');
+    }
+    const legs = (lines || []).filter(function (x) {
+      return x && (x.MAINACCOUNTID || num_(x.DEBITAMOUNT) || num_(x.CREDITAMOUNT));
+    }).map(function (x) {
+      return { acc: x.MAINACCOUNTID, s2: x.SUB2_OPERATINGUNIT, s1: x.SUB1_OPERATINGUNIT, ou: x.OPERATINGUNIT,
+        debit: toNum_(x.DEBITAMOUNT, { ar: 'مدين' }) || 0, credit: toNum_(x.CREDITAMOUNT, { ar: 'دائن' }) || 0, note: x.NOTE, ref: x.REFERENCE };
+    });
+    // التحقق أولاً (كل الأخطاء قبل أي كتابة)
+    const gl = ctx.table('gllines');
+    const old = [];
+    gl.rows.forEach(function (r, i) { if (!isNew && low_(r.VOUCHER) === low_(head.VOUCHER)) old.push(i); });
+    const h = Object.assign({}, head, { SOURCE: 'Manual' });
+    // نحذف السطور القديمة من الذاكرة مؤقتاً حتى لا تتعارض المفاتيح، ثم نتحقق
+    const v = prepareVoucher_(ctx, h, legs, isNew ? 'add' : 'edit');
+    v.head.rec.SOURCE = 'Manual';
+    if (!v.head.rec.STATUS) v.head.rec.STATUS = 'Draft';
+    deleteRows_(gl, old);
+    ctx.resetIndex('gllines');
+    writeVoucher_(ctx, v);
+    return { voucher: v.head.rec.VOUCHER, debit: v.head.rec.TOTALDEBIT, credit: v.head.rec.TOTALCREDIT };
+  });
+}
+
+/** action: approve | unapprove | post | delete */
+function glAction(token, voucher, action) {
+  const s = auth_(token);
+  need_(s, 'gl', action === 'post' ? 'post' : action === 'delete' ? 'delete' : 'approve');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    const ht = ctx.table('glheaders');
+    const h = ctx.find('glheaders', voucher);
+    if (!h) throw new Error('القيد غير موجود');
+    const hi = ht.rows.indexOf(h);
+    const now = stamp_();
+    if (action === 'delete') {
+      if (h.STATUS !== 'Draft') throw new Error('يمكن حذف القيود في حالة مسودة فقط');
+      const gl = ctx.table('gllines');
+      const idx = [];
+      gl.rows.forEach(function (r, i) { if (low_(r.VOUCHER) === low_(voucher)) idx.push(i); });
+      deleteRows_(gl, idx);
+      deleteRows_(ht, [hi]);
+      return true;
+    }
+    if (h.SOURCE && h.SOURCE !== 'Manual') throw new Error('هذا قيد تلقائي مُرحّل');
+    if (action === 'approve') {
+      if (h.STATUS !== 'Draft') throw new Error('القيد ليس في حالة مسودة');
+      if (Math.abs(num_(h.TOTALDEBIT) - num_(h.TOTALCREDIT)) >= 0.0005) throw new Error('القيد غير متوازن: المدين ' + h.TOTALDEBIT + ' ≠ الدائن ' + h.TOTALCREDIT);
+      if (!num_(h.TOTALDEBIT)) throw new Error('القيد بدون مبالغ');
+      h.STATUS = 'Approved'; h.APPROVEDBY = s.username;
+    } else if (action === 'unapprove') {
+      if (h.STATUS !== 'Approved') throw new Error('يمكن إلغاء الاعتماد للقيود المعتمدة فقط');
+      h.STATUS = 'Draft'; h.APPROVEDBY = '';
+    } else if (action === 'post') {
+      if (h.STATUS !== 'Approved') throw new Error('يجب اعتماد القيد قبل الترحيل');
+      h.STATUS = 'Posted'; h.POSTEDBY = s.username; h.POSTEDON = now;
+    } else {
+      throw new Error('إجراء غير معروف');
+    }
+    writeRow_(ht, hi, h);
+    return true;
   });
 }
 

@@ -1,0 +1,1401 @@
+<script>
+(function () {
+  'use strict';
+
+  /* ======================= State & helpers ======================= */
+  var S = { token: '', b: null, lang: 'ar', page: 'dashboard', view: {}, data: {}, grids: {}, busy: 0, info: {} };
+  var $ = function (s, el) { return (el || document).querySelector(s); };
+  var $$ = function (s, el) { return Array.prototype.slice.call((el || document).querySelectorAll(s)); };
+
+  function esc(s) {
+    return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function T(ar, en) { return S.lang === 'ar' ? ar : en; }
+  function L(o) { return o ? (S.lang === 'ar' ? (o.ar || o.en) : (o.en || o.ar)) : ''; }
+  function ls(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
+  function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9؀-ۿ]/g, ''); }
+  function low(s) { return String(s === undefined || s === null ? '' : s).trim().toLowerCase(); }
+  function jsArg(v) { return esc(JSON.stringify(String(v === undefined || v === null ? '' : v))); }
+  function today() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function pad(n) { return ('0' + n).slice(-2); }
+  function dateStr(d) { d = new Date(d.getTime() + 300000); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function fmtNum(v, dec) {
+    if (v === '' || v === null || v === undefined || isNaN(Number(v))) return v === undefined || v === null ? '' : String(v);
+    var d = dec === undefined ? 2 : dec;
+    return Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  function parseNum(v) { v = String(v || '').replace(/[\s,]/g, ''); return v === '' ? '' : v; }
+  function initials(name) {
+    var p = String(name || '?').trim().split(/\s+/);
+    return ((p[0] || '?').charAt(0) + (p[1] ? p[1].charAt(0) : (p[0] || '').charAt(1) || '')).toUpperCase();
+  }
+  function can(page, act) { return !!(S.b && S.b.perms[page] && S.b.perms[page][act || 'view']); }
+  function sch(e) { return S.b.schemas[e]; }
+  function fld(e, k) { return sch(e).fields.filter(function (f) { return f.k === k; })[0]; }
+  function keyObj(e, r) { var o = {}; sch(e).key.forEach(function (k) { o[k] = r[k]; }); return o; }
+  function keyStr(e, r) { return sch(e).key.map(function (k) { return low(r[k]); }).join('\u0001'); }
+  function findRec(e, key) { return (S.data[e] || []).filter(function (r) { return keyStr(e, r) === key; })[0]; }
+
+  /* ======================= Icons ======================= */
+  var IC = {
+    menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    home: '<path d="M3 11l9-7 9 7M5 10v10h14V10"/>',
+    box: '<path d="M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10"/>',
+    book: '<path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>',
+    journal: '<path d="M9 6h11M9 12h11M9 18h11M4 6h1M4 12h1M4 18h1"/>',
+    truck: '<path d="M2 6h12v10H2zM14 10h4l3 3v3h-7"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+    save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h8V3M8 14h8v7H8z"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
+    refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
+    upload: '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
+    download: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>',
+    check: '<path d="M5 12l5 5L20 7"/>',
+    send: '<path d="M4 12l16-8-6 16-3-7z"/>',
+    undo: '<path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/>',
+    back: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    up: '<path d="M6 15l6-6 6 6"/>',
+    search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
+    block: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 11-4.7M15 15l6 6M21 15l-6 6"/>',
+    unblock: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 11-4.7M15 18l2 2 4-4"/>',
+    logout: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    excel: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/>',
+    folder: '<path d="M3 6h6l2 2h10v11H3z"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
+  };
+  function icon(n, cls) {
+    return '<svg class="i ' + (cls || '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (IC[n] || '') + '</svg>';
+  }
+
+  /* ======================= Server calls ======================= */
+  function busy(on) {
+    S.busy += on ? 1 : -1;
+    $('#busy').classList.toggle('hidden', S.busy <= 0);
+  }
+  function api(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    busy(true);
+    return new Promise(function (resolve, reject) {
+      var r = google.script.run
+        .withSuccessHandler(function (x) { busy(false); resolve(x); })
+        .withFailureHandler(function (e) {
+          busy(false);
+          var m = (e && e.message) || String(e);
+          if (m.indexOf('AUTH:') >= 0) {
+            m = m.replace(/^.*?AUTH:\s*/, '');
+            if (S.token) { localLogout(m); }
+          }
+          reject(new Error(m));
+        });
+      r[fn].apply(r, args);
+    });
+  }
+  function fail(e) { toast((e && e.message) || String(e), 'err'); }
+
+  /* ======================= UI primitives ======================= */
+  function toast(msg, type) {
+    var d = document.createElement('div');
+    d.className = 'toast ' + (type || '');
+    d.textContent = msg;
+    $('#toasts').appendChild(d);
+    setTimeout(function () { d.remove(); }, type === 'err' ? 6500 : 3500);
+  }
+
+  function modal(title, body, foot, opts) {
+    opts = opts || {};
+    $('#modal').innerHTML = '<div class="overlay"><div class="dialog ' + (opts.wide ? 'wide' : '') + '" role="dialog" aria-modal="true">' +
+      '<div class="dh"><h2>' + esc(title) + '</h2>' + (opts.locked ? '' : '<button class="ib" onclick="FA.closeModal()" title="' + T('إغلاق', 'Close') + '">' + icon('close') + '</button>') + '</div>' +
+      '<div class="db">' + body + '</div><div class="df">' + (foot || '') + '</div></div></div>';
+    var first = $('#modal input:not([readonly]):not([type=checkbox]), #modal select:not([disabled])');
+    if (first) setTimeout(function () { first.focus(); }, 30);
+  }
+  function closeModal() { $('#modal').innerHTML = ''; }
+
+  function confirmBox(msg, okLabel, danger) {
+    return new Promise(function (resolve) {
+      FA._confirm = function (v) { closeModal(); resolve(v); };
+      modal(T('تأكيد', 'Confirm'), '<p>' + esc(msg) + '</p>',
+        '<button class="btn ' + (danger ? 'red' : 'pri') + '" onclick="FA._confirm(true)">' + esc(okLabel || T('موافق', 'OK')) + '</button>' +
+        '<button class="btn" onclick="FA._confirm(false)">' + T('إلغاء', 'Cancel') + '</button>');
+    });
+  }
+
+  function apane(btns, extra) {
+    return '<div class="apane"><div class="bar">' + btns.filter(Boolean).map(function (b) {
+      if (b === '|') return '<span class="sep"></span>';
+      return '<button class="abtn ' + (b.cls || '') + '" ' + (b.dis ? 'disabled' : '') + ' onclick="' + b.on + '">' + icon(b.icon, b.icon === 'back' ? 'flip-rtl' : '') + '<span>' + esc(T(b.ar, b.en)) + '</span></button>';
+    }).join('') + '</div>' + (extra || '') + '</div>';
+  }
+
+  function phead(sub, title) {
+    return '<div class="phead"><div class="sub">' + sub + '</div><h1>' + title + '</h1></div>';
+  }
+
+  function badge(kind, v) {
+    var map = {
+      book: { Open: 'b-ok', NoAcquisition: 'b-gray', Suspended: 'b-warn', Closed: 'b-gray', Sold: 'b-err', Scrapped: 'b-err' },
+      journal: { Draft: 'b-gray', Approved: 'b-info', Posted: 'b-ok', Mixed: 'b-warn' }
+    };
+    var opts = kind === 'book' ? fld('books', 'STATUS').opts : fld('journal', 'STATUS').opts;
+    var o = opts.filter(function (x) { return x.v === v; })[0];
+    return v ? '<span class="badge ' + ((map[kind] || {})[v] || 'b-gray') + '">' + esc(o ? L(o) : v) + '</span>' : '';
+  }
+
+  /* ======================= Lookups ======================= */
+  function lookupKey(f, rec) { return f.lkBy ? (f.lkMap[rec[f.lkBy] || 'Ledger'] || '') : f.lk; }
+  function lookupList(key, f, rec, all) {
+    var r = S.b.refs, l;
+    if (key === '@assets') l = r.assets;
+    else if (key === '@vendors') l = r.vendors;
+    else if (key === '@books') {
+      l = r.books.filter(function (b) { return all || !rec.FIXEDASSETNUMBER || low(b.a) === low(rec.FIXEDASSETNUMBER); });
+    } else {
+      l = S.b.lookups[key] || [];
+      if (!all && f && f.parent && rec[f.parent]) {
+        l = l.filter(function (x) { return !x.p || low(x.p) === low(rec[f.parent]); });
+      }
+    }
+    return l || [];
+  }
+  function lookupName(key, v, rec) {
+    if (!v) return '';
+    var hit = lookupList(key, null, rec || {}, key !== '@books').filter(function (x) { return low(x.c) === low(v); })[0];
+    if (!hit) return '';
+    if (key === '@books') {
+      var o = fld('books', 'STATUS').opts.filter(function (x) { return x.v === hit.n; })[0];
+      return o ? L(o) : hit.n;
+    }
+    return hit.n;
+  }
+  function datalistOpts(key, f, rec) {
+    var seen = {};
+    return lookupList(key, f, rec).filter(function (x) { var k = low(x.c); if (seen[k]) return false; seen[k] = 1; return true; })
+      .slice(0, 3000).map(function (x) { return '<option value="' + esc(x.c) + '">' + esc(x.n) + '</option>'; }).join('');
+  }
+  function displayVal(f, v) {
+    if (v === '' || v === undefined || v === null) return '';
+    if (f.type === 'select') { var o = f.opts.filter(function (x) { return x.v === v; })[0]; return o ? L(o) : v; }
+    if (f.type === 'number') return fmtNum(v, f.dec);
+    return String(v);
+  }
+
+  /* ======================= Forms ======================= */
+  function fieldHtml(e, f, rec, isNew, ro) {
+    var v = rec[f.k];
+    if (v === undefined || v === null) v = '';
+    var lock = ro || f.sys || f.calc || (!isNew && f.key);
+    var id = 'f_' + f.k;
+    var common = 'id="' + id + '" data-k="' + f.k + '" onchange="FA.fchg(this)"';
+    var h;
+    if (f.type === 'select') {
+      h = '<select class="inp" ' + common + (lock ? ' disabled' : '') + '><option value=""></option>' +
+        f.opts.map(function (o) { return '<option value="' + esc(o.v) + '"' + (o.v === v ? ' selected' : '') + '>' + esc(L(o)) + '</option>'; }).join('') + '</select>';
+    } else if (f.type === 'lookup') {
+      var key = lookupKey(f, rec);
+      h = '<div class="lk"><input class="inp" ' + common + (lock ? ' readonly' : '') + ' list="dl_' + f.k + '" value="' + esc(v) + '" autocomplete="off" dir="ltr" oninput="FA.lkName(this)">' +
+        '<input class="inp name" tabindex="-1" readonly value="' + esc(lookupName(key, v, rec)) + '"></div>' +
+        '<datalist id="dl_' + f.k + '">' + (lock ? '' : datalistOpts(key, f, rec)) + '</datalist>';
+    } else if (f.type === 'date') {
+      h = '<input class="inp" type="date" ' + common + (lock ? ' readonly' : '') + ' value="' + esc(v) + '">';
+    } else if (f.type === 'number') {
+      h = '<input class="inp num" inputmode="decimal" ' + common + (lock ? ' readonly' : '') + ' value="' + esc(v === '' ? '' : fmtNum(v, f.dec)) + '">';
+    } else if (f.type === 'textarea') {
+      h = '<textarea class="inp" ' + common + (lock ? ' readonly' : '') + '>' + esc(v) + '</textarea>';
+    } else {
+      h = '<input class="inp" type="' + (f.type === 'email' ? 'email' : 'text') + '" ' + common + (lock ? ' readonly' : '') + ' value="' + esc(v) + '"' + (f.type === 'email' ? ' dir="ltr"' : ' dir="auto"') + '>';
+    }
+    return '<div class="fld"><label for="' + id + '" title="' + esc(f.en) + '"><bdi>' + esc(L(f)) + '</bdi>' +
+      (f.req && !lock ? '<span class="req">*</span>' : '') + (S.lang === 'ar' ? '<small><bdi>' + esc(f.en) + '</bdi></small>' : '') + '</label>' + h + '</div>';
+  }
+
+  function formHtml(e, rec, isNew, ro, opts) {
+    opts = opts || {};
+    var s = sch(e);
+    return '<div data-form="' + e + '" data-new="' + (isNew ? 1 : 0) + '">' + s.sections.map(function (sec) {
+      var fields = s.fields.filter(function (f) { return f.sec === sec.id && (opts.hide || []).indexOf(f.k) < 0; });
+      var hidden = s.fields.filter(function (f) { return f.sec === sec.id && (opts.hide || []).indexOf(f.k) >= 0; })
+        .map(function (f) { return '<input type="hidden" data-k="' + f.k + '" value="' + esc(rec[f.k]) + '">'; }).join('');
+      if (!fields.length || (sec.id === 'wf' && isNew)) return '';
+      var groups = sec.groups.map(function (g) {
+        var fs = fields.filter(function (f) { return f.grp === g.id; });
+        if (!fs.length) return '';
+        return '<div class="fgroup">' + (opts.flat ? '' : '<h5>' + esc(L(g)) + '</h5>') + fs.map(function (f) { return fieldHtml(e, f, rec, isNew, ro); }).join('') + '</div>';
+      }).join('');
+      var sum = isNew ? '' : fields.filter(function (f) { return f.sum && rec[f.k] !== '' && rec[f.k] !== undefined; })
+        .map(function (f) { return '<span>' + esc(displayVal(f, rec[f.k])) + '</span>'; }).join('');
+      return '<div class="card ftab" data-sec="' + sec.id + '"><div class="ftab-h" onclick="FA.toggleTab(this)"><h3>' + esc(L(sec)) + '</h3>' +
+        '<div class="sum">' + sum + '</div><span class="chev">' + icon('up') + '</span></div><div class="ftab-b">' + hidden + groups + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  function readForm(form) {
+    var o = {};
+    $$('[data-k]', form).forEach(function (el) {
+      var k = el.getAttribute('data-k');
+      o[k] = el.classList.contains('num') ? parseNum(el.value) : el.value;
+    });
+    return o;
+  }
+
+  function setVal(form, k, v) {
+    var el = $('[data-k="' + k + '"]', form);
+    if (!el) return;
+    var f = fld(form.getAttribute('data-form'), k);
+    el.value = f && f.type === 'number' && v !== '' ? fmtNum(v, f.dec) : v;
+    if (f && f.type === 'lookup') updateLkName(el);
+  }
+
+  function updateLkName(el) {
+    var form = el.closest('[data-form]');
+    var e = form.getAttribute('data-form');
+    var f = fld(e, el.getAttribute('data-k'));
+    var nm = el.parentNode.querySelector('.name');
+    if (nm) nm.value = lookupName(lookupKey(f, readForm(form)), el.value, readForm(form));
+  }
+
+  function rebuildList(form, k) {
+    var e = form.getAttribute('data-form');
+    var f = fld(e, k);
+    var dl = $('#dl_' + k);
+    if (dl && f) dl.innerHTML = datalistOpts(lookupKey(f, readForm(form)), f, readForm(form));
+  }
+
+  function validateForm(form) {
+    var e = form.getAttribute('data-form');
+    var ok = true;
+    $$('[data-k]', form).forEach(function (el) {
+      var f = fld(e, el.getAttribute('data-k'));
+      var bad = f && f.req && !f.sys && !f.calc && String(el.value).trim() === '';
+      if (f && f.type === 'number' && el.value !== '' && isNaN(Number(parseNum(el.value)))) bad = true;
+      el.classList.toggle('err', !!bad);
+      if (bad) ok = false;
+    });
+    if (!ok) toast(T('يرجى تعبئة الحقول المطلوبة بشكل صحيح', 'Please fill in the required fields correctly'), 'err');
+    return ok;
+  }
+
+  function fchg(el) {
+    var form = el.closest('[data-form]');
+    var e = form.getAttribute('data-form');
+    var k = el.getAttribute('data-k');
+    var f = fld(e, k);
+    el.classList.remove('err');
+    if (f.type === 'lookup') updateLkName(el);
+    if (f.type === 'number' && el.value !== '' && !isNaN(Number(parseNum(el.value)))) el.value = fmtNum(parseNum(el.value), f.dec);
+    var rec = readForm(form);
+
+    // قوائم الأبعاد المتسلسلة
+    sch(e).fields.forEach(function (c) {
+      if (c.parent === k) {
+        rebuildList(form, c.k);
+        var cur = rec[c.k];
+        if (cur) {
+          var item = (S.b.lookups[c.lk] || []).filter(function (x) { return low(x.c) === low(cur); })[0];
+          if (item && item.p && low(item.p) !== low(el.value)) { setVal(form, c.k, ''); fchg($('[data-k="' + c.k + '"]', form)); }
+        }
+      }
+      if (c.lkBy === k) { rebuildList(form, c.k); updateLkName($('[data-k="' + c.k + '"]', form)); }
+    });
+
+    if (e === 'books') {
+      if (k === 'SERVICELIFE' && rec.SERVICELIFE !== '') {
+        var per = Math.round(Number(rec.SERVICELIFE) * 12);
+        var isNew = form.getAttribute('data-new') === '1';
+        if (isNew || !rec.DEPRECIATIONPERIODSREMAINING || parseNum(rec.DEPRECIATIONPERIODSREMAINING) === parseNum(rec.DEPRECIATIONPERIODS)) setVal(form, 'DEPRECIATIONPERIODSREMAINING', per);
+        setVal(form, 'DEPRECIATIONPERIODS', per);
+      }
+      if (k === 'DEPRECIATIONPERIODS' && rec.DEPRECIATIONPERIODS !== '') setVal(form, 'SERVICELIFE', Math.round(Number(rec.DEPRECIATIONPERIODS) / 12 * 100) / 100);
+      rec = readForm(form);
+      setVal(form, 'DEFAULTDIMENSIONDISPLAYVALUE', [rec.OPERATINGUNIT, rec.SUB1_OPERATINGUNIT, rec.SUB2_OPERATINGUNIT].filter(String).join('-'));
+    }
+
+    if (e === 'journal') {
+      if (k === 'FIXEDASSETNUMBER') {
+        setVal(form, 'ASSETNAME', lookupName('@assets', el.value));
+        rebuildList(form, 'BOOKID');
+        var bk = S.b.refs.books.filter(function (b) { return low(b.a) === low(el.value) && low(b.c) === low(rec.BOOKID || 'General'); })[0];
+        if (bk && !rec.OFFSET_OPERATINGUNIT && rec.OFFSETACCOUNTTYPE !== 'Vendor') {
+          setVal(form, 'OFFSET_OPERATINGUNIT', bk.ou || '');
+          setVal(form, 'OFFSET_SUB1_OPERATINGUNIT', bk.s1 || '');
+          setVal(form, 'OFFSET_SUB2_OPERATINGUNIT', bk.s2 || '');
+        }
+      }
+      if (k === 'DEBITAMOUNT' && rec.DEBITAMOUNT !== '' && Number(rec.DEBITAMOUNT) > 0) setVal(form, 'CREDITAMOUNT', '');
+      if (k === 'CREDITAMOUNT' && rec.CREDITAMOUNT !== '' && Number(rec.CREDITAMOUNT) > 0) setVal(form, 'DEBITAMOUNT', '');
+      rec = readForm(form);
+      var vend = rec.OFFSETACCOUNTTYPE === 'Vendor';
+      ['OFFSET_OPERATINGUNIT', 'OFFSET_SUB1_OPERATINGUNIT', 'OFFSET_SUB2_OPERATINGUNIT'].forEach(function (d) {
+        var x = $('[data-k="' + d + '"]', form);
+        if (!x) return;
+        if (vend) setVal(form, d, '');
+        x.readOnly = vend;
+      });
+      rec = readForm(form);
+      setVal(form, 'OFFSETACCOUNTDISPLAYVALUE', !rec.OFFSETACCOUNT ? '' : vend ? rec.OFFSETACCOUNT :
+        [rec.OFFSETACCOUNT, rec.OFFSET_OPERATINGUNIT, rec.OFFSET_SUB1_OPERATINGUNIT, rec.OFFSET_SUB2_OPERATINGUNIT].filter(String).join('-'));
+    }
+  }
+
+  function toggleTab(h) { h.parentNode.classList.toggle('closed'); }
+
+  async function saveForm(e, form) {
+    if (!validateForm(form)) return null;
+    var isNew = form.getAttribute('data-new') === '1';
+    var rec = readForm(form);
+    try {
+      var saved = await api('saveRecord', S.token, e, rec, isNew);
+      var list = S.data[e] = S.data[e] || [];
+      var k = keyStr(e, saved);
+      var i = list.findIndex(function (r) { return keyStr(e, r) === k; });
+      if (i >= 0) list[i] = saved; else list.push(saved);
+      toast(T('تم الحفظ', 'Saved'), 'ok');
+      if (['assets', 'books', 'vendors', 'lookups'].indexOf(e) >= 0) refreshRefs();
+      return saved;
+    } catch (err) { fail(err); return null; }
+  }
+
+  async function refreshRefs() {
+    try { var r = await api('getRefs', S.token); S.b.lookups = r.lookups; S.b.refs = r.refs; } catch (e) { /* ignore */ }
+  }
+
+  async function load(e, force) {
+    if (!S.data[e] || force) S.data[e] = await api('listRecords', S.token, e);
+    return S.data[e];
+  }
+
+  /* ======================= Grid ======================= */
+  function schemaCols(e) {
+    return sch(e).fields.filter(function (f) { return f.list; }).map(function (f) {
+      var c = { k: f.k, label: L(f), num: f.type === 'number', text: function (r) { return displayVal(f, r[f.k]); } };
+      if (f.k === 'STATUS') c.html = function (r) { return badge(e === 'books' ? 'book' : 'journal', r.STATUS); };
+      if (f.type === 'number' && /AMOUNT|PRICE/.test(f.k)) c.total = true;
+      return c;
+    });
+  }
+
+  function grid(gid, cfg) {
+    var old = S.grids[gid] || {};
+    S.grids[gid] = Object.assign({ q: old.q || '', sort: old.sort === undefined ? -1 : old.sort, dir: old.dir || 1, sel: old.sel || {} }, cfg);
+    return '<div class="gridtools"><div class="search">' + icon('search') + '<input class="inp" placeholder="' + T('تصفية', 'Filter') + '" value="' + esc(S.grids[gid].q) +
+      '" oninput="FA.gq(\'' + gid + '\', this.value)"></div>' + (cfg.tools || '') + '</div><div id="g_' + gid + '"></div>';
+  }
+
+  function cellText(c, r) { return c.text ? c.text(r) : (r[c.k] === undefined ? '' : r[c.k]); }
+
+  function gridRender(gid) {
+    var g = S.grids[gid];
+    var el = document.getElementById('g_' + gid);
+    if (!g || !el) return;
+    var rows = g.rows();
+    if (g.q) {
+      var q = g.q.toLowerCase();
+      rows = rows.filter(function (r) { return g.cols.some(function (c) { return String(cellText(c, r)).toLowerCase().indexOf(q) >= 0 || String(r[c.k] || '').toLowerCase().indexOf(q) >= 0; }); });
+    }
+    if (g.sort >= 0) {
+      var c = g.cols[g.sort];
+      rows = rows.slice().sort(function (a, b) {
+        var x = a[c.k], y = b[c.k];
+        if (c.num) return ((Number(x) || 0) - (Number(y) || 0)) * g.dir;
+        return String(x === undefined ? '' : x).localeCompare(String(y === undefined ? '' : y), undefined, { numeric: true }) * g.dir;
+      });
+    }
+    g.visible = rows;
+    var shown = rows.slice(0, 1500);
+    var selCount = Object.keys(g.sel).length;
+    var allSel = shown.length && shown.every(function (r) { return g.sel[g.key(r)]; });
+    var h = '<div class="gridwrap"><table class="grid"><thead><tr>' +
+      (g.select ? '<th class="ck"><input type="checkbox" ' + (allSel ? 'checked' : '') + ' onchange="FA.gselAll(\'' + gid + '\', this.checked)"></th>' : '') +
+      g.cols.map(function (c, i) {
+        return '<th class="' + (c.num ? 'n' : '') + '" onclick="FA.gsort(\'' + gid + '\',' + i + ')">' + esc(c.label) +
+          (g.sort === i ? '<span class="arr">' + (g.dir > 0 ? '▲' : '▼') + '</span>' : '') + '</th>';
+      }).join('') + '</tr></thead><tbody>';
+    if (!shown.length) {
+      h += '<tr><td colspan="' + (g.cols.length + 1) + '"><div class="empty">' + icon('folder') + T('لا توجد بيانات لعرضها', "We didn't find anything to show here.") + '</div></td></tr>';
+    }
+    shown.forEach(function (r, i) {
+      var k = g.key(r);
+      h += '<tr class="' + (g.sel[k] ? 'sel' : '') + '">' + (g.select ? '<td class="ck"><input type="checkbox" ' + (g.sel[k] ? 'checked' : '') + ' onchange="FA.gsel(\'' + gid + '\',' + i + ', this.checked)"></td>' : '') +
+        g.cols.map(function (c, ci) {
+          var inner = c.html ? c.html(r) : esc(cellText(c, r));
+          if (ci === 0 && g.open) inner = '<a onclick="FA.gopen(\'' + gid + '\',' + i + ')">' + (inner || '—') + '</a>';
+          return '<td class="' + (c.num ? 'n' : '') + '" title="' + esc(cellText(c, r)) + '"><bdi>' + inner + '</bdi></td>';
+        }).join('') + '</tr>';
+    });
+    h += '</tbody>';
+    if (g.cols.some(function (c) { return c.total; }) && shown.length) {
+      h += '<tfoot><tr>' + (g.select ? '<td></td>' : '') + g.cols.map(function (c, i) {
+        if (i === 0) return '<td>' + T('الإجمالي', 'Total') + '</td>';
+        if (!c.total) return '<td></td>';
+        var sum = rows.reduce(function (a, r) { return a + (Number(r[c.k]) || 0); }, 0);
+        return '<td class="n">' + fmtNum(sum, 3) + '</td>';
+      }).join('') + '</tr></tfoot>';
+    }
+    h += '</table></div><div class="gridfoot">' + T('عدد السجلات: ', 'Records: ') + rows.length +
+      (rows.length > shown.length ? ' — ' + T('يتم عرض أول 1500 سجل، استخدم التصفية', 'Showing first 1500, use the filter') : '') +
+      (selCount ? ' — ' + T('المحدد: ', 'Selected: ') + selCount : '') + '</div>';
+    el.innerHTML = h;
+  }
+
+  var qTimer;
+  function gq(gid, v) { S.grids[gid].q = v; clearTimeout(qTimer); qTimer = setTimeout(function () { gridRender(gid); }, 200); }
+  function gsort(gid, i) { var g = S.grids[gid]; if (g.sort === i) g.dir = -g.dir; else { g.sort = i; g.dir = 1; } gridRender(gid); }
+  function gsel(gid, i, on) { var g = S.grids[gid]; var k = g.key(g.visible[i]); if (on) g.sel[k] = 1; else delete g.sel[k]; gridRender(gid); }
+  function gselAll(gid, on) { var g = S.grids[gid]; g.sel = {}; if (on) g.visible.slice(0, 1500).forEach(function (r) { g.sel[g.key(r)] = 1; }); gridRender(gid); }
+  function gopen(gid, i) { var g = S.grids[gid]; g.open(g.visible[i]); }
+  function selected(gid) {
+    var g = S.grids[gid];
+    return g.rows().filter(function (r) { return g.sel[g.key(r)]; });
+  }
+
+  /* ======================= Import / Export ======================= */
+  function aliasMap(e) {
+    var m = {};
+    sch(e).fields.forEach(function (f) {
+      [f.k, f.en, f.ar].concat(f.aliases || []).forEach(function (a) { var n = norm(a); if (n && !m[n]) m[n] = f.k; });
+    });
+    return m;
+  }
+
+  function exportRows(e, rows, name) {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    var keys = sch(e).fields.map(function (f) { return f.k; });
+    var data = rows.map(function (r) { var o = {}; keys.forEach(function (k) { o[k] = r[k] === undefined ? '' : r[k]; }); return o; });
+    var ws = XLSX.utils.json_to_sheet(data, { header: keys });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, e.slice(0, 30));
+    XLSX.writeFile(wb, (name || e) + '_' + today() + '.xlsx');
+  }
+
+  function importStart(e, extra) {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    S.importFor = { e: e, extra: extra || {} };
+    var fi = $('#fileInput');
+    fi.value = '';
+    fi.click();
+  }
+
+  async function onImportFile(file) {
+    var e = S.importFor.e;
+    try {
+      var wb = /\.csv$/i.test(file.name)
+        ? XLSX.read(await file.text(), { type: 'string', cellDates: true, raw: false })
+        : XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+      var map = aliasMap(e), best = { row: 0, hits: -1 };
+      for (var i = 0; i < Math.min(15, aoa.length); i++) {
+        var hits = aoa[i].filter(function (h) { return map[norm(h)]; }).length;
+        if (hits > best.hits) best = { row: i, hits: hits };
+      }
+      var head = aoa[best.row] || [];
+      var colMap = head.map(function (h) { return map[norm(h)] || null; });
+      var rows = aoa.slice(best.row + 1).filter(function (r) { return r.some(function (c) { return c !== '' && c !== null; }); }).map(function (r) {
+        var o = {};
+        colMap.forEach(function (k, ci) {
+          if (!k) return;
+          var v = r[ci];
+          if (v instanceof Date) v = dateStr(v);
+          o[k] = v;
+        });
+        Object.keys(S.importFor.extra).forEach(function (k) { if (o[k] === undefined || o[k] === '') o[k] = S.importFor.extra[k]; });
+        return o;
+      });
+      var mapped = head.map(function (h, ci) { return colMap[ci] ? '<li>' + esc(h) + ' ← <b>' + esc(L(fld(e, colMap[ci]))) + '</b></li>' : ''; }).join('');
+      var ignored = head.filter(function (h, ci) { return h !== '' && !colMap[ci]; });
+      var missingKey = sch(e).key.filter(function (k) { return colMap.indexOf(k) < 0 && !S.importFor.extra[k] && sch(e).autoId !== k; });
+      S.importRows = rows;
+      modal(T('استيراد: ', 'Import: ') + L(sch(e).title),
+        '<p>' + T('الملف: ', 'File: ') + '<b>' + esc(file.name) + '</b> — ' + T('عدد الأسطر: ', 'Rows: ') + '<b>' + rows.length + '</b></p>' +
+        (missingKey.length ? '<div class="note">' + T('أعمدة المفتاح غير موجودة: ', 'Key columns missing: ') + esc(missingKey.join(', ')) + '</div>' : '') +
+        '<p><b>' + T('الأعمدة المطابقة', 'Mapped columns') + '</b></p><ul>' + (mapped || '<li>—</li>') + '</ul>' +
+        (ignored.length ? '<p class="sub" style="color:#605e5c">' + T('أعمدة سيتم تجاهلها: ', 'Ignored columns: ') + esc(ignored.join(', ')) + '</p>' : '') +
+        '<div class="note">' + T('السجلات الموجودة (نفس المفتاح) سيتم تحديثها، والجديدة ستُضاف.', 'Existing records (same key) will be updated; new ones will be added.') + '</div>',
+        '<button class="btn pri" onclick="FA.importRun()" ' + (rows.length && !missingKey.length ? '' : 'disabled') + '>' + icon('upload') + T('استيراد', 'Import') + '</button>' +
+        '<button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>', { wide: true });
+    } catch (err) { fail(err); }
+  }
+
+  async function importRun() {
+    var e = S.importFor.e, rows = S.importRows || [];
+    closeModal();
+    var tot = { added: 0, updated: 0, errors: [] }, batch = '';
+    try {
+      for (var i = 0; i < rows.length; i += 500) {
+        var r = await api('importRecords', S.token, e, rows.slice(i, i + 500), { offset: i, batch: batch });
+        batch = r.batch || batch;
+        tot.added += r.added; tot.updated += r.updated; tot.errors = tot.errors.concat(r.errors);
+        toast(T('جاري الاستيراد... ', 'Importing... ') + Math.min(i + 500, rows.length) + '/' + rows.length);
+      }
+    } catch (err) { fail(err); }
+    await load(e, true);
+    refreshRefs();
+    modal(T('نتيجة الاستيراد', 'Import result'),
+      '<div class="kv"><span>' + T('أُضيف', 'Added') + '</span><b>' + tot.added + '</b></div>' +
+      '<div class="kv"><span>' + T('حُدّث', 'Updated') + '</span><b>' + tot.updated + '</b></div>' +
+      '<div class="kv"><span>' + T('أخطاء', 'Errors') + '</span><b>' + tot.errors.length + '</b></div>' +
+      (tot.errors.length ? '<div class="errlist">' + tot.errors.slice(0, 300).map(function (x) { return T('سطر ', 'Row ') + x.row + ': ' + esc(x.msg); }).join('<br>') + '</div>' : ''),
+      '<button class="btn pri" onclick="FA.closeModal()">' + T('تم', 'Done') + '</button>');
+    render();
+  }
+
+  /* ======================= Login / chrome ======================= */
+  function applyLang() {
+    document.documentElement.lang = S.lang;
+    document.documentElement.dir = S.lang === 'ar' ? 'rtl' : 'ltr';
+    $$('[data-t]').forEach(function (el) { var p = el.getAttribute('data-t').split('|'); el.textContent = S.lang === 'ar' ? p[0] : p[1]; });
+    $('#loginLang').textContent = S.lang === 'ar' ? 'English' : 'العربية';
+  }
+  function setLang(l) { S.lang = l; lsSet('fa_lang', l); applyLang(); if (S.b) { chrome(); render(); } }
+
+  function paintLogin() {
+    var i = S.info || {};
+    $('#loginOrg').textContent = i.orgName || T('إدارة الأصول الثابتة', 'Fixed assets management');
+    $('#loginBar').textContent = i.orgName || 'Fixed Assets';
+    var img = $('#loginLogo');
+    if (i.logo) { img.src = i.logo; img.classList.remove('hidden'); } else img.classList.add('hidden');
+  }
+
+  function showLogin(msg) {
+    $('#app').classList.add('hidden');
+    $('#login').classList.remove('hidden');
+    $('#loginMsg').textContent = msg || '';
+    paintLogin();
+    setTimeout(function () { $('#lu').focus(); }, 50);
+  }
+
+  function localLogout(msg) {
+    S.token = ''; S.b = null; S.data = {}; S.grids = {};
+    lsSet('fa_token', '');
+    closeModal();
+    showLogin(msg);
+  }
+
+  async function doLogin(ev) {
+    ev.preventDefault();
+    $('#loginMsg').textContent = '';
+    $('#loginBtn').disabled = true;
+    try {
+      var b = await api('login', $('#lu').value, $('#lp').value);
+      $('#lp').value = '';
+      enter(b);
+    } catch (e) {
+      $('#loginMsg').textContent = e.message;
+    } finally { $('#loginBtn').disabled = false; }
+  }
+
+  async function logout() {
+    var t = S.token;
+    localLogout();
+    try { await api('logout', t); } catch (e) { /* ignore */ }
+  }
+
+  function enter(b) {
+    S.b = b; S.token = b.token; S.data = {}; S.grids = {};
+    lsSet('fa_token', b.token);
+    S.info.orgName = b.settings.ORGNAME; S.info.logo = b.settings.LOGO;
+    $('#login').classList.add('hidden');
+    $('#app').classList.remove('hidden');
+    if (window.innerWidth < 680) $('#navpane').classList.add('collapsed');
+    chrome();
+    go('dashboard');
+    if (b.user.mustChange) changePasswordDlg(true);
+  }
+
+  var NAV = [
+    { id: 'dashboard', icon: 'home', ar: 'الرئيسية', en: 'Home' },
+    { h: 1, ar: 'الأصول الثابتة', en: 'Fixed assets' },
+    { id: 'assets', icon: 'box', ar: 'الأصول الثابتة', en: 'Fixed assets', perm: 'assets' },
+    { id: 'books', icon: 'book', ar: 'دفاتر الأصول', en: 'Books', perm: 'books' },
+    { id: 'journal', icon: 'journal', ar: 'يومية الأصول الثابتة', en: 'Fixed asset journal', perm: 'journal' },
+    { id: 'vendors', icon: 'truck', ar: 'الموردون', en: 'Vendors', perm: 'vendors' },
+    { h: 1, ar: 'الإدارة', en: 'Administration' },
+    { id: 'users', icon: 'users', ar: 'المستخدمون والصلاحيات', en: 'Users & permissions', perm: 'users' },
+    { id: 'settings', icon: 'gear', ar: 'الإعدادات', en: 'Settings', perm: 'settings' }
+  ];
+
+  function chrome() {
+    var st = S.b.settings;
+    $('#brandName').textContent = st.ORGNAME || 'Fixed Assets';
+    var img = $('#brandLogo');
+    if (st.LOGO) { img.src = st.LOGO; img.classList.remove('hidden'); } else img.classList.add('hidden');
+    $('#navToggle').innerHTML = icon('menu');
+    $('#langBtn').innerHTML = icon('globe') + '<span>' + (S.lang === 'ar' ? 'EN' : 'ع') + '</span>';
+    $('#userBtn').innerHTML = '<span class="avatar sm">' + esc(initials(S.b.user.fullName || S.b.user.username)) + '</span>';
+    var items = NAV.filter(function (n) { return n.h || !n.perm || can(n.perm); });
+    items = items.filter(function (n, i) { return !n.h || (items[i + 1] && !items[i + 1].h); });
+    $('#navpane').innerHTML = items.map(function (n) {
+      if (n.h) return '<div class="nav-h">' + esc(T(n.ar, n.en)) + '</div>';
+      return '<div class="nav-i ' + (S.page === n.id ? 'active' : '') + '" title="' + esc(T(n.ar, n.en)) + '" onclick="FA.go(\'' + n.id + '\')">' + icon(n.icon) + '<span class="lbl">' + esc(T(n.ar, n.en)) + '</span></div>';
+    }).join('');
+    var role = S.b.roles[S.b.user.role];
+    $('#userMenu').innerHTML = '<div class="who"><b>' + esc(S.b.user.fullName) + '</b><span style="color:#605e5c">' + esc(S.b.user.username) + ' · ' + esc(L(role)) + '</span></div>' +
+      '<button onclick="FA.changePasswordDlg()">' + icon('key') + T('تغيير كلمة المرور', 'Change password') + '</button>' +
+      '<button onclick="FA.logout()">' + icon('logout') + T('تسجيل الخروج', 'Sign out') + '</button>';
+  }
+
+  function crumbs(parts) {
+    $('#crumbs').innerHTML = parts.filter(Boolean).map(function (p, i) { return (i ? '<span class="sep">›</span>' : '') + '<span>' + esc(p) + '</span>'; }).join('');
+  }
+
+  /* ======================= Router ======================= */
+  function go(page, view) {
+    S.page = page; S.view = view || {};
+    $$('.nav-i').forEach(function (n) { n.classList.toggle('active', n.getAttribute('onclick').indexOf("'" + page + "'") > 0); });
+    if (window.innerWidth < 680) $('#navpane').classList.add('collapsed');
+    window.scrollTo(0, 0);
+    render();
+  }
+
+  async function render() {
+    var main = $('#main');
+    try {
+      switch (S.page) {
+        case 'assets': return await (S.view.key !== undefined || S.view.isNew ? pageRecord('assets') : pageList('assets'));
+        case 'vendors': return await (S.view.key !== undefined || S.view.isNew ? pageRecord('vendors') : pageList('vendors'));
+        case 'books': return await pageBooks();
+        case 'journal': return await (S.view.batch ? pageBatch() : pageJournal());
+        case 'users': return await pageUsers();
+        case 'settings': return await pageSettings();
+        default: return await pageDashboard();
+      }
+    } catch (e) {
+      main.innerHTML = '<div class="content" style="padding-top:16px"><div class="card"><div class="empty">' + esc(e.message) + '</div></div></div>';
+    }
+  }
+
+  /* ======================= Dashboard ======================= */
+  async function pageDashboard() {
+    crumbs([S.b.settings.ORGNAME, T('الرئيسية', 'Home')]);
+    var main = $('#main');
+    main.innerHTML = phead('', T('مرحباً، ', 'Welcome, ') + esc(S.b.user.fullName || S.b.user.username)) + '<div class="content"><div class="empty">…</div></div>';
+    var d = await api('dashboard', S.token);
+    var cur = S.b.settings.CURRENCY;
+    var tiles = '';
+    if (d.assets) tiles += tile('assets', 'box', T('الأصول الثابتة', 'Fixed assets'), d.assets.count, '');
+    if (d.books) tiles += tile('books', 'book', T('دفاتر الأصول', 'Asset books'), d.books.count, T('إجمالي تكلفة الاقتناء: ', 'Total acquisition cost: ') + fmtNum(d.books.cost, 3) + ' ' + cur);
+    if (d.journal) tiles += tile('journal', 'journal', T('يوميات بانتظار الاعتماد', 'Journals awaiting approval'), d.journal.Draft,
+      T('معتمدة: ', 'Approved: ') + d.journal.Approved + ' · ' + T('مُرحّلة: ', 'Posted: ') + d.journal.Posted);
+    if (d.vendors) tiles += tile('vendors', 'truck', T('الموردون', 'Vendors'), d.vendors.count, '');
+    var cards = '';
+    if (d.books) {
+      var opts = fld('books', 'STATUS').opts;
+      cards += '<div class="card" style="padding:14px"><h3 style="margin:0 0 8px;font-size:14px">' + T('الدفاتر حسب الحالة', 'Books by status') + '</h3>' +
+        (Object.keys(d.books.byStatus).map(function (k) { return '<div class="kv"><span>' + badge('book', k) + '</span><b>' + d.books.byStatus[k] + '</b></div>'; }).join('') || '<div class="empty">—</div>') + '</div>';
+    }
+    if (d.assets) {
+      cards += '<div class="card" style="padding:14px"><h3 style="margin:0 0 8px;font-size:14px">' + T('الأصول حسب المجموعة', 'Assets by group') + '</h3>' +
+        (Object.keys(d.assets.byGroup).map(function (k) { return '<div class="kv"><span>' + esc(k) + ' <small style="color:#605e5c">' + esc(lookupName('AssetGroup', k)) + '</small></span><b>' + d.assets.byGroup[k] + '</b></div>'; }).join('') || '<div class="empty">—</div>') + '</div>';
+    }
+    main.innerHTML = phead(esc(S.b.settings.ORGNAME), T('مرحباً، ', 'Welcome, ') + esc(S.b.user.fullName || S.b.user.username)) +
+      '<div class="content"><div class="tiles">' + tiles + '</div><div class="tiles" style="margin-top:12px">' + cards + '</div></div>';
+  }
+  function tile(page, ic, t, v, d) {
+    return '<div class="tile" onclick="FA.go(\'' + page + '\')"><div class="t">' + icon(ic) + esc(t) + '</div><div class="v">' + esc(v) + '</div><div class="d">' + esc(d) + '</div></div>';
+  }
+
+  /* ======================= Generic list + record (assets, vendors) ======================= */
+  async function pageList(e) {
+    var s = sch(e);
+    crumbs([S.b.settings.ORGNAME, L(s.title)]);
+    await load(e);
+    var gid = 'list_' + e;
+    $('#main').innerHTML = apane([
+      can(s.perm, 'add') && { icon: 'plus', ar: 'جديد', en: 'New', on: "FA.go('" + e + "',{isNew:true})" },
+      can(s.perm, 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: "FA.deleteSelected('" + e + "','" + gid + "')", cls: 'danger' },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('" + e + "')" },
+      (can(s.perm, 'add') || can(s.perm, 'edit')) && { icon: 'upload', ar: 'استيراد من Excel', en: 'Import from Excel', on: "FA.importStart('" + e + "')" },
+      { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: "FA.exportGrid('" + e + "','" + gid + "')" },
+      { icon: 'excel', ar: 'قالب الاستيراد', en: 'Import template', on: "FA.exportTemplate('" + e + "')" }
+    ]) + phead('<a onclick="FA.go(\'' + e + '\')">' + esc(L(s.title)) + '</a> | ' + T('العرض القياسي', 'Standard view'), esc(L(s.title))) +
+      '<div class="content"><div class="card">' + grid(gid, {
+        rows: function () { return S.data[e] || []; }, cols: schemaCols(e), key: function (r) { return keyStr(e, r); },
+        select: true, open: function (r) { go(e, { key: keyStr(e, r) }); }
+      }) + '</div></div>';
+    gridRender(gid);
+  }
+
+  async function pageRecord(e) {
+    var s = sch(e);
+    await load(e);
+    var isNew = !!S.view.isNew;
+    var rec = isNew ? Object.assign({}, S.view.preset || {}) : findRec(e, S.view.key);
+    if (!rec) { go(e); return; }
+    if (isNew) s.fields.forEach(function (f) { if (rec[f.k] === undefined && f.dflt !== undefined) rec[f.k] = f.dflt === '@today' ? today() : f.dflt; });
+    var ro = !can(s.perm, isNew ? 'add' : 'edit');
+    var nameField = e === 'vendors' ? 'VENDORORGANIZATIONNAME' : 'NAME';
+    var id = rec[s.key[0]];
+    var title = isNew ? T('جديد', 'New') : esc(id) + ' : ' + esc(rec[nameField] || '');
+    crumbs([S.b.settings.ORGNAME, L(s.title), isNew ? T('جديد', 'New') : id]);
+    var factbox = '';
+    if (e === 'assets' && !isNew) {
+      var books = S.b.refs.books.filter(function (b) { return low(b.a) === low(id); });
+      factbox = '<div class="factbox"><div class="card"><h4>' + T('معلومات ذات صلة', 'Related information') + '</h4></div><div class="card"><h4>' + T('دفاتر الأصل', 'Asset books') + '</h4><div class="b">' +
+        (books.length ? books.map(function (b) {
+          return '<div class="row"><a onclick="FA.go(\'books\',{key:' + jsArg(low(b.a) + '\u0001' + low(b.c)) + '})">' + esc(b.c) + '</a>' + badge('book', b.n) + '</div>';
+        }).join('') : '<div class="empty">' + icon('folder') + T('لا توجد دفاتر', 'No books yet') + '</div>') +
+        (can('books', 'add') ? '<div style="margin-top:8px"><a onclick="FA.newBookFor(' + jsArg(id) + ')">+ ' + T('إنشاء دفتر', 'Create book') + '</a></div>' : '') +
+        '</div></div></div>';
+    }
+    $('#main').innerHTML = apane([
+      { icon: 'back', ar: 'رجوع', en: 'Back', on: "FA.go('" + e + "')", cls: 'back' },
+      !ro && { icon: 'save', ar: 'حفظ', en: 'Save', on: "FA.saveRecord('" + e + "')" },
+      can(s.perm, 'add') && { icon: 'plus', ar: 'جديد', en: 'New', on: "FA.go('" + e + "',{isNew:true})" },
+      !isNew && can(s.perm, 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: "FA.deleteCurrent('" + e + "')", cls: 'danger' },
+      e === 'assets' && !isNew && '|',
+      e === 'assets' && !isNew && can('books') && { icon: 'book', ar: 'الدفاتر', en: 'Books', on: "FA.go('books',{asset:" + jsArg(id) + "})" },
+      e === 'assets' && !isNew && can('journal') && { icon: 'journal', ar: 'المعاملات', en: 'Transactions', on: "FA.assetTrans(" + jsArg(id) + ")" }
+    ]) + phead('<a onclick="FA.go(\'' + e + '\')">' + esc(L(s.title)) + '</a> | ' + T('عرضي', 'My view'), title) +
+      '<div class="content"><div class="split"><div class="grow">' + formHtml(e, rec, isNew, ro) + '</div>' + factbox + '</div></div>';
+  }
+
+  async function saveRecordBtn(e) {
+    var form = $('[data-form="' + e + '"]');
+    var saved = await saveForm(e, form);
+    if (saved) go(e, { key: keyStr(e, saved) });
+  }
+
+  async function deleteCurrent(e) {
+    var rec = findRec(e, S.view.key);
+    if (!rec) return;
+    if (!(await confirmBox(T('هل تريد حذف هذا السجل؟', 'Delete this record?'), T('حذف', 'Delete'), true))) return;
+    try {
+      await api('deleteRecords', S.token, e, [keyObj(e, rec)]);
+      S.data[e] = S.data[e].filter(function (r) { return r !== rec; });
+      toast(T('تم الحذف', 'Deleted'), 'ok');
+      refreshRefs();
+      go(e);
+    } catch (err) { fail(err); }
+  }
+
+  async function deleteSelected(e, gid) {
+    var rows = selected(gid);
+    if (!rows.length) return toast(T('حدد سجلاً واحداً على الأقل', 'Select at least one record'));
+    if (!(await confirmBox(T('حذف ', 'Delete ') + rows.length + T(' سجل؟', ' record(s)?'), T('حذف', 'Delete'), true))) return;
+    try {
+      await api('deleteRecords', S.token, e, rows.map(function (r) { return keyObj(e, r); }));
+      S.grids[gid].sel = {};
+      toast(T('تم الحذف', 'Deleted'), 'ok');
+      await load(e, true);
+      refreshRefs();
+      render();
+    } catch (err) { fail(err); }
+  }
+
+  async function reload(e) { await load(e, true); await refreshRefs(); render(); }
+  function exportGrid(e, gid) { var g = S.grids[gid]; var sel = selected(gid); exportRows(e, sel.length ? sel : g.visible || g.rows()); }
+  function exportTemplate(e) { exportRows(e, [], e + '_template'); }
+
+  /* ======================= Books (list pane + details) ======================= */
+  async function pageBooks() {
+    var s = sch('books');
+    var rows = await load('books');
+    var v = S.view;
+    if (v.asset) S.booksFilter = v.asset;
+    var isNew = !!v.isNew;
+    var rec = isNew ? Object.assign({}, v.preset || {}) : (v.key !== undefined ? findRec('books', v.key) : null);
+    if (!isNew && !rec) {
+      var first = filteredBooks()[0];
+      rec = first || null;
+    }
+    if (isNew) s.fields.forEach(function (f) { if (rec[f.k] === undefined && f.dflt !== undefined) rec[f.k] = f.dflt; });
+    var ro = !can('books', isNew ? 'add' : 'edit');
+    var assetName = rec ? lookupName('@assets', rec.FIXEDASSETNUMBER) : '';
+    crumbs([S.b.settings.ORGNAME, L(s.title), rec && !isNew ? rec.FIXEDASSETNUMBER + ' : ' + rec.BOOKID : '']);
+    S.curBook = rec && !isNew ? keyStr('books', rec) : '';
+    var title = isNew ? T('دفتر جديد', 'New book') : rec ? esc(rec.FIXEDASSETNUMBER) + ' : ' + esc(rec.BOOKID) : esc(L(s.title));
+    $('#main').innerHTML = apane([
+      can('books', 'add') && { icon: 'plus', ar: 'جديد', en: 'New', on: "FA.go('books',{isNew:true})" },
+      rec && !ro && { icon: 'save', ar: 'حفظ', en: 'Save', on: 'FA.saveBook()' },
+      rec && !isNew && can('books', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: 'FA.deleteBook()', cls: 'danger' },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('books')" },
+      (can('books', 'add') || can('books', 'edit')) && { icon: 'upload', ar: 'استيراد من Excel', en: 'Import from Excel', on: "FA.importStart('books')" },
+      { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: 'FA.exportBooks()' },
+      { icon: 'excel', ar: 'قالب الاستيراد', en: 'Import template', on: "FA.exportTemplate('books')" },
+      rec && !isNew && can('assets') && '|',
+      rec && !isNew && can('assets') && { icon: 'box', ar: 'الأصل الثابت', en: 'Fixed asset', on: "FA.go('assets',{key:" + jsArg(low(rec.FIXEDASSETNUMBER)) + "})" }
+    ]) + phead('<a onclick="FA.go(\'books\')">' + esc(L(s.title)) + '</a>' + (rec && !isNew ? ' | ' + esc(rec.FIXEDASSETNUMBER) + ' : ' + esc(assetName) : '') + ' | ' + T('عرضي', 'My view'), title) +
+      '<div class="content"><div class="split"><div class="lpane"><div class="f"><div class="search">' + icon('search') +
+      '<input class="inp" placeholder="' + T('تصفية', 'Filter') + '" value="' + esc(S.booksFilter || '') + '" oninput="FA.booksFilter(this.value)"></div></div><div class="items" id="bookItems"></div></div>' +
+      '<div class="grow">' + (rec ? formHtml('books', rec, isNew, ro) : '<div class="card"><div class="empty">' + icon('folder') + T('لا توجد دفاتر بعد', 'No books yet') + '</div></div>') + '</div></div></div>';
+    drawBookItems();
+  }
+
+  function filteredBooks() {
+    var q = low(S.booksFilter);
+    return (S.data.books || []).filter(function (r) {
+      return !q || low(r.FIXEDASSETNUMBER).indexOf(q) >= 0 || low(r.BOOKID).indexOf(q) >= 0 || low(lookupName('@assets', r.FIXEDASSETNUMBER)).indexOf(q) >= 0;
+    }).sort(function (a, b) { return String(a.FIXEDASSETNUMBER).localeCompare(String(b.FIXEDASSETNUMBER), undefined, { numeric: true }); });
+  }
+
+  function drawBookItems() {
+    var el = $('#bookItems');
+    if (!el) return;
+    var rows = filteredBooks();
+    var st = fld('books', 'STATUS').opts;
+    el.innerHTML = rows.slice(0, 1000).map(function (r) {
+      var k = keyStr('books', r);
+      var o = st.filter(function (x) { return x.v === r.STATUS; })[0];
+      return '<div class="it ' + (k === S.curBook ? 'on' : '') + '" data-key="' + esc(k) + '" onclick="FA.openBook(this)"><b>' + esc(r.FIXEDASSETNUMBER) + ' : ' + esc(r.BOOKID) + '</b><span>' +
+        esc(o ? L(o) : r.STATUS) + '</span><span>' + esc(lookupName('@assets', r.FIXEDASSETNUMBER)) + '</span></div>';
+    }).join('') || '<div class="empty">' + T('لا توجد نتائج', 'No results') + '</div>';
+  }
+
+  var bfTimer;
+  function booksFilter(v) { S.booksFilter = v; clearTimeout(bfTimer); bfTimer = setTimeout(drawBookItems, 200); }
+  function openBook(el) { go('books', { key: el.getAttribute('data-key') }); }
+  async function saveBook() {
+    var saved = await saveForm('books', $('[data-form="books"]'));
+    if (saved) go('books', { key: keyStr('books', saved) });
+  }
+  async function deleteBook() {
+    var rec = findRec('books', S.curBook);
+    if (!rec) return;
+    if (!(await confirmBox(T('هل تريد حذف الدفتر ', 'Delete book ') + rec.FIXEDASSETNUMBER + ' : ' + rec.BOOKID + '?', T('حذف', 'Delete'), true))) return;
+    try {
+      await api('deleteRecords', S.token, 'books', [keyObj('books', rec)]);
+      S.data.books = S.data.books.filter(function (r) { return r !== rec; });
+      refreshRefs();
+      toast(T('تم الحذف', 'Deleted'), 'ok');
+      go('books');
+    } catch (err) { fail(err); }
+  }
+  function exportBooks() { exportRows('books', filteredBooks()); }
+  function newBookFor(asset) { go('books', { isNew: true, preset: { FIXEDASSETNUMBER: asset } }); }
+
+  /* ======================= Journal ======================= */
+  function batches() {
+    var m = {};
+    (S.data.journal || []).forEach(function (r) {
+      var b = m[r.JOURNALBATCHNUMBER] = m[r.JOURNALBATCHNUMBER] || { JOURNALBATCHNUMBER: r.JOURNALBATCHNUMBER, JOURNALNAME: r.JOURNALNAME, TRANSDATE: r.TRANSDATE, LINES: 0, DEBITAMOUNT: 0, CREDITAMOUNT: 0, st: {}, CREATEDBY: r.CREATEDBY, TEXT: r.TEXT };
+      b.LINES++;
+      b.DEBITAMOUNT += Number(r.DEBITAMOUNT) || 0;
+      b.CREDITAMOUNT += Number(r.CREDITAMOUNT) || 0;
+      b.st[r.STATUS] = 1;
+      if (String(r.TRANSDATE) < String(b.TRANSDATE)) b.TRANSDATE = r.TRANSDATE;
+    });
+    return Object.keys(m).map(function (k) {
+      var b = m[k];
+      b.STATUS = b.st.Posted ? 'Posted' : b.st.Approved ? (b.st.Draft ? 'Mixed' : 'Approved') : 'Draft';
+      return b;
+    }).sort(function (a, b) { return String(b.JOURNALBATCHNUMBER).localeCompare(String(a.JOURNALBATCHNUMBER), undefined, { numeric: true }); });
+  }
+
+  async function pageJournal() {
+    var s = sch('journal');
+    crumbs([S.b.settings.ORGNAME, L(s.title)]);
+    await load('journal');
+    $('#main').innerHTML = apane([
+      can('journal', 'add') && { icon: 'plus', ar: 'يومية جديدة', en: 'New journal', on: 'FA.newJournal()' },
+      can('journal', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: 'FA.deleteBatches()', cls: 'danger' },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('journal')" },
+      (can('journal', 'add') || can('journal', 'edit')) && { icon: 'upload', ar: 'استيراد من Excel', en: 'Import from Excel', on: "FA.importStart('journal')" },
+      { icon: 'download', ar: 'تصدير كل الأسطر', en: 'Export all lines', on: "FA.exportAllJournal()" },
+      { icon: 'excel', ar: 'قالب الاستيراد', en: 'Import template', on: "FA.exportTemplate('journal')" }
+    ]) + phead('<a onclick="FA.go(\'journal\')">' + esc(L(s.title)) + '</a> | ' + T('العرض القياسي', 'Standard view'), esc(L(s.title))) +
+      '<div class="content"><div class="card">' + grid('batches', {
+        rows: batches, key: function (r) { return r.JOURNALBATCHNUMBER; }, select: true,
+        open: function (r) { go('journal', { batch: r.JOURNALBATCHNUMBER }); },
+        cols: [
+          { k: 'JOURNALBATCHNUMBER', label: L(fld('journal', 'JOURNALBATCHNUMBER')) },
+          { k: 'JOURNALNAME', label: L(fld('journal', 'JOURNALNAME')) },
+          { k: 'TEXT', label: L(fld('journal', 'TEXT')) },
+          { k: 'TRANSDATE', label: L(fld('journal', 'TRANSDATE')) },
+          { k: 'LINES', label: T('عدد الأسطر', 'Lines'), num: true },
+          { k: 'DEBITAMOUNT', label: L(fld('journal', 'DEBITAMOUNT')), num: true, total: true, text: function (r) { return fmtNum(r.DEBITAMOUNT, 3); } },
+          { k: 'CREDITAMOUNT', label: L(fld('journal', 'CREDITAMOUNT')), num: true, total: true, text: function (r) { return fmtNum(r.CREDITAMOUNT, 3); } },
+          { k: 'STATUS', label: L(fld('journal', 'STATUS')), html: function (r) { return r.STATUS === 'Mixed' ? '<span class="badge b-warn">' + T('مختلط', 'Mixed') + '</span>' : badge('journal', r.STATUS); }, text: function (r) { return r.STATUS; } },
+          { k: 'CREATEDBY', label: T('أنشئ بواسطة', 'Created by') }
+        ]
+      }) + '</div></div>';
+    gridRender('batches');
+  }
+
+  function newJournal() {
+    var names = S.b.lookups.JournalName || [];
+    modal(T('يومية جديدة', 'New journal'),
+      '<div class="fld"><label>' + T('اسم اليومية', 'Journal name') + '<span class="req">*</span></label><select class="inp" id="nj_name">' +
+      names.map(function (n) { return '<option value="' + esc(n.c) + '">' + esc(n.c + ' - ' + n.n) + '</option>'; }).join('') + '</select></div>' +
+      (names.length ? '' : '<div class="note">' + T('أضف أسماء اليوميات من الإعدادات ← القوائم المرجعية', 'Add journal names in Settings → Lookups') + '</div>'),
+      '<button class="btn pri" onclick="FA.newJournalGo()" ' + (names.length ? '' : 'disabled') + '>' + T('إنشاء', 'Create') + '</button><button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>');
+  }
+
+  async function newJournalGo() {
+    var name = $('#nj_name').value;
+    closeModal();
+    try {
+      var batch = await api('newJournalBatch', S.token);
+      S.pendingBatch = { batch: batch, name: name };
+      go('journal', { batch: batch });
+      lineDlg(null);
+    } catch (e) { fail(e); }
+  }
+
+  function batchLines(b) { return (S.data.journal || []).filter(function (r) { return r.JOURNALBATCHNUMBER === b; }); }
+
+  async function pageBatch() {
+    var s = sch('journal');
+    await load('journal');
+    var b = S.view.batch;
+    var lines = batchLines(b);
+    var info = batches().filter(function (x) { return x.JOURNALBATCHNUMBER === b; })[0];
+    var pend = S.pendingBatch && S.pendingBatch.batch === b ? S.pendingBatch : null;
+    var status = info ? info.STATUS : 'Draft';
+    var jname = info ? info.JOURNALNAME : pend ? pend.name : '';
+    var draft = status === 'Draft';
+    crumbs([S.b.settings.ORGNAME, L(s.title), b]);
+    $('#main').innerHTML = apane([
+      { icon: 'back', ar: 'رجوع', en: 'Back', on: "FA.go('journal')", cls: 'back' },
+      draft && can('journal', 'add') && { icon: 'plus', ar: 'سطر جديد', en: 'New line', on: 'FA.lineDlg(null)' },
+      draft && can('journal', 'delete') && { icon: 'trash', ar: 'حذف الأسطر', en: 'Delete lines', on: 'FA.deleteLines()', cls: 'danger' },
+      '|',
+      can('journal', 'approve') && { icon: 'check', ar: 'اعتماد', en: 'Approve', on: "FA.jAction('approve')", dis: !(draft && lines.length) },
+      can('journal', 'approve') && { icon: 'undo', ar: 'إلغاء الاعتماد', en: 'Reject / unapprove', on: "FA.jAction('unapprove')", dis: status !== 'Approved' },
+      can('journal', 'post') && { icon: 'send', ar: 'ترحيل', en: 'Post', on: "FA.jAction('post')", dis: status !== 'Approved' },
+      '|',
+      { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: "FA.exportRowsBatch()" },
+      draft && (can('journal', 'add') || can('journal', 'edit')) && { icon: 'upload', ar: 'استيراد أسطر', en: 'Import lines', on: "FA.importStart('journal',{JOURNALBATCHNUMBER:" + jsArg(b) + ",JOURNALNAME:" + jsArg(jname) + "})" }
+    ]) + phead('<a onclick="FA.go(\'journal\')">' + esc(L(s.title)) + '</a> | ' + esc(jname),
+      esc(b) + ' : ' + esc(jname) + ' ' + (status === 'Mixed' ? '<span class="badge b-warn">' + T('مختلط', 'Mixed') + '</span>' : badge('journal', status))) +
+      '<div class="content"><div class="card">' + grid('lines', {
+        rows: function () { return batchLines(b); }, key: function (r) { return r.LINEID; }, select: draft,
+        open: function (r) { lineDlg(r); }, cols: schemaCols('journal').filter(function (c) { return c.k !== 'JOURNALBATCHNUMBER' && c.k !== 'JOURNALNAME'; })
+      }) + '</div></div>';
+    gridRender('lines');
+  }
+
+  function lineDlg(rec) {
+    var isNew = !rec;
+    var b = S.view.batch;
+    var info = batches().filter(function (x) { return x.JOURNALBATCHNUMBER === b; })[0];
+    var pend = S.pendingBatch && S.pendingBatch.batch === b ? S.pendingBatch : null;
+    if (isNew) {
+      var last = batchLines(b).slice(-1)[0] || {};
+      rec = { JOURNALBATCHNUMBER: b, JOURNALNAME: info ? info.JOURNALNAME : pend ? pend.name : '', TRANSDATE: last.TRANSDATE || today(),
+        TRANSACTIONTYPE: last.TRANSACTIONTYPE || '', BOOKID: 'General', OFFSETACCOUNTTYPE: last.OFFSETACCOUNTTYPE || 'Ledger', OFFSETACCOUNT: last.OFFSETACCOUNT || '' };
+    }
+    var ro = rec.STATUS && rec.STATUS !== 'Draft' || !can('journal', isNew ? 'add' : 'edit');
+    S.lineRec = rec;
+    var foot = (!ro ? '<button class="btn pri" onclick="FA.saveLine(false)">' + icon('save') + T('حفظ', 'Save') + '</button>' +
+      (isNew ? '<button class="btn" onclick="FA.saveLine(true)">' + T('حفظ وجديد', 'Save & new') + '</button>' : '') : '') +
+      (!isNew && rec.STATUS === 'Draft' && can('journal', 'delete') ? '<button class="btn red" onclick="FA.deleteLine()">' + T('حذف', 'Delete') + '</button>' : '') +
+      '<button class="btn" onclick="FA.closeModal()">' + T('إغلاق', 'Close') + '</button>';
+    modal((isNew ? T('سطر جديد — ', 'New line — ') : T('سطر — ', 'Line — ')) + b, formHtml('journal', rec, isNew, ro, { hide: ['JOURNALBATCHNUMBER'] }), foot, { wide: true });
+    var form = $('#modal [data-form="journal"]');
+    var t = $('[data-k="OFFSETACCOUNTTYPE"]', form);
+    if (t && !ro) fchg(t);
+  }
+
+  async function saveLine(again) {
+    var form = $('#modal [data-form="journal"]');
+    var rec = readForm(form);
+    if (!validateForm(form)) return;
+    var d = Number(rec.DEBITAMOUNT) || 0, c = Number(rec.CREDITAMOUNT) || 0;
+    if ((d > 0) === (c > 0)) return toast(T('أدخل مبلغاً في المدين أو الدائن (واحد فقط)', 'Enter either a debit or a credit amount'), 'err');
+    var saved = await saveForm('journal', form);
+    if (!saved) return;
+    closeModal();
+    if (S.pendingBatch && S.pendingBatch.batch === saved.JOURNALBATCHNUMBER) S.pendingBatch = null;
+    await render();
+    if (again) lineDlg(null);
+  }
+
+  async function deleteLine() {
+    if (!(await confirmBox(T('حذف هذا السطر؟', 'Delete this line?'), T('حذف', 'Delete'), true))) return;
+    try {
+      await api('deleteRecords', S.token, 'journal', [{ LINEID: S.lineRec.LINEID }]);
+      S.data.journal = S.data.journal.filter(function (r) { return r.LINEID !== S.lineRec.LINEID; });
+      toast(T('تم الحذف', 'Deleted'), 'ok');
+      render();
+    } catch (e) { fail(e); }
+  }
+
+  async function deleteLines() {
+    var rows = selected('lines');
+    if (!rows.length) return toast(T('حدد سطراً واحداً على الأقل', 'Select at least one line'));
+    if (!(await confirmBox(T('حذف ', 'Delete ') + rows.length + T(' سطر؟', ' line(s)?'), T('حذف', 'Delete'), true))) return;
+    try {
+      await api('deleteRecords', S.token, 'journal', rows.map(function (r) { return { LINEID: r.LINEID }; }));
+      S.grids.lines.sel = {};
+      await load('journal', true);
+      toast(T('تم الحذف', 'Deleted'), 'ok');
+      render();
+    } catch (e) { fail(e); }
+  }
+
+  async function deleteBatches() {
+    var bs = selected('batches');
+    if (!bs.length) return toast(T('حدد يومية واحدة على الأقل', 'Select at least one journal'));
+    if (bs.some(function (b) { return b.STATUS !== 'Draft'; })) return toast(T('يمكن حذف اليوميات في حالة مسودة فقط', 'Only draft journals can be deleted'), 'err');
+    if (!(await confirmBox(T('حذف ', 'Delete ') + bs.length + T(' يومية بكل أسطرها؟', ' journal(s) and all their lines?'), T('حذف', 'Delete'), true))) return;
+    var ids = {};
+    bs.forEach(function (b) { ids[b.JOURNALBATCHNUMBER] = 1; });
+    try {
+      await api('deleteRecords', S.token, 'journal', S.data.journal.filter(function (r) { return ids[r.JOURNALBATCHNUMBER]; }).map(function (r) { return { LINEID: r.LINEID }; }));
+      S.grids.batches.sel = {};
+      await load('journal', true);
+      toast(T('تم الحذف', 'Deleted'), 'ok');
+      render();
+    } catch (e) { fail(e); }
+  }
+
+  async function jAction(action) {
+    var msgs = {
+      approve: T('اعتماد اليومية؟ لن يمكن تعديل الأسطر بعد الاعتماد.', 'Approve the journal? Lines cannot be edited after approval.'),
+      unapprove: T('إلغاء اعتماد اليومية وإعادتها إلى مسودة؟', 'Unapprove the journal and return it to draft?'),
+      post: T('ترحيل اليومية؟ سيتم تحديث دفاتر الأصول ولا يمكن التراجع.', 'Post the journal? Asset books will be updated and this cannot be undone.')
+    };
+    if (!(await confirmBox(msgs[action]))) return;
+    try {
+      var n = await api('journalAction', S.token, S.view.batch, action);
+      toast(T('تم بنجاح — عدد الأسطر: ', 'Done — lines: ') + n, 'ok');
+      await load('journal', true);
+      if (action === 'post') { S.data.books = null; refreshRefs(); }
+      render();
+    } catch (e) { fail(e); }
+  }
+
+  function exportRowsBatch() { exportRows('journal', batchLines(S.view.batch), S.view.batch); }
+  function exportAllJournal() { exportRows('journal', S.data.journal || [], 'FAJournal'); }
+  async function assetTrans(asset) {
+    await load('journal');
+    var rows = (S.data.journal || []).filter(function (r) { return low(r.FIXEDASSETNUMBER) === low(asset); });
+    modal(T('معاملات الأصل ', 'Transactions of ') + asset, '<div class="card">' + grid('assetTrans', {
+      rows: function () { return rows; }, key: function (r) { return r.LINEID; }, cols: schemaCols('journal'),
+      open: function (r) { closeModal(); go('journal', { batch: r.JOURNALBATCHNUMBER }); }
+    }) + '</div>', '<button class="btn" onclick="FA.closeModal()">' + T('إغلاق', 'Close') + '</button>', { wide: true });
+    gridRender('assetTrans');
+  }
+
+  /* ======================= Users ======================= */
+  function roleTemplate(role) {
+    var p = {};
+    S.b.permPages.forEach(function (pg) { p[pg] = {}; S.b.permActions.forEach(function (a) { p[pg][a] = false; }); });
+    var set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
+    var data = ['assets', 'books', 'journal', 'vendors'];
+    if (role === 'SuperAdmin' || role === 'Admin') set(S.b.permPages, S.b.permActions);
+    else if (role === 'Accountant') set(data, ['view', 'add', 'edit']);
+    else set(data, ['view']);
+    return p;
+  }
+  var PAGE_NAMES = { assets: ['الأصول الثابتة', 'Fixed assets'], books: ['دفاتر الأصول', 'Books'], journal: ['يومية الأصول', 'FA journal'],
+    vendors: ['الموردون', 'Vendors'], users: ['المستخدمون', 'Users'], settings: ['الإعدادات', 'Settings'] };
+  var ACT_NAMES = { view: ['دخول للصفحة', 'View'], add: ['إضافة', 'Add'], edit: ['تعديل', 'Edit'], delete: ['حذف', 'Delete'], approve: ['اعتماد', 'Approve'], post: ['ترحيل', 'Post'] };
+
+  async function pageUsers() {
+    crumbs([S.b.settings.ORGNAME, T('المستخدمون والصلاحيات', 'Users & permissions')]);
+    S.users = await api('listUsers', S.token);
+    var rows = S.users.map(function (u, i) {
+      var role = S.b.roles[u.ROLE] || {};
+      var isSA = u.ROLE === 'SuperAdmin';
+      var me = u.USERNAME === S.b.user.username;
+      var guard = isSA && S.b.user.role !== 'SuperAdmin';
+      var acts = '';
+      if (!guard) {
+        if (can('users', 'edit') && !me) acts += '<button class="ib red" title="' + (u.STATUS === 'Active' ? T('إيقاف', 'Deactivate') : T('تفعيل', 'Activate')) + '" onclick="FA.userStatus(' + i + ')">' + icon(u.STATUS === 'Active' ? 'block' : 'unblock') + '</button>';
+        if (can('users', 'edit')) acts += '<button class="ib yel" title="' + T('تعديل', 'Edit') + '" onclick="FA.userDlg(' + i + ')">' + icon('edit') + '</button>';
+        acts += '<button class="ib blue" title="' + T('الصلاحيات', 'Permissions') + '" onclick="FA.userExpand(' + i + ')">' + icon('shield') + '</button>';
+        if (can('users', 'edit')) acts += '<button class="ib navy" title="' + T('إعادة تعيين كلمة المرور', 'Reset password') + '" onclick="FA.resetPwDlg(' + i + ')">' + icon('key') + '</button>';
+        if (can('users', 'delete') && !me) acts += '<button class="ib red" title="' + T('حذف', 'Delete') + '" onclick="FA.userDelete(' + i + ')">' + icon('trash') + '</button>';
+      }
+      return '<tr><td style="width:40px;text-align:center"><button class="expander" onclick="FA.userExpand(' + i + ')">+</button></td>' +
+        '<td><div class="ucell"><span class="avatar">' + esc(initials(u.FULLNAME || u.USERNAME)) + '</span><div><b>' + esc(u.FULLNAME) + '</b><span class="meta">' + esc(u.USERNAME) +
+        (u.LASTLOGIN ? ' · ' + T('آخر دخول ', 'last login ') + esc(u.LASTLOGIN) : '') + '</span></div></div></td>' +
+        '<td>' + (u.EMAIL ? '<a href="mailto:' + esc(u.EMAIL) + '" style="text-decoration:underline">' + esc(u.EMAIL) + '</a>' : '') + '</td>' +
+        '<td style="text-align:center">' + (isSA ? '<span class="badge b-info">' + esc(L(role)) + '</span>' : u.ROLE === 'Admin' ? '<span class="badge b-ok">' + esc(L(role)) + '</span>' : esc(L(role))) + '</td>' +
+        '<td style="text-align:center">' + (u.STATUS === 'Active' ? '<span class="badge b-ok">' + T('نشط', 'Active') + '</span>' : '<span class="badge b-err">' + T('موقوف', 'Inactive') + '</span>') + '</td>' +
+        '<td><div class="uacts">' + acts + '</div></td></tr>' +
+        '<tr class="permrow hidden" id="perm_' + i + '"><td></td><td colspan="5">' + permTable(u.PERMS, true) + '</td></tr>';
+    }).join('');
+    $('#main').innerHTML = apane([
+      can('users', 'add') && { icon: 'plus', ar: 'مستخدم جديد', en: 'New user', on: 'FA.userDlg(-1)' },
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.render()' }
+    ]) + phead(T('الإدارة', 'Administration'), T('المستخدمون والصلاحيات', 'Users & permissions')) +
+      '<div class="content"><div class="card" style="overflow:auto"><table class="utable"><thead><tr><th></th><th>' + T('المستخدم', 'User') + ' ▲</th><th>' + T('البريد الإلكتروني', 'Email') + ' ▲</th><th>' +
+      T('الدور', 'Role') + ' ▲</th><th>' + T('الحالة', 'Status') + ' ▲</th><th>' + T('الإجراءات', 'Actions') + '</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+  }
+
+  function permTable(p, ro, lockAll) {
+    return '<table class="permgrid"><thead><tr><th>' + T('الصفحة', 'Page') + '</th>' + S.b.permActions.map(function (a) { return '<th>' + esc(T(ACT_NAMES[a][0], ACT_NAMES[a][1])) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      S.b.permPages.map(function (pg) {
+        return '<tr><td>' + esc(T(PAGE_NAMES[pg][0], PAGE_NAMES[pg][1])) + '</td>' + S.b.permActions.map(function (a) {
+          var on = p && p[pg] && p[pg][a];
+          return '<td>' + (ro ? (on ? '<span style="color:#107c10">✔</span>' : '<span style="color:#c8c6c4">—</span>') :
+            '<input type="checkbox" data-pg="' + pg + '" data-a="' + a + '" ' + (on ? 'checked' : '') + (lockAll ? ' disabled' : '') + '>') + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function userExpand(i) { $('#perm_' + i).classList.toggle('hidden'); }
+
+  function userDlg(i) {
+    var isNew = i < 0;
+    var u = isNew ? { USERNAME: '', FULLNAME: '', EMAIL: '', ROLE: 'Viewer', STATUS: 'Active', PERMS: roleTemplate('Viewer') } : S.users[i];
+    S.editUser = isNew ? null : u;
+    var roles = Object.keys(S.b.roles).filter(function (r) { return r !== 'SuperAdmin' || S.b.user.role === 'SuperAdmin'; });
+    var me = !isNew && u.USERNAME === S.b.user.username;
+    modal(isNew ? T('مستخدم جديد', 'New user') : T('تعديل المستخدم', 'Edit user'),
+      '<div class="ftab-b" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">' +
+      '<div class="fld"><label>' + T('اسم المستخدم', 'User name') + '<span class="req">*</span></label><input class="inp" id="u_name" dir="ltr" value="' + esc(u.USERNAME) + '" ' + (isNew ? '' : 'readonly') + '></div>' +
+      '<div class="fld"><label>' + T('الاسم الكامل', 'Full name') + '<span class="req">*</span></label><input class="inp" id="u_full" value="' + esc(u.FULLNAME) + '"></div>' +
+      '<div class="fld"><label>' + T('البريد الإلكتروني', 'Email') + '</label><input class="inp" id="u_email" type="email" dir="ltr" value="' + esc(u.EMAIL) + '"></div>' +
+      '<div class="fld"><label>' + T('الدور', 'Role') + '</label><select class="inp" id="u_role" onchange="FA.roleChanged(this.value)" ' + (me ? 'disabled' : '') + '>' +
+      roles.map(function (r) { return '<option value="' + r + '" ' + (r === u.ROLE ? 'selected' : '') + '>' + esc(L(S.b.roles[r])) + '</option>'; }).join('') + '</select></div>' +
+      (isNew ? '<div class="fld"><label>' + T('كلمة المرور', 'Password') + '<span class="req">*</span></label><input class="inp" id="u_pw" type="password" dir="ltr" autocomplete="new-password"></div>' : '') +
+      '</div>' + (isNew ? '<div class="note">' + T('كلمة المرور: 8 أحرف على الأقل وتحتوي على حروف وأرقام. سيُطلب من المستخدم تغييرها عند أول دخول.', 'Password: at least 8 characters with letters and digits. The user must change it at first sign-in.') + '</div>' : '') +
+      '<h3 style="font-size:14px;margin:14px 0 6px">' + T('صلاحيات المستخدم', 'User permissions') + '</h3><div id="permBox">' + permTable(u.PERMS, false, u.ROLE === 'SuperAdmin') + '</div>',
+      '<button class="btn pri" onclick="FA.saveUser(' + (isNew ? 1 : 0) + ')">' + icon('save') + T('حفظ', 'Save') + '</button><button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>', { wide: true });
+  }
+
+  function roleChanged(r) { $('#permBox').innerHTML = permTable(roleTemplate(r), false, r === 'SuperAdmin'); }
+
+  async function saveUser(isNew) {
+    var perms = {};
+    $$('#permBox input[type=checkbox]').forEach(function (c) {
+      var pg = c.getAttribute('data-pg');
+      perms[pg] = perms[pg] || {};
+      perms[pg][c.getAttribute('data-a')] = c.checked;
+    });
+    var data = { USERNAME: $('#u_name').value, FULLNAME: $('#u_full').value, EMAIL: $('#u_email').value, ROLE: $('#u_role').value, PERMS: perms };
+    if (isNew) data.PASSWORD = $('#u_pw').value;
+    try {
+      await api('saveUser', S.token, data, !!isNew);
+      closeModal();
+      toast(T('تم الحفظ', 'Saved'), 'ok');
+      render();
+    } catch (e) { fail(e); }
+  }
+
+  async function userStatus(i) {
+    var u = S.users[i];
+    var to = u.STATUS === 'Active' ? 'Inactive' : 'Active';
+    if (!(await confirmBox(to === 'Active' ? T('تفعيل المستخدم ', 'Activate user ') + u.USERNAME + '?' : T('إيقاف المستخدم ', 'Deactivate user ') + u.USERNAME + T('؟ سيتم إنهاء جلساته.', '? Their sessions will end.')))) return;
+    try { await api('setUserStatus', S.token, u.USERNAME, to); toast(T('تم', 'Done'), 'ok'); render(); } catch (e) { fail(e); }
+  }
+
+  async function userDelete(i) {
+    var u = S.users[i];
+    if (!(await confirmBox(T('حذف المستخدم ', 'Delete user ') + u.USERNAME + '?', T('حذف', 'Delete'), true))) return;
+    try { await api('deleteUser', S.token, u.USERNAME); toast(T('تم الحذف', 'Deleted'), 'ok'); render(); } catch (e) { fail(e); }
+  }
+
+  function resetPwDlg(i) {
+    var u = S.users[i];
+    S.editUser = u;
+    modal(T('إعادة تعيين كلمة المرور — ', 'Reset password — ') + u.USERNAME,
+      '<div class="fld"><label>' + T('كلمة المرور الجديدة', 'New password') + '</label><input class="inp" id="rp1" type="password" dir="ltr" autocomplete="new-password"></div>' +
+      '<div class="fld"><label>' + T('تأكيد كلمة المرور', 'Confirm password') + '</label><input class="inp" id="rp2" type="password" dir="ltr" autocomplete="new-password"></div>' +
+      '<div class="note">' + T('سيُطلب من المستخدم تغييرها عند الدخول التالي، وستنتهي جلساته الحالية.', 'The user must change it at next sign-in; current sessions will end.') + '</div>',
+      '<button class="btn pri" onclick="FA.resetPw()">' + T('حفظ', 'Save') + '</button><button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>');
+  }
+  async function resetPw() {
+    if ($('#rp1').value !== $('#rp2').value) return toast(T('كلمتا المرور غير متطابقتين', 'Passwords do not match'), 'err');
+    try { await api('resetUserPassword', S.token, S.editUser.USERNAME, $('#rp1').value); closeModal(); toast(T('تم تغيير كلمة المرور', 'Password changed'), 'ok'); } catch (e) { fail(e); }
+  }
+
+  function changePasswordDlg(forced) {
+    $('#userMenu').classList.add('hidden');
+    modal(T('تغيير كلمة المرور', 'Change password'),
+      (forced ? '<div class="note">' + T('يجب تغيير كلمة المرور قبل المتابعة.', 'You must change your password before continuing.') + '</div>' : '') +
+      '<div class="fld"><label>' + T('كلمة المرور الحالية', 'Current password') + '</label><input class="inp" id="cp0" type="password" dir="ltr" autocomplete="current-password"></div>' +
+      '<div class="fld"><label>' + T('كلمة المرور الجديدة', 'New password') + '</label><input class="inp" id="cp1" type="password" dir="ltr" autocomplete="new-password"></div>' +
+      '<div class="fld"><label>' + T('تأكيد كلمة المرور', 'Confirm password') + '</label><input class="inp" id="cp2" type="password" dir="ltr" autocomplete="new-password"></div>',
+      '<button class="btn pri" onclick="FA.changePw(' + (forced ? 1 : 0) + ')">' + T('حفظ', 'Save') + '</button>' +
+      (forced ? '<button class="btn" onclick="FA.logout()">' + T('تسجيل الخروج', 'Sign out') + '</button>' : '<button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>'),
+      { locked: forced });
+  }
+  async function changePw() {
+    if ($('#cp1').value !== $('#cp2').value) return toast(T('كلمتا المرور غير متطابقتين', 'Passwords do not match'), 'err');
+    try {
+      await api('changePassword', S.token, $('#cp0').value, $('#cp1').value);
+      S.b.user.mustChange = false;
+      closeModal();
+      toast(T('تم تغيير كلمة المرور', 'Password changed'), 'ok');
+    } catch (e) { fail(e); }
+  }
+
+  /* ======================= Settings ======================= */
+  async function pageSettings() {
+    crumbs([S.b.settings.ORGNAME, T('الإعدادات', 'Settings')]);
+    var tab = S.view.tab || 'general';
+    var tabs = [['general', 'عام', 'General'], ['sessions', 'الجلسات', 'Sessions'], ['lookups', 'القوائم المرجعية', 'Lookups']];
+    var head = apane([]) .replace('<div class="bar"></div>', '<div class="bar">' + tabs.map(function (t) {
+      return '<button class="abtn tab ' + (t[0] === tab ? 'on' : '') + '" onclick="FA.go(\'settings\',{tab:\'' + t[0] + '\'})">' + esc(T(t[1], t[2])) + '</button>';
+    }).join('') + '</div>');
+    var body = tab === 'sessions' ? await settingsSessions() : tab === 'lookups' ? await settingsLookups() : settingsGeneral();
+    $('#main').innerHTML = head + phead(T('الإدارة', 'Administration'), T('الإعدادات', 'Settings')) + '<div class="content">' + body + '</div>';
+    if (tab === 'lookups') gridRender('lookups');
+  }
+
+  function settingsGeneral() {
+    var st = S.b.settings, ro = !can('settings', 'edit');
+    var curs = ['DJF', 'USD', 'EUR', 'SAR', 'AED', 'EGP', 'KWD', 'QAR', 'BHD', 'OMR', 'JOD', 'GBP', 'ETB'];
+    return '<div class="card ftab"><div class="ftab-h"><h3>' + T('بيانات المؤسسة', 'Organization') + '</h3></div><div class="ftab-b">' +
+      '<div class="fgroup"><h5>' + T('الشعار', 'Logo') + '</h5><div class="logo-prev">' + (st.LOGO ? '<img src="' + esc(st.LOGO) + '" alt="">' : icon('image')) + '</div>' +
+      (ro ? '' : '<input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" onchange="FA.logoPicked(this)">' +
+        '<button class="btn" onclick="document.getElementById(\'logoFile\').click()">' + icon('upload') + T('رفع شعار', 'Upload logo') + '</button> ' +
+        (st.LOGO ? '<button class="btn" onclick="FA.removeLogo()">' + T('إزالة', 'Remove') + '</button>' : '')) + '</div>' +
+      '<div class="fgroup"><h5>' + T('البيانات العامة', 'General') + '</h5>' +
+      sf('ORGNAME', T('اسم المؤسسة', 'Organization name'), st.ORGNAME, ro) +
+      sf('ORGEMAIL', T('البريد الإلكتروني', 'Email'), st.ORGEMAIL, ro, 'email') +
+      '<div class="fld"><label>' + T('العملة', 'Currency') + '</label><input class="inp" data-s="CURRENCY" list="curList" dir="ltr" maxlength="3" value="' + esc(st.CURRENCY) + '" ' + (ro ? 'readonly' : '') + '>' +
+      '<datalist id="curList">' + curs.map(function (c) { return '<option value="' + c + '">'; }).join('') + '</datalist></div></div>' +
+      '<div class="fgroup"><h5>' + T('الاستيراد واليوميات', 'Import & journals') + '</h5>' +
+      '<div class="fld"><label>' + T('صيغة التاريخ في ملفات CSV المستوردة', 'Date format in imported CSV files') + '</label><select class="inp" data-s="DATEFORMAT" ' + (ro ? 'disabled' : '') + '>' +
+      '<option value="MDY" ' + (st.DATEFORMAT === 'MDY' ? 'selected' : '') + '>MM/DD/YYYY (D365 en-us)</option><option value="DMY" ' + (st.DATEFORMAT === 'DMY' ? 'selected' : '') + '>DD/MM/YYYY</option></select></div>' +
+      sf('JOURNALPREFIX', T('بادئة رقم اليومية', 'Journal number prefix'), st.JOURNALPREFIX, ro) + '</div>' +
+      '</div>' + (ro ? '' : '<div style="padding:0 14px 14px"><button class="btn pri" onclick="FA.saveSettings()">' + icon('save') + T('حفظ الإعدادات', 'Save settings') + '</button></div>') + '</div>';
+  }
+  function sf(k, label, v, ro, type) {
+    return '<div class="fld"><label>' + esc(label) + '</label><input class="inp" data-s="' + k + '" ' + (type === 'email' ? 'type="email" dir="ltr"' : '') + ' value="' + esc(v) + '" ' + (ro ? 'readonly' : '') + '></div>';
+  }
+
+  async function saveSettings() {
+    var d = {};
+    $$('[data-s]').forEach(function (el) { d[el.getAttribute('data-s')] = el.value; });
+    try {
+      S.b.settings = await api('saveSettings', S.token, d);
+      chrome();
+      toast(T('تم حفظ الإعدادات', 'Settings saved'), 'ok');
+      render();
+    } catch (e) { fail(e); }
+  }
+
+  function logoPicked(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = async function () {
+        var scale = Math.min(1, 240 / img.width, 120 / img.height);
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * scale));
+        c.height = Math.max(1, Math.round(img.height * scale));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        var url = c.toDataURL('image/png');
+        if (url.length > 45000) url = c.toDataURL('image/jpeg', 0.85);
+        try {
+          await api('saveLogo', S.token, url);
+          S.b.settings.LOGO = url;
+          chrome();
+          toast(T('تم تحديث الشعار', 'Logo updated'), 'ok');
+          render();
+        } catch (e) { fail(e); }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  async function removeLogo() {
+    try { await api('saveLogo', S.token, ''); S.b.settings.LOGO = ''; chrome(); render(); } catch (e) { fail(e); }
+  }
+
+  async function settingsSessions() {
+    var st = S.b.settings, ro = !can('settings', 'edit');
+    var list = await api('listSessions', S.token);
+    return '<div class="card ftab"><div class="ftab-h"><h3>' + T('سياسة الجلسات', 'Session policy') + '</h3></div><div class="ftab-b">' +
+      '<div class="fgroup">' + sf('SESSIONTIMEOUT', T('مدة انتهاء الجلسة عند عدم النشاط (دقائق)', 'Idle session timeout (minutes)'), st.SESSIONTIMEOUT, ro) +
+      sf('MAXSESSIONS', T('أقصى عدد جلسات متزامنة لكل مستخدم', 'Max concurrent sessions per user'), st.MAXSESSIONS, ro) + '</div></div>' +
+      (ro ? '' : '<div style="padding:0 14px 14px"><button class="btn pri" onclick="FA.saveSettings()">' + icon('save') + T('حفظ', 'Save') + '</button></div>') + '</div>' +
+      '<div class="card"><div class="ftab-h"><h3>' + T('الجلسات النشطة', 'Active sessions') + ' (' + list.length + ')</h3></div><div class="gridwrap"><table class="grid"><thead><tr><th>' +
+      T('المستخدم', 'User') + '</th><th>' + T('بدأت', 'Started') + '</th><th>' + T('آخر نشاط', 'Last activity') + '</th><th></th></tr></thead><tbody>' +
+      list.map(function (x) {
+        return '<tr><td>' + esc(x.fullName) + ' <code class="tag">' + esc(x.username) + '</code>' + (x.current ? ' <span class="badge b-info">' + T('جلستك الحالية', 'This session') + '</span>' : '') + '</td><td>' +
+          esc(new Date(x.created).toLocaleString()) + '</td><td>' + esc(new Date(x.lastSeen).toLocaleString()) + '</td><td>' +
+          (!x.current && !ro ? '<button class="btn" onclick="FA.endSession(\'' + esc(x.id) + '\')">' + icon('logout') + T('إنهاء', 'End') + '</button>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+  }
+
+  async function endSession(id) {
+    if (!(await confirmBox(T('إنهاء هذه الجلسة؟', 'End this session?')))) return;
+    try { await api('endSessionById', S.token, id); toast(T('تم إنهاء الجلسة', 'Session ended'), 'ok'); render(); } catch (e) { fail(e); }
+  }
+
+  async function settingsLookups() {
+    await load('lookups');
+    var type = S.view.ltype || 'AssetGroup';
+    var types = S.b.lookupTypes;
+    var cols = schemaCols('lookups').filter(function (c) { return c.k !== 'TYPE'; });
+    return '<div class="tabs">' + types.map(function (t) {
+      var n = (S.data.lookups || []).filter(function (r) { return r.TYPE === t.v; }).length;
+      return '<button class="' + (t.v === type ? 'on' : '') + '" onclick="FA.go(\'settings\',{tab:\'lookups\',ltype:\'' + t.v + '\'})">' + esc(L(t)) + ' (' + n + ')</button>';
+    }).join('') + '</div><div class="card">' + grid('lookups', {
+      rows: function () { return (S.data.lookups || []).filter(function (r) { return r.TYPE === type; }); },
+      key: function (r) { return keyStr('lookups', r); }, select: can('settings', 'delete'), cols: cols,
+      open: function (r) { lookupDlg(r); },
+      tools: (can('settings', 'add') ? '<button class="btn" onclick="FA.lookupDlg(null)">' + icon('plus') + T('جديد', 'New') + '</button>' : '') +
+        (can('settings', 'delete') ? '<button class="btn" onclick="FA.deleteSelected(\'lookups\',\'lookups\')">' + icon('trash') + T('حذف', 'Delete') + '</button>' : '') +
+        (can('settings', 'add') ? '<button class="btn" onclick="FA.importStart(\'lookups\',{TYPE:\'' + type + '\'})">' + icon('upload') + T('استيراد', 'Import') + '</button>' : '') +
+        '<button class="btn" onclick="FA.exportGrid(\'lookups\',\'lookups\')">' + icon('download') + T('تصدير', 'Export') + '</button>'
+    }) + '</div>';
+  }
+
+  function lookupDlg(rec) {
+    var isNew = !rec;
+    var type = S.view.ltype || 'AssetGroup';
+    rec = rec || { TYPE: type };
+    var ro = !can('settings', isNew ? 'add' : 'edit');
+    modal(L(S.b.lookupTypes.filter(function (t) { return t.v === type; })[0]), formHtml('lookups', rec, isNew, ro, { flat: true }),
+      (ro ? '' : '<button class="btn pri" onclick="FA.saveLookup()">' + icon('save') + T('حفظ', 'Save') + '</button>') + '<button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>');
+    var t = $('#modal [data-k="TYPE"]');
+    if (t) t.disabled = true;
+  }
+  async function saveLookup() {
+    var saved = await saveForm('lookups', $('#modal [data-form="lookups"]'));
+    if (saved) { closeModal(); render(); }
+  }
+
+  /* ======================= Boot ======================= */
+  async function start() {
+    S.lang = ls('fa_lang') || 'ar';
+    applyLang();
+    $('#loginForm').addEventListener('submit', doLogin);
+    $('#loginLang').addEventListener('click', function () { setLang(S.lang === 'ar' ? 'en' : 'ar'); });
+    $('#langBtn').addEventListener('click', function () { setLang(S.lang === 'ar' ? 'en' : 'ar'); });
+    $('#navToggle').addEventListener('click', function () { $('#navpane').classList.toggle('collapsed'); });
+    $('#userBtn').addEventListener('click', function (ev) { ev.stopPropagation(); $('#userMenu').classList.toggle('hidden'); });
+    document.addEventListener('click', function (ev) { if (!ev.target.closest('#userMenu')) $('#userMenu').classList.add('hidden'); });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && $('#modal .overlay') && !S.b?.user?.mustChange) closeModal(); });
+    $('#fileInput').addEventListener('change', function () { if (this.files[0]) onImportFile(this.files[0]); });
+    try { S.info = await api('getPublicInfo'); } catch (e) { S.info = {}; }
+    var tok = ls('fa_token');
+    if (tok) {
+      try { enter(await api('bootstrap', tok)); return; } catch (e) { lsSet('fa_token', ''); }
+    }
+    showLogin();
+  }
+
+  window.FA = {
+    go: go, render: render, closeModal: closeModal, toggleTab: toggleTab, fchg: fchg,
+    lkName: function (el) { updateLkName(el); },
+    gq: gq, gsort: gsort, gsel: gsel, gselAll: gselAll, gopen: gopen,
+    saveRecord: saveRecordBtn, deleteCurrent: deleteCurrent, deleteSelected: deleteSelected, reload: reload,
+    exportGrid: exportGrid, exportTemplate: exportTemplate, importStart: importStart, importRun: importRun,
+    booksFilter: booksFilter, openBook: openBook, saveBook: saveBook, deleteBook: deleteBook, exportBooks: exportBooks, newBookFor: newBookFor,
+    newJournal: newJournal, newJournalGo: newJournalGo, lineDlg: lineDlg, saveLine: saveLine, deleteLine: deleteLine, deleteLines: deleteLines,
+    deleteBatches: deleteBatches, jAction: jAction, exportRowsBatch: exportRowsBatch, exportAllJournal: exportAllJournal, assetTrans: assetTrans,
+    userDlg: userDlg, userExpand: userExpand, roleChanged: roleChanged, saveUser: saveUser, userStatus: userStatus, userDelete: userDelete,
+    resetPwDlg: resetPwDlg, resetPw: resetPw, changePasswordDlg: changePasswordDlg, changePw: changePw, logout: logout,
+    saveSettings: saveSettings, logoPicked: logoPicked, removeLogo: removeLogo, endSession: endSession,
+    lookupDlg: lookupDlg, saveLookup: saveLookup
+  };
+
+  start();
+})();
+</script>

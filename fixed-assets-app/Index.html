@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include_('Styles'); ?>
+</head>
+<body>
+  <!-- شاشة الدخول -->
+  <div id="login" class="login hidden">
+    <div class="lbar" id="loginBar">Fixed Assets</div>
+    <div class="lbody">
+      <form class="lcard" id="loginForm" autocomplete="on">
+        <img id="loginLogo" class="hidden" alt="">
+        <h2 id="loginOrg">إدارة الأصول الثابتة</h2>
+        <p class="s" data-t="تسجيل الدخول إلى حسابك|Sign in to your account">تسجيل الدخول إلى حسابك</p>
+        <div class="fld"><label for="lu" data-t="اسم المستخدم|User name">اسم المستخدم</label>
+          <input class="inp" id="lu" autocomplete="username" required dir="ltr"></div>
+        <div class="fld"><label for="lp" data-t="كلمة المرور|Password">كلمة المرور</label>
+          <input class="inp" id="lp" type="password" autocomplete="current-password" required dir="ltr"></div>
+        <button class="btn pri" id="loginBtn" type="submit" data-t="دخول|Sign in">دخول</button>
+        <div class="msg" id="loginMsg"></div>
+        <div style="margin-top:14px;text-align:center"><a id="loginLang">English</a></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- التطبيق -->
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <button class="tbtn" id="navToggle" title="Menu"></button>
+      <div class="brand"><img id="brandLogo" class="hidden" alt=""><span id="brandName"></span></div>
+      <nav class="crumbs" id="crumbs"></nav>
+      <div class="top-actions">
+        <button class="tbtn" id="langBtn" title="Language"></button>
+        <button class="tbtn" id="userBtn"></button>
+      </div>
+      <div class="menu hidden" id="userMenu"></div>
+    </header>
+    <div class="shell">
+      <aside class="navpane" id="navpane"></aside>
+      <main id="main"></main>
+    </div>
+  </div>
+
+  <div id="modal"></div>
+  <div class="toasts" id="toasts"></div>
+  <div class="busy hidden" id="busy"></div>
+  <input type="file" id="fileInput" class="hidden" accept=".xlsx,.xls,.csv">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <?!= include_('App'); ?>
+</body>
+</html>

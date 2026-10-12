@@ -10,24 +10,24 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '6.0.0';
-const SETUP_VERSION = '6';
+const APP_VERSION = '7.0.0';
+const SETUP_VERSION = '7';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
 const AUDIT = ['CREATEDBY', 'CREATEDON', 'MODIFIEDBY', 'MODIFIEDON'];
-const PERM_PAGES = ['assets', 'books', 'journal', 'transfers', 'gl', 'depreciation', 'reports', 'masterdata', 'vendors', 'users', 'settings'];
+const PERM_PAGES = ['assets', 'books', 'journal', 'transfers', 'gl', 'fiscal', 'depreciation', 'reports', 'masterdata', 'vendors', 'users', 'settings'];
 const PERM_ACTIONS = ['view', 'add', 'edit', 'delete', 'approve', 'post'];
 const USER_COLS = ['USERNAME', 'FULLNAME', 'EMAIL', 'PASSWORDHASH', 'SALT', 'ROLE', 'PERMISSIONS', 'STATUS',
   'MUSTCHANGE', 'LASTLOGIN', 'CREATEDBY', 'CREATEDON', 'MODIFIEDBY', 'MODIFIEDON'];
 const SESSION_COLS = ['SESSIONID', 'USERNAME', 'CREATEDON', 'LASTSEEN', 'ACTIVE', 'CLIENT'];
 const SETTING_DEFAULTS = {
   ORGNAME: 'الإدارة المالية', ORGEMAIL: '', CURRENCY: 'DJF', SESSIONTIMEOUT: '60',
-  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ',
+  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ', RETAINEDEARNINGSACCOUNT: '', CLOSINGJOURNALNAME: 'YE',
   DEPJOURNALNAME: 'FADEP', DEPOFFSETACCOUNT: '', DEPMONTHS: '3'
 };
 const PUBLIC_SETTINGS = ['ORGNAME', 'ORGEMAIL', 'CURRENCY', 'SESSIONTIMEOUT', 'MAXSESSIONS', 'DATEFORMAT', 'LOGO', 'JOURNALPREFIX',
-  'DEPJOURNALNAME', 'DEPOFFSETACCOUNT', 'DEPMONTHS', 'TRANSFERPREFIX', 'GLPREFIX', 'TRFJOURNALNAME'];
+  'DEPJOURNALNAME', 'DEPOFFSETACCOUNT', 'DEPMONTHS', 'TRANSFERPREFIX', 'GLPREFIX', 'TRFJOURNALNAME', 'RETAINEDEARNINGSACCOUNT', 'CLOSINGJOURNALNAME'];
 
 /* ============================== Schemas ============================== */
 
@@ -57,7 +57,9 @@ const TRANS_TYPES = [
 ];
 
 const JOURNAL_STATUS = [o('Draft', 'مسودة'), o('Approved', 'معتمد'), o('Posted', 'مُرحّل')];
-const GL_SOURCES = [o('Manual', 'يدوي', 'Manual'), o('FAJournal', 'يومية الأصول', 'Fixed asset journal'), o('Transfer', 'نقل أصول', 'Asset transfer')];
+const GL_SOURCES = [o('Manual', 'يدوي', 'Manual'), o('FAJournal', 'يومية الأصول', 'Fixed asset journal'), o('Transfer', 'نقل أصول', 'Asset transfer'),
+  o('YearEnd', 'إقفال السنة', 'Year-end closing')];
+const FISCAL_STATUS = [o('Open', 'مفتوحة', 'Open'), o('Closed', 'مقفلة', 'Closed')];
 
 const ACCOUNT_TYPES = [o('ProfitAndLoss', 'أرباح وخسائر', 'Profit and loss'), o('Revenue', 'إيرادات', 'Revenue'),
   o('Expense', 'مصروفات', 'Expense'), o('BalanceSheet', 'الميزانية العمومية', 'Balance sheet'), o('Asset', 'أصول', 'Asset'),
@@ -313,13 +315,54 @@ const SCHEMAS = {
       F('MAINACCOUNTID', 'رقم الحساب', 'Main account', 'lookup', { lk: '@accounts', req: 1, sec: 'l', grp: 'l1', list: 1, aliases: ['Account', 'MAINACCOUNT'] }),
       F('ACCOUNTNAME', 'اسم الحساب', 'Account name', 'text', { calc: 1, sec: 'l', grp: 'l1', list: 1 })
     ].concat(unitFields_('', 'l', 'l1')).concat([
-      F('DEBITAMOUNT', 'مدين', 'Debit', 'number', { dec: 3, sec: 'l', grp: 'l2', list: 1 }),
-      F('CREDITAMOUNT', 'دائن', 'Credit', 'number', { dec: 3, sec: 'l', grp: 'l2', list: 1 }),
+      F('CURRENCYCODE', 'العملة', 'Currency', 'lookup', { lk: '@currencies', sec: 'l', grp: 'l2', list: 1, aliases: ['Currency'] }),
+      F('EXCHANGERATE', 'سعر الصرف', 'Exchange rate', 'number', { dec: 6, sec: 'l', grp: 'l2', list: 1 }),
+      F('AMOUNTCURDEBIT', 'مدين (بالعملة)', 'Debit (currency)', 'number', { dec: 3, sec: 'l', grp: 'l2', list: 1 }),
+      F('AMOUNTCURCREDIT', 'دائن (بالعملة)', 'Credit (currency)', 'number', { dec: 3, sec: 'l', grp: 'l2', list: 1 }),
+      F('DEBITAMOUNT', 'مدين (محلي)', 'Debit (accounting)', 'number', { dec: 3, calc: 1, sec: 'l', grp: 'l2', list: 1 }),
+      F('CREDITAMOUNT', 'دائن (محلي)', 'Credit (accounting)', 'number', { dec: 3, calc: 1, sec: 'l', grp: 'l2', list: 1 }),
       F('NOTE', 'ملاحظة', 'Note', 'text', { sec: 'l', grp: 'l2', list: 1, aliases: ['Text', 'TEXT'] }),
       F('REFERENCE', 'المرجع', 'Reference', 'text', { sec: 'l', grp: 'l2', list: 1 }),
       F('LEDGERDIMENSIONDISPLAYVALUE', 'الحساب والأبعاد', 'Ledger account display value', 'text', { calc: 1, sec: 'l', grp: 'l1', list: 1,
         aliases: ['ACCOUNTDISPLAYVALUE'] })
     ])
+  },
+
+  currencies: {
+    sheet: 'Currencies', perm: 'masterdata', key: ['CURRENCYCODE'], title: { ar: 'العملات', en: 'Currencies' },
+    sections: [{ id: 'g', ar: 'العملة', en: 'Currency', groups: [{ id: 'g', ar: 'العملة', en: 'Currency' }] }],
+    fields: [
+      F('CURRENCYCODE', 'رمز العملة', 'Currency code', 'text', { req: 1, key: 1, sec: 'g', grp: 'g', list: 1, aliases: ['Currency', 'CODE'] }),
+      F('NAME', 'اسم العملة', 'Name', 'text', { req: 1, sec: 'g', grp: 'g', list: 1, aliases: ['Description', 'TXT'] }),
+      F('SYMBOL', 'الرمز', 'Symbol', 'text', { sec: 'g', grp: 'g', list: 1 })
+    ]
+  },
+
+  exrates: {
+    sheet: 'ExchangeRates', perm: 'masterdata', key: ['CURRENCYCODE', 'FROMDATE'], title: { ar: 'أسعار الصرف', en: 'Exchange rates' },
+    sections: [{ id: 'g', ar: 'سعر الصرف', en: 'Exchange rate', groups: [{ id: 'g', ar: 'السعر مقابل العملة المحلية', en: 'Rate against local currency' }] }],
+    fields: [
+      F('CURRENCYCODE', 'العملة', 'Currency', 'lookup', { lk: '@currencies', req: 1, key: 1, sec: 'g', grp: 'g', list: 1, aliases: ['From currency', 'FROMCURRENCY'] }),
+      F('FROMDATE', 'ساري من تاريخ', 'Start date', 'date', { req: 1, key: 1, dflt: '@today', sec: 'g', grp: 'g', list: 1, aliases: ['Start date', 'STARTDATE'] }),
+      F('RATE', 'السعر (عدد وحدات العملة المحلية لكل وحدة)', 'Rate (local units per 1)', 'number', { dec: 6, req: 1, sec: 'g', grp: 'g', list: 1,
+        aliases: ['Exchange rate', 'EXCHANGERATE'] })
+    ]
+  },
+
+  fiscal: {
+    sheet: 'FiscalYears', perm: 'fiscal', key: ['YEAR'], title: { ar: 'السنوات المالية', en: 'Fiscal years' },
+    sections: [{ id: 'g', ar: 'السنة المالية', en: 'Fiscal year', groups: [
+      { id: 'y', ar: 'الفترة', en: 'Period' }, { id: 'c', ar: 'الإقفال', en: 'Closing' }] }],
+    fields: [
+      F('YEAR', 'السنة المالية', 'Fiscal year', 'text', { req: 1, key: 1, sec: 'g', grp: 'y', list: 1 }),
+      F('STARTDATE', 'تاريخ البداية', 'Start date', 'date', { sec: 'g', grp: 'y', list: 1 }),
+      F('ENDDATE', 'تاريخ النهاية', 'End date', 'date', { sec: 'g', grp: 'y', list: 1 }),
+      F('RETAINEDEARNINGSACCOUNT', 'حساب الأرباح المحتجزة', 'Retained earnings account', 'lookup', { lk: '@accounts', sec: 'g', grp: 'c', list: 1 }),
+      F('STATUS', 'الحالة', 'Status', 'select', { opts: FISCAL_STATUS, sys: 1, sec: 'g', grp: 'c', list: 1 }),
+      F('CLOSINGVOUCHER', 'قيد الإقفال', 'Closing voucher', 'text', { sys: 1, sec: 'g', grp: 'c', list: 1 }),
+      F('CLOSEDBY', 'أقفلها', 'Closed by', 'text', { sys: 1, sec: 'g', grp: 'c', list: 1 }),
+      F('CLOSEDON', 'تاريخ الإقفال', 'Closed on', 'text', { sys: 1, sec: 'g', grp: 'c' })
+    ]
   },
 
   vendors: {
@@ -462,6 +505,7 @@ function setup() {
 
     migrateV3_(ss);
     migrateV6_();
+    migrateV7_();
 
     const def = ss.getSheetByName('Sheet1') || ss.getSheetByName('ورقة1');
     if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
@@ -582,6 +626,44 @@ function migrateV6_() {
     if (r.MAINACCOUNTID && !r.CASHFLOWCATEGORY && r.ACCOUNTLEVEL !== 'Header' && String(r.MAINACCOUNTCATEGORY).toUpperCase() === 'CASH') {
       r.CASHFLOWCATEGORY = 'Cash'; writeRow_(at, i, r);
     }
+  });
+}
+
+/** الإصدار 7: العملات، أسماء يوميات الإقفال، حساب الأرباح المحتجزة، تحويل سطور القيود القديمة للعملة المحلية. */
+function migrateV7_() {
+  const st = getSettings_();
+  const local = String(st.CURRENCY || 'DJF').toUpperCase();
+  const stamp = stamp_();
+  const ct = readTable_('Currencies');
+  const have = {};
+  ct.rows.forEach(function (r) { have[String(r.CURRENCYCODE).toUpperCase()] = 1; });
+  const names = { DJF: 'فرنك جيبوتي', USD: 'دولار أمريكي', EUR: 'يورو', SAR: 'ريال سعودي', AED: 'درهم إماراتي', EGP: 'جنيه مصري' };
+  const fresh = !ct.rows.some(function (r) { return r.CURRENCYCODE; });
+  [local].concat(fresh ? ['USD', 'EUR'] : []).forEach(function (c) {
+    if (have[c]) return;
+    have[c] = 1;
+    appendRow_(ct, { CURRENCYCODE: c, NAME: names[c] || c, SYMBOL: '', CREATEDBY: 'setup', CREATEDON: stamp });
+  });
+  const jt = readTable_('JournalNames');
+  const jn = {};
+  jt.rows.forEach(function (r) { jn[low_(r.CODE)] = 1; });
+  [['GJ', 'قيود عامة - General journal'], ['YE', 'إقفال السنة - Year-end closing']].forEach(function (x) {
+    if (!jn[low_(x[0])]) appendRow_(jt, { CODE: x[0], NAME: x[1], CREATEDBY: 'setup', CREATEDON: stamp });
+  });
+  const at = readTable_('MainAccounts');
+  const accs = {};
+  at.rows.forEach(function (r) { accs[low_(r.MAINACCOUNTID)] = r; });
+  if (accs['3100'] && !accs['310200']) {
+    appendRow_(at, { MAINACCOUNTID: '310200', NAME: 'الأرباح المحتجزة', ACCOUNTLEVEL: 'Posting', PARENTACCOUNT: '3100', MAINACCOUNTTYPE: 'Equity',
+      MAINACCOUNTCATEGORY: 'EQ', CREATEDBY: 'setup', CREATEDON: stamp });
+    accs['310200'] = 1;
+  }
+  if (!st.RETAINEDEARNINGSACCOUNT && accs['310200']) setSettings_({ RETAINEDEARNINGSACCOUNT: '310200' });
+  const gl = readTable_('GLJournalLines');
+  gl.rows.forEach(function (l, i) {
+    if (!l.LINEID || l.CURRENCYCODE) return;
+    l.CURRENCYCODE = local; l.EXCHANGERATE = 1; l.AMOUNTCURDEBIT = num_(l.DEBITAMOUNT); l.AMOUNTCURCREDIT = num_(l.CREDITAMOUNT);
+    writeRow_(gl, i, l);
   });
 }
 
@@ -771,7 +853,7 @@ function roleTemplate_(role) {
   const set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
   const data = ['assets', 'books', 'journal', 'vendors', 'masterdata'];
   if (role === 'SuperAdmin' || role === 'Admin') set(PERM_PAGES, PERM_ACTIONS);
-  else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
+  else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
   else if (role !== 'none') set(data.concat(['reports', 'transfers', 'gl']), ['view']);
   return p;
 }
@@ -986,7 +1068,11 @@ function lookups_() {
 }
 
 function refs_(s) {
-  const out = { assets: [], vendors: [], books: [], accounts: [], groups: [] };
+  const out = { assets: [], vendors: [], books: [], accounts: [], groups: [], currencies: [], rates: [] };
+  out.currencies = readTable_('Currencies').rows.filter(function (r) { return r.CURRENCYCODE; })
+    .map(function (r) { return { c: String(r.CURRENCYCODE), n: String(r.NAME || '') }; });
+  out.rates = readTable_('ExchangeRates').rows.filter(function (r) { return r.CURRENCYCODE; })
+    .map(function (r) { return { c: String(r.CURRENCYCODE), d: String(r.FROMDATE), r: num_(r.RATE) }; });
   out.accounts = readTable_('MainAccounts').rows.filter(function (r) { return r.MAINACCOUNTID; })
     .map(function (r) { return { c: String(r.MAINACCOUNTID), n: String(r.NAME || ''), p: String(r.PARENTACCOUNT || ''), h: r.ACCOUNTLEVEL === 'Header' ? 1 : 0 }; });
   out.groups = readTable_('AssetGroups').rows.filter(function (r) { return r.FIXEDASSETGROUPID; }).map(function (r) {
@@ -1106,6 +1192,17 @@ function ctx_(s, entity) {
     },
     asset: function (n) { return ctx.find('assets', n); },
     resetIndex: function (e) { delete index[e]; },
+    voucherDate: '',
+    /** سعر الصرف الساري: آخر سعر بتاريخ لا يتجاوز تاريخ الحركة. */
+    rate: function (cur, date) {
+      let best = null;
+      ctx.table('exrates').rows.forEach(function (r) {
+        if (low_(r.CURRENCYCODE) !== low_(cur) || !(num_(r.RATE) > 0)) return;
+        if (date && String(r.FROMDATE) > String(date)) return;
+        if (!best || String(r.FROMDATE) > String(best.FROMDATE)) best = r;
+      });
+      return best ? num_(best.RATE) : 0;
+    },
     dirty: {},
     touch: function (e, row) {
       const i = ctx.table(e).rows.indexOf(row);
@@ -1305,6 +1402,7 @@ const HOOKS = {
       if (st && st !== 'Draft') throw new Error('لا يمكن إضافة أسطر إلى يومية معتمدة أو مُرحّلة: ' + rec.JOURNALBATCHNUMBER);
     }
     checkLk_(ctx, rec, 'JOURNALNAME', 'JournalName');
+    checkOpenPeriod_(ctx, rec.TRANSDATE, 'سطر يومية الأصول');
     const a = ctx.asset(rec.FIXEDASSETNUMBER);
     if (!a) throw new Error('رقم الأصل غير موجود: ' + rec.FIXEDASSETNUMBER);
     rec.FIXEDASSETNUMBER = a.FIXEDASSETNUMBER;
@@ -1349,18 +1447,61 @@ HOOKS.glheaders = function (rec, ex, ctx) {
   if (ex && ex.STATUS && ex.STATUS !== 'Draft') throw new Error('لا يمكن تعديل قيد معتمد أو مُرحّل');
   if (!rec.VOUCHER) rec.VOUCHER = '@pending'; // الرقم يُعطى عند الكتابة فقط حتى لا تضيع أرقام عند فشل الحفظ
   checkLk_(ctx, rec, 'JOURNALNAME', 'JournalName');
+  checkOpenPeriod_(ctx, rec.TRANSDATE, 'القيد');
+  ctx.voucherDate = rec.TRANSDATE;
   if (!rec.STATUS) rec.STATUS = 'Draft';
+};
+
+HOOKS.currencies = function (rec) {
+  rec.CURRENCYCODE = String(rec.CURRENCYCODE).toUpperCase();
+  if (!/^[A-Z]{3}$/.test(rec.CURRENCYCODE)) throw new Error('رمز العملة يجب أن يكون 3 أحرف إنجليزية (مثل USD)');
+};
+
+HOOKS.exrates = function (rec, ex, ctx) {
+  const c = ctx.find('currencies', rec.CURRENCYCODE);
+  if (!c) throw new Error('العملة غير معرّفة: ' + rec.CURRENCYCODE);
+  rec.CURRENCYCODE = c.CURRENCYCODE;
+  if (c.CURRENCYCODE === String(getSettings_().CURRENCY).toUpperCase()) throw new Error('لا يلزم سعر صرف للعملة المحلية');
+  if (!(num_(rec.RATE) > 0)) throw new Error('سعر الصرف يجب أن يكون أكبر من صفر');
+};
+
+HOOKS.fiscal = function (rec, ex, ctx) {
+  if (ex && ex.STATUS === 'Closed') throw new Error('لا يمكن تعديل سنة مقفلة — أعد فتحها أولاً');
+  if (/^\d{4}$/.test(rec.YEAR)) {
+    if (!rec.STARTDATE) rec.STARTDATE = rec.YEAR + '-01-01';
+    if (!rec.ENDDATE) rec.ENDDATE = rec.YEAR + '-12-31';
+  }
+  if (!rec.STARTDATE || !rec.ENDDATE) throw new Error('حدد تاريخ البداية والنهاية');
+  if (rec.STARTDATE >= rec.ENDDATE) throw new Error('تاريخ البداية يجب أن يسبق تاريخ النهاية');
+  const clash = ctx.table('fiscal').rows.filter(function (r) {
+    return r.YEAR && low_(r.YEAR) !== low_(rec.YEAR) && !(String(rec.ENDDATE) < String(r.STARTDATE) || String(rec.STARTDATE) > String(r.ENDDATE));
+  })[0];
+  if (clash) throw new Error('الفترة تتداخل مع السنة المالية ' + clash.YEAR);
+  if (rec.RETAINEDEARNINGSACCOUNT) rec.RETAINEDEARNINGSACCOUNT = postingAccount_(ctx, rec.RETAINEDEARNINGSACCOUNT, 'حساب الأرباح المحتجزة');
+  if (!rec.STATUS) rec.STATUS = 'Open';
 };
 
 HOOKS.gllines = function (rec, ex, ctx) {
   rec.MAINACCOUNTID = postingAccount_(ctx, rec.MAINACCOUNTID, 'سطر ' + (rec.LINENUM || '') + ' — رقم الحساب');
   rec.ACCOUNTNAME = (ctx.find('accounts', rec.MAINACCOUNTID) || {}).NAME || '';
   deriveChain_(ctx, rec, UNIT_CHAIN);
-  const d = num_(rec.DEBITAMOUNT), c = num_(rec.CREDITAMOUNT);
+  const local = String(getSettings_().CURRENCY || '').toUpperCase();
+  rec.CURRENCYCODE = String(rec.CURRENCYCODE || local).toUpperCase();
+  // سطور قديمة/تلقائية بدون مبالغ بالعملة: المبلغ المحاسبي هو المبلغ بالعملة المحلية
+  if (rec.AMOUNTCURDEBIT === '' && rec.AMOUNTCURCREDIT === '') { rec.AMOUNTCURDEBIT = rec.DEBITAMOUNT; rec.AMOUNTCURCREDIT = rec.CREDITAMOUNT; }
+  const d = num_(rec.AMOUNTCURDEBIT), c = num_(rec.AMOUNTCURCREDIT);
   if (d < 0 || c < 0) throw new Error('سطر ' + rec.LINENUM + ': المبالغ لا يمكن أن تكون سالبة');
   if (d > 0 && c > 0) throw new Error('سطر ' + rec.LINENUM + ': أدخل مديناً أو دائناً فقط');
   if (!d && !c) throw new Error('سطر ' + rec.LINENUM + ': أدخل مبلغاً');
-  rec.DEBITAMOUNT = d; rec.CREDITAMOUNT = c;
+  let rate = 1;
+  if (rec.CURRENCYCODE !== local) {
+    if (!ctx.find('currencies', rec.CURRENCYCODE)) throw new Error('سطر ' + rec.LINENUM + ': العملة غير معرّفة ' + rec.CURRENCYCODE);
+    rate = num_(rec.EXCHANGERATE) || ctx.rate(rec.CURRENCYCODE, ctx.voucherDate);
+    if (!(rate > 0)) throw new Error('سطر ' + rec.LINENUM + ': لا يوجد سعر صرف للعملة ' + rec.CURRENCYCODE + ' بتاريخ ' + (ctx.voucherDate || '') + ' — أضفه من صفحة أسعار الصرف');
+  }
+  rec.EXCHANGERATE = rate;
+  rec.AMOUNTCURDEBIT = d; rec.AMOUNTCURCREDIT = c;
+  rec.DEBITAMOUNT = round_(d * rate, 3); rec.CREDITAMOUNT = round_(c * rate, 3);
   rec.LEDGERDIMENSIONDISPLAYVALUE = dimJoin_([rec.MAINACCOUNTID, rec.OPERATINGUNIT, rec.SUB1_OPERATINGUNIT, rec.SUB2_OPERATINGUNIT]);
 };
 
@@ -1372,6 +1513,7 @@ HOOKS.transfers = function (rec, ex, ctx) {
     const st = ctx.docStatus('transfers', 'TRANSFERNUMBER', rec.TRANSFERNUMBER);
     if (st && st !== 'Draft') throw new Error('لا يمكن إضافة أسطر إلى مستند نقل معتمد أو مُرحّل: ' + rec.TRANSFERNUMBER);
   }
+  checkOpenPeriod_(ctx, rec.TRANSFERDATE, 'النقل');
   const a = ctx.asset(rec.FIXEDASSETNUMBER);
   if (!a) throw new Error('رقم الأصل غير موجود: ' + rec.FIXEDASSETNUMBER);
   rec.FIXEDASSETNUMBER = a.FIXEDASSETNUMBER;
@@ -1644,6 +1786,7 @@ function journalAction(token, batch, action) {
     } else if (action === 'post') {
       if (lines.some(function (l) { return l.STATUS === 'Posted'; })) throw new Error('اليومية مُرحّلة مسبقاً');
       if (lines.some(function (l) { return l.STATUS !== 'Approved'; })) throw new Error('يجب اعتماد اليومية قبل الترحيل');
+      lines.forEach(function (l) { checkOpenPeriod_(ctx, l.TRANSDATE, 'سطر يومية الأصول'); });
       const legs = [];
       lines.forEach(function (l) { faLegs_(ctx, l).forEach(function (x) { legs.push(x); }); });
       const v = autoVoucher_(ctx, { TRANSDATE: lines[0].TRANSDATE, JOURNALNAME: lines[0].JOURNALNAME, DESCRIPTION: 'قيد يومية الأصول ' + batch,
@@ -1791,6 +1934,7 @@ function transferAction(token, number, action) {
     } else if (action === 'post') {
       if (lines.some(function (l) { return l.STATUS === 'Posted'; })) throw new Error('المستند مُرحّل مسبقاً');
       if (lines.some(function (l) { return l.STATUS !== 'Approved'; })) throw new Error('يجب اعتماد المستند قبل الترحيل');
+      lines.forEach(function (l) { checkOpenPeriod_(ctx, l.TRANSFERDATE, 'النقل'); });
       const at = ctx.table('assets');
       lines.forEach(function (l) {
         const a = ctx.asset(l.FIXEDASSETNUMBER);
@@ -1875,7 +2019,9 @@ function prepareVoucher_(ctx, head, legs, mode) {
   const lines = legs.map(function (x, i) {
     return prepare_('gllines', {
       VOUCHER: ph.rec.VOUCHER, LINENUM: i + 1, MAINACCOUNTID: x.acc, OPERATINGUNIT: x.ou || '', SUB1_OPERATINGUNIT: x.s1 || '',
-      SUB2_OPERATINGUNIT: x.s2 || '', DEBITAMOUNT: x.debit || 0, CREDITAMOUNT: x.credit || 0, NOTE: x.note || '', REFERENCE: x.ref || ''
+      SUB2_OPERATINGUNIT: x.s2 || '', CURRENCYCODE: x.cur || '', EXCHANGERATE: x.rate || '',
+      AMOUNTCURDEBIT: x.curDebit !== undefined ? x.curDebit : (x.debit || 0), AMOUNTCURCREDIT: x.curCredit !== undefined ? x.curCredit : (x.credit || 0),
+      DEBITAMOUNT: '', CREDITAMOUNT: '', NOTE: x.note || '', REFERENCE: x.ref || ''
     }, 'add', ctx);
   });
   let dr = 0, cr = 0;
@@ -1928,10 +2074,10 @@ function saveGLVoucher(token, head, lines, isNew) {
       if (ex.SOURCE && ex.SOURCE !== 'Manual') throw new Error('هذا قيد تلقائي ولا يمكن تعديله');
     }
     const legs = (lines || []).filter(function (x) {
-      return x && (x.MAINACCOUNTID || num_(x.DEBITAMOUNT) || num_(x.CREDITAMOUNT));
+      return x && (x.MAINACCOUNTID || num_(x.AMOUNTCURDEBIT) || num_(x.AMOUNTCURCREDIT));
     }).map(function (x) {
-      return { acc: x.MAINACCOUNTID, s2: x.SUB2_OPERATINGUNIT, s1: x.SUB1_OPERATINGUNIT, ou: x.OPERATINGUNIT,
-        debit: toNum_(x.DEBITAMOUNT, { ar: 'مدين' }) || 0, credit: toNum_(x.CREDITAMOUNT, { ar: 'دائن' }) || 0, note: x.NOTE, ref: x.REFERENCE };
+      return { acc: x.MAINACCOUNTID, s2: x.SUB2_OPERATINGUNIT, s1: x.SUB1_OPERATINGUNIT, ou: x.OPERATINGUNIT, cur: x.CURRENCYCODE, rate: toNum_(x.EXCHANGERATE, { ar: 'سعر الصرف' }),
+        curDebit: toNum_(x.AMOUNTCURDEBIT, { ar: 'مدين' }) || 0, curCredit: toNum_(x.AMOUNTCURCREDIT, { ar: 'دائن' }) || 0, note: x.NOTE, ref: x.REFERENCE };
     });
     // التحقق أولاً (كل الأخطاء قبل أي كتابة)
     const gl = ctx.table('gllines');
@@ -1980,11 +2126,140 @@ function glAction(token, voucher, action) {
       h.STATUS = 'Draft'; h.APPROVEDBY = '';
     } else if (action === 'post') {
       if (h.STATUS !== 'Approved') throw new Error('يجب اعتماد القيد قبل الترحيل');
+      checkOpenPeriod_(ctx, h.TRANSDATE, 'القيد');
       h.STATUS = 'Posted'; h.POSTEDBY = s.username; h.POSTEDON = now;
     } else {
       throw new Error('إجراء غير معروف');
     }
     writeRow_(ht, hi, h);
+    return true;
+  });
+}
+
+/* ============================== Fiscal years & closing ============================== */
+
+/** يمنع أي حركة بتاريخ داخل سنة مالية مقفلة. */
+function checkOpenPeriod_(ctx, date, what) {
+  if (!date) return;
+  const y = ctx.table('fiscal').rows.filter(function (r) {
+    return r.YEAR && r.STATUS === 'Closed' && String(date) >= String(r.STARTDATE) && String(date) <= String(r.ENDDATE);
+  })[0];
+  if (y) throw new Error('لا يمكن حفظ أو ترحيل ' + (what || 'الحركة') + ' بتاريخ ' + date + ' لأن السنة المالية ' + y.YEAR + ' مقفلة');
+}
+
+/** ملخص قبل الإقفال: الإيرادات والمصروفات وصافي الربح + المستندات غير المُرحّلة. */
+function fiscalSummary_(ctx, y) {
+  const inYear = function (d) { return String(d) >= String(y.STARTDATE) && String(d) <= String(y.ENDDATE); };
+  const heads = {};
+  ctx.table('glheaders').rows.forEach(function (h) { if (h.VOUCHER) heads[low_(h.VOUCHER)] = h; });
+  const accs = {};
+  ctx.table('accounts').rows.forEach(function (a) { accs[low_(a.MAINACCOUNTID)] = a; });
+  const groups = {};
+  let revenue = 0, expense = 0, other = 0;
+  ctx.table('gllines').rows.forEach(function (l) {
+    const h = heads[low_(l.VOUCHER)];
+    if (!h || h.STATUS !== 'Posted' || h.SOURCE === 'YearEnd' || !inYear(h.TRANSDATE)) return;
+    const a = accs[low_(l.MAINACCOUNTID)];
+    const t = a ? a.MAINACCOUNTTYPE : '';
+    if (t !== 'Revenue' && t !== 'Expense' && t !== 'ProfitAndLoss') return;
+    const net = num_(l.DEBITAMOUNT) - num_(l.CREDITAMOUNT);
+    if (t === 'Revenue') revenue -= net; else if (t === 'Expense') expense += net; else other -= net;
+    const k = [low_(l.MAINACCOUNTID), l.OPERATINGUNIT || '', l.SUB1_OPERATINGUNIT || '', l.SUB2_OPERATINGUNIT || ''].join('|');
+    const g = groups[k] = groups[k] || { acc: l.MAINACCOUNTID, ou: l.OPERATINGUNIT || '', s1: l.SUB1_OPERATINGUNIT || '', s2: l.SUB2_OPERATINGUNIT || '', net: 0 };
+    g.net += net;
+  });
+  const pending = {
+    vouchers: ctx.table('glheaders').rows.filter(function (h) { return h.VOUCHER && h.STATUS !== 'Posted' && inYear(h.TRANSDATE); }).length,
+    faLines: ctx.table('journal').rows.filter(function (j) { return j.LINEID && j.STATUS !== 'Posted' && inYear(j.TRANSDATE); }).length,
+    transfers: ctx.table('transfers').rows.filter(function (j) { return j.LINEID && j.STATUS !== 'Posted' && inYear(j.TRANSFERDATE); }).length
+  };
+  return { revenue: round_(revenue, 3), expense: round_(expense, 3), other: round_(other, 3), net: round_(revenue - expense + other, 3),
+    groups: Object.keys(groups).map(function (k) { return groups[k]; }).filter(function (g) { return Math.abs(g.net) >= 0.0005; }), pending: pending };
+}
+
+function fiscalPreview(token, year) {
+  const s = auth_(token);
+  need_(s, 'fiscal', 'view');
+  const ctx = ctx_(s);
+  const y = ctx.find('fiscal', year);
+  if (!y) throw new Error('السنة المالية غير موجودة');
+  const sum = fiscalSummary_(ctx, y);
+  return { year: y.YEAR, start: y.STARTDATE, end: y.ENDDATE, status: y.STATUS, revenue: sum.revenue, expense: sum.expense, other: sum.other, net: sum.net,
+    lines: sum.groups.length, pending: sum.pending, account: y.RETAINEDEARNINGSACCOUNT || getSettings_().RETAINEDEARNINGSACCOUNT || '' };
+}
+
+/** إقفال السنة: ترحيل أرصدة الإيرادات والمصروفات (لكل وحدة) إلى حساب الأرباح المحتجزة ثم قفل الفترة. */
+function fiscalClose(token, year, reAccount) {
+  const s = auth_(token);
+  need_(s, 'fiscal', 'post');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    const t = ctx.table('fiscal');
+    const y = ctx.find('fiscal', year);
+    if (!y) throw new Error('السنة المالية غير موجودة');
+    if (y.STATUS === 'Closed') throw new Error('السنة مقفلة مسبقاً');
+    const earlier = t.rows.filter(function (r) { return r.YEAR && r.STATUS !== 'Closed' && String(r.ENDDATE) < String(y.STARTDATE); })[0];
+    if (earlier) throw new Error('أقفل السنة السابقة ' + earlier.YEAR + ' أولاً');
+    const sum = fiscalSummary_(ctx, y);
+    const p = sum.pending;
+    if (p.vouchers || p.faLines || p.transfers) {
+      throw new Error('توجد مستندات غير مُرحّلة في السنة: ' + p.vouchers + ' قيد، ' + p.faLines + ' سطر يومية أصول، ' + p.transfers + ' سطر نقل — رحّلها أو احذفها قبل الإقفال');
+    }
+    const re = postingAccount_(ctx, reAccount || y.RETAINEDEARNINGSACCOUNT || getSettings_().RETAINEDEARNINGSACCOUNT, 'حساب الأرباح المحتجزة');
+    if (!re) throw new Error('حدد حساب الأرباح المحتجزة');
+    const reAcc = ctx.find('accounts', re);
+    if (reAcc.MAINACCOUNTTYPE !== 'Equity') throw new Error('حساب الأرباح المحتجزة يجب أن يكون من نوع حقوق ملكية');
+    let v = null;
+    if (sum.groups.length) {
+      const legs = [], perUnit = {};
+      sum.groups.forEach(function (g) {
+        legs.push({ acc: g.acc, ou: g.ou, s1: g.s1, s2: g.s2, debit: g.net < 0 ? round_(-g.net, 3) : 0, credit: g.net > 0 ? round_(g.net, 3) : 0,
+          note: 'إقفال ' + g.acc + ' — سنة ' + y.YEAR });
+        const k = [g.ou, g.s1, g.s2].join('|');
+        const u = perUnit[k] = perUnit[k] || { ou: g.ou, s1: g.s1, s2: g.s2, net: 0 };
+        u.net += g.net;
+      });
+      Object.keys(perUnit).forEach(function (k) {
+        const u = perUnit[k], n = round_(u.net, 3);
+        if (!n) return;
+        legs.push({ acc: re, ou: u.ou, s1: u.s1, s2: u.s2, debit: n > 0 ? n : 0, credit: n < 0 ? -n : 0,
+          note: (n < 0 ? 'صافي ربح' : 'صافي خسارة') + ' سنة ' + y.YEAR });
+      });
+      v = autoVoucher_(ctx, { TRANSDATE: y.ENDDATE, JOURNALNAME: getSettings_().CLOSINGJOURNALNAME || 'YE',
+        DESCRIPTION: 'قيد إقفال السنة المالية ' + y.YEAR, REFERENCE: 'FY' + y.YEAR, SOURCE: 'YearEnd', SOURCEREF: y.YEAR }, legs);
+      writeVoucher_(ctx, v);
+    }
+    y.STATUS = 'Closed';
+    y.RETAINEDEARNINGSACCOUNT = re;
+    y.CLOSINGVOUCHER = v ? v.head.rec.VOUCHER : '';
+    y.CLOSEDBY = s.username; y.CLOSEDON = stamp_();
+    writeRow_(t, t.rows.indexOf(y), y);
+    return { year: y.YEAR, voucher: y.CLOSINGVOUCHER, net: sum.net };
+  });
+}
+
+/** إعادة فتح سنة مقفلة: حذف قيد الإقفال وفتح الفترة. */
+function fiscalReopen(token, year) {
+  const s = auth_(token);
+  need_(s, 'fiscal', 'post');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    const t = ctx.table('fiscal');
+    const y = ctx.find('fiscal', year);
+    if (!y) throw new Error('السنة المالية غير موجودة');
+    if (y.STATUS !== 'Closed') throw new Error('السنة ليست مقفلة');
+    const later = t.rows.filter(function (r) { return r.YEAR && r.STATUS === 'Closed' && String(r.STARTDATE) > String(y.ENDDATE); })[0];
+    if (later) throw new Error('أعد فتح السنة اللاحقة ' + later.YEAR + ' أولاً');
+    if (y.CLOSINGVOUCHER) {
+      const gl = ctx.table('gllines'), ht = ctx.table('glheaders');
+      const idx = [];
+      gl.rows.forEach(function (r, i) { if (low_(r.VOUCHER) === low_(y.CLOSINGVOUCHER)) idx.push(i); });
+      deleteRows_(gl, idx);
+      const hi = ht.rows.findIndex(function (h) { return low_(h.VOUCHER) === low_(y.CLOSINGVOUCHER); });
+      if (hi >= 0) deleteRows_(ht, [hi]);
+    }
+    y.STATUS = 'Open'; y.CLOSINGVOUCHER = ''; y.CLOSEDBY = ''; y.CLOSEDON = '';
+    writeRow_(t, t.rows.indexOf(y), y);
     return true;
   });
 }
@@ -2147,7 +2422,8 @@ function ledgerData(token) {
     // [تاريخ، قيد، يومية، بيان، حساب، وحدة رئيسية، فرعية1، فرعية2، مدين، دائن، ملاحظة، مرجع، مصدر، سطر]
     lines.push([String(h.TRANSDATE), String(h.VOUCHER), String(h.JOURNALNAME || ''), String(h.DESCRIPTION || ''), String(l.MAINACCOUNTID),
       String(l.OPERATINGUNIT || ''), String(l.SUB1_OPERATINGUNIT || ''), String(l.SUB2_OPERATINGUNIT || ''), num_(l.DEBITAMOUNT), num_(l.CREDITAMOUNT),
-      String(l.NOTE || ''), String(l.REFERENCE || h.REFERENCE || ''), String(h.SOURCE || ''), num_(l.LINENUM)]);
+      String(l.NOTE || ''), String(l.REFERENCE || h.REFERENCE || ''), String(h.SOURCE || ''), num_(l.LINENUM),
+      String(l.CURRENCYCODE || ''), num_(l.AMOUNTCURDEBIT), num_(l.AMOUNTCURCREDIT)]);
   });
   const accounts = readTable_('MainAccounts').rows.filter(function (a) { return a.MAINACCOUNTID; }).map(function (a) {
     return { c: String(a.MAINACCOUNTID), n: String(a.NAME || ''), h: a.ACCOUNTLEVEL === 'Header' ? 1 : 0, p: String(a.PARENTACCOUNT || ''),
@@ -2342,6 +2618,7 @@ function saveSettings(token, data) {
     out.MAXSESSIONS = n;
   }
   if ('DATEFORMAT' in data) out.DATEFORMAT = data.DATEFORMAT === 'DMY' ? 'DMY' : 'MDY';
+  if ('RETAINEDEARNINGSACCOUNT' in data) out.RETAINEDEARNINGSACCOUNT = String(data.RETAINEDEARNINGSACCOUNT).trim().slice(0, 40);
   if ('DEPJOURNALNAME' in data) out.DEPJOURNALNAME = String(data.DEPJOURNALNAME).trim().slice(0, 20);
   if ('DEPOFFSETACCOUNT' in data) out.DEPOFFSETACCOUNT = String(data.DEPOFFSETACCOUNT).trim().slice(0, 40);
   if ('DEPMONTHS' in data) {

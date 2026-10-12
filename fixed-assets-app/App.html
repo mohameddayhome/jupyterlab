@@ -171,6 +171,7 @@
     else if (key === '@accounts') l = r.accounts.filter(function (x) { return !x.h; });
     else if (key === '@accountHeaders') l = r.accounts.filter(function (x) { return x.h; });
     else if (key === '@allAccounts') l = r.accounts;
+    else if (key === '@currencies') l = r.currencies || [];
     else if (key === '@books') {
       l = r.books.filter(function (b) { return all || !rec.FIXEDASSETNUMBER || low(b.a) === low(rec.FIXEDASSETNUMBER); });
     } else {
@@ -667,6 +668,8 @@
     { h: 1, ar: 'المحاسبة', en: 'Accounting' },
     { id: 'gl', icon: 'book', ar: 'القيود المحاسبية', en: 'Journal entries', perm: 'gl' },
     { id: 'finreports', icon: 'chart', ar: 'التقارير المالية', en: 'Financial reports', perm: 'reports' },
+    { id: 'currency', icon: 'globe', ar: 'العملات وأسعار الصرف', en: 'Currencies & rates', perm: 'masterdata' },
+    { id: 'fiscal', icon: 'lock', ar: 'السنوات المالية والإقفال', en: 'Fiscal years & closing', perm: 'fiscal' },
     { h: 1, ar: 'البيانات الأساسية', en: 'Master data' },
     { id: 'units', icon: 'tree', ar: 'الوحدات التشغيلية', en: 'Operating units', perm: 'masterdata' },
     { id: 'locations', icon: 'pin', ar: 'المواقع والمسؤولون', en: 'Locations & responsibility', perm: 'masterdata' },
@@ -730,6 +733,8 @@
         case 'barcodes': return await pageBarcodes();
         case 'transactions': return await pageTransactions();
         case 'finreports': return await pageFin();
+        case 'fiscal': return await pageFiscal();
+        case 'currency': return await pageCurrency();
         case 'gl': return await (S.view.voucher ? pageGLVoucher() : pageGL());
         case 'reports': return await pageReports();
         default: return await pageDashboard();
@@ -942,9 +947,11 @@
   /* ======================= Books (list pane + details) ======================= */
   async function pageBooks() {
     var s = sch('books');
-    var rows = await load('books');
     var v = S.view;
-    if (v.asset) S.booksFilter = v.asset;
+    if (v.key === undefined && !v.isNew && !v.asset) return pageBooksList();
+    await load('books');
+    S.booksFilter = '';
+    S.bookAsset = v.asset || (v.preset && v.preset.FIXEDASSETNUMBER) || (v.key !== undefined ? (findRec('books', v.key) || {}).FIXEDASSETNUMBER : '') || '';
     var isNew = !!v.isNew;
     var rec = isNew ? Object.assign({}, v.preset || {}) : (v.key !== undefined ? findRec('books', v.key) : null);
     if (!isNew && !rec) {
@@ -958,7 +965,8 @@
     S.curBook = rec && !isNew ? keyStr('books', rec) : '';
     var title = isNew ? T('دفتر جديد', 'New book') : rec ? esc(rec.FIXEDASSETNUMBER) + ' : ' + esc(rec.BOOKID) : esc(L(s.title));
     $('#main').innerHTML = apane([
-      can('books', 'add') && { icon: 'plus', ar: 'جديد', en: 'New', on: "FA.go('books',{isNew:true})" },
+      { icon: 'back', ar: 'كل الدفاتر', en: 'All books', on: "FA.go('books')", cls: 'back' },
+      can('books', 'add') && { icon: 'plus', ar: 'دفتر جديد لهذا الأصل', en: 'New book for this asset', on: S.bookAsset ? "FA.newBookFor(" + jsArg(S.bookAsset) + ")" : "FA.go('books',{isNew:true})" },
       rec && !ro && { icon: 'save', ar: 'حفظ', en: 'Save', on: 'FA.saveBook()' },
       rec && !isNew && can('books', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: 'FA.deleteBook()', cls: 'danger' },
       '|',
@@ -969,15 +977,17 @@
       rec && !isNew && can('assets') && '|',
       rec && !isNew && can('assets') && { icon: 'box', ar: 'الأصل الثابت', en: 'Fixed asset', on: "FA.go('assets',{key:" + jsArg(low(rec.FIXEDASSETNUMBER)) + "})" }
     ]) + phead('<a onclick="FA.go(\'books\')">' + esc(L(s.title)) + '</a>' + (rec && !isNew ? ' | ' + esc(rec.FIXEDASSETNUMBER) + ' : ' + esc(assetName) : '') + ' | ' + T('عرضي', 'My view'), title) +
-      '<div class="content"><div class="split"><div class="lpane"><div class="f"><div class="search">' + icon('search') +
+      '<div class="content"><div class="split"><div class="lpane">' + (S.bookAsset ? '<div class="lp-h"><b dir="ltr">' + esc(S.bookAsset) + '</b><span>' + esc(lookupName('@assets', S.bookAsset)) + '</span></div>' : '') + '<div class="f"><div class="search">' + icon('search') +
       '<input class="inp" placeholder="' + T('تصفية', 'Filter') + '" value="' + esc(S.booksFilter || '') + '" oninput="FA.booksFilter(this.value)"></div></div><div class="items" id="bookItems"></div></div>' +
       '<div class="grow">' + (rec ? formHtml('books', rec, isNew, ro) : '<div class="card"><div class="empty">' + icon('folder') + T('لا توجد دفاتر بعد', 'No books yet') + '</div></div>') + '</div></div></div>';
     drawBookItems();
   }
 
   function filteredBooks() {
-    var q = low(S.booksFilter);
+    var q = low(S.booksFilter), a = low(S.bookAsset);
+    if (!a) return [];
     return (S.data.books || []).filter(function (r) {
+      if (a && low(r.FIXEDASSETNUMBER) !== a) return false; // دفاتر الأصل المرتبط فقط
       return !q || low(r.FIXEDASSETNUMBER).indexOf(q) >= 0 || low(r.BOOKID).indexOf(q) >= 0 || low(lookupName('@assets', r.FIXEDASSETNUMBER)).indexOf(q) >= 0;
     }).sort(function (a, b) { return String(a.FIXEDASSETNUMBER).localeCompare(String(b.FIXEDASSETNUMBER), undefined, { numeric: true }); });
   }
@@ -1535,7 +1545,7 @@
       return '<button class="abtn tab ' + (r[0] === tab ? 'on' : '') + '" onclick="FA.go(\'reports\',{tab:\'' + r[0] + '\'})">' + esc(T(r[1], r[2])) + '</button>';
     }).join('') + '<span class="sep"></span><button class="abtn" onclick="FA.repRefresh()">' + icon('refresh') + T('تحديث', 'Refresh') + '</button>' +
       '<button class="abtn" onclick="FA.repExport()">' + icon('download') + T('تصدير إلى Excel', 'Export to Excel') + '</button>' +
-      '<button class="abtn" onclick="window.print()">' + icon('list') + T('طباعة', 'Print') + '</button></div>');
+      '<button class="abtn" onclick="FA.printDoc(null, \'landscape\')">' + icon('list') + T('طباعة', 'Print') + '</button></div>');
     var title = REPORTS.filter(function (r) { return r[0] === tab; })[0];
     var sel = function (k, list) {
       return '<select class="inp" style="width:auto" onchange="FA.repFilter(\'' + k + '\', this.value)">' + list.map(function (x) {
@@ -1886,7 +1896,7 @@
       '</tbody></table><div class="signs">' + [T('المُسلِّم', 'Handed over by'), T('المُستلِم', 'Received by'), T('أمين العهدة', 'Custodian'), T('المعتمد', 'Approved by')].map(function (x) {
         return '<div><b>' + esc(x) + '</b><span>' + T('الاسم:', 'Name:') + '</span><span>' + T('التوقيع:', 'Signature:') + '</span></div>';
       }).join('') + '</div></div>';
-    printHtml(html, 'size: A4 portrait; margin: 12mm;');
+    printDoc(html, 'portrait');
   }
 
   /* ======================= Barcode labels ======================= */
@@ -2064,7 +2074,7 @@
     $('#main').innerHTML = apane([
       { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('journal')" },
       { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: 'FA.trxExport()' },
-      { icon: 'list', ar: 'طباعة', en: 'Print', on: 'window.print()' }
+      { icon: 'list', ar: 'طباعة', en: 'Print', on: "FA.printDoc(null, 'landscape')" }
     ]) + '<div class="print-head"><b>' + esc(S.b.settings.ORGNAME) + '</b> — ' + T('حركات الأصول الثابتة', 'Fixed asset transactions') + ' — ' + today() + '</div>' +
       phead(T('الأصول الثابتة', 'Fixed assets'), T('حركات الأصول الثابتة', 'Fixed asset transactions')) +
       '<div class="content"><div class="card">' + grid('trx', {
@@ -2133,7 +2143,7 @@
       '<div class="signs">' + [T('أعدّه', 'Prepared by'), T('راجعه', 'Reviewed by'), T('المدير المالي', 'Finance manager'), T('المعتمد', 'Approved by')].map(function (x) {
         return '<div><b>' + esc(x) + '</b><span>' + T('الاسم:', 'Name:') + '</span><span>' + T('التوقيع:', 'Signature:') + '</span></div>';
       }).join('') + '</div></div>';
-    printHtml(html, 'size: A4 portrait; margin: 12mm;');
+    printDoc(html, 'portrait');
   }
 
   function faPrintEntry() {
@@ -2195,11 +2205,16 @@
     var head = isNew ? { TRANSDATE: today(), JOURNALNAME: ((S.b.lookups.JournalName || [])[0] || {}).c || '', SOURCE: 'Manual', STATUS: 'Draft' }
       : (S.data.glheaders || []).filter(function (h) { return h.VOUCHER === v; })[0];
     if (!head) { go('gl'); return; }
-    var lines = isNew ? [{}, {}] : (S.data.gllines || []).filter(function (l) { return l.VOUCHER === v; })
+    var lines = isNew ? [{ CURRENCYCODE: localCur(), EXCHANGERATE: 1 }, { CURRENCYCODE: localCur(), EXCHANGERATE: 1 }] : (S.data.gllines || []).filter(function (l) { return l.VOUCHER === v; })
       .sort(function (a, b) { return (Number(a.LINENUM) || 0) - (Number(b.LINENUM) || 0); });
     var manual = !head.SOURCE || head.SOURCE === 'Manual';
     var editable = head.STATUS === 'Draft' && manual && can('gl', isNew ? 'add' : 'edit');
-    S.glLines = lines.map(function (l) { return Object.assign({}, l); });
+    S.glLines = lines.map(function (l) {
+      var x = Object.assign({}, l);
+      if (!x.CURRENCYCODE) { x.CURRENCYCODE = localCur(); x.EXCHANGERATE = 1; }
+      if ((x.AMOUNTCURDEBIT === undefined || x.AMOUNTCURDEBIT === '') && (x.AMOUNTCURCREDIT === undefined || x.AMOUNTCURCREDIT === '')) { x.AMOUNTCURDEBIT = x.DEBITAMOUNT; x.AMOUNTCURCREDIT = x.CREDITAMOUNT; }
+      return x;
+    });
     crumbs([S.b.settings.ORGNAME, L(s.title), isNew ? T('جديد', 'New') : v]);
     $('#main').innerHTML = apane([
       { icon: 'back', ar: 'رجوع', en: 'Back', on: "FA.go('gl')", cls: 'back' },
@@ -2214,64 +2229,119 @@
       !isNew && manual && head.STATUS === 'Draft' && can('gl', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: "FA.glAct('delete')", cls: 'danger' }
     ]) + phead('<a onclick="FA.go(\'gl\')">' + esc(L(s.title)) + '</a>' + (!manual ? ' | ' + esc(displayVal(fld('glheaders', 'SOURCE'), head.SOURCE)) + ' ' + esc(head.SOURCEREF || '') : ''),
       (isNew ? T('قيد جديد', 'New voucher') : esc(v)) + ' ' + badge('journal', head.STATUS)) +
-      '<div class="content">' + formHtml('glheaders', head, isNew, !editable, { hide: isNew ? ['VOUCHER', 'SOURCE', 'SOURCEREF', 'TOTALDEBIT', 'TOTALCREDIT', 'STATUS', 'APPROVEDBY', 'POSTEDBY', 'POSTEDON'] : [] }) +
-      '<div class="card"><div class="ftab-h" style="cursor:default"><h3>' + T('تفاصيل القيد', 'Voucher lines') + '</h3></div><div class="gridwrap" style="max-height:none">' +
-      '<table class="grid gl-lines"><thead><tr><th>#</th><th>' + T('رقم الحساب', 'Account') + '</th><th>' + T('الوحدة (الفرعية 2)', 'Unit (sub 2)') + '</th><th class="n">' +
-      T('مدين', 'Debit') + '</th><th class="n">' + T('دائن', 'Credit') + '</th><th>' + T('ملاحظة', 'Note') + '</th><th>' + T('المرجع', 'Reference') + '</th>' + (editable ? '<th></th>' : '') +
-      '</tr></thead><tbody id="glBody"></tbody><tfoot id="glFoot"></tfoot></table></div></div>' +
-      '<datalist id="dl_glacc">' + datalistOpts('@accounts', null, {}) + '</datalist><datalist id="dl_glsub2">' + datalistOpts('Sub2_OperatingUnit', null, {}) + '</datalist></div>';
+      '<div class="content compact">' + formHtml('glheaders', head, isNew, !editable, { flat: true, hide: isNew ? ['VOUCHER', 'SOURCE', 'SOURCEREF', 'TOTALDEBIT', 'TOTALCREDIT', 'STATUS', 'APPROVEDBY', 'POSTEDBY', 'POSTEDON'] : ['APPROVEDBY', 'POSTEDBY', 'POSTEDON'] }) +
+      '<div class="card"><div class="ftab-h" style="cursor:default;padding:6px 12px"><h3>' + T('تفاصيل القيد', 'Voucher lines') + '</h3>' +
+      (editable ? '<div class="sum"><button class="btn sm" onclick="FA.glAddLine()">' + icon('plus') + T('سطر', 'Line') + '</button></div>' : '') + '</div><div class="gl-wrap">' +
+      '<table class="gl-grid"><thead id="glHead"></thead><tbody id="glBody"></tbody><tfoot id="glFoot"></tfoot></table></div></div>' +
+      '<datalist id="dl_glacc">' + datalistOpts('@accounts', null, {}) + '</datalist><datalist id="dl_glsub2">' + datalistOpts('Sub2_OperatingUnit', null, {}) + '</datalist>' +
+      '<datalist id="dl_glcur">' + datalistOpts('@currencies', null, {}) + '</datalist></div>';
     S.glEditable = editable;
     drawGLLines();
   }
 
+  function localCur() { return String(S.b.settings.CURRENCY || '').toUpperCase(); }
+  /** سعر الصرف الساري للعملة في تاريخ معيّن (آخر سعر لا يتجاوز التاريخ). */
+  function rateFor(cur, date) {
+    if (!cur || cur.toUpperCase() === localCur()) return 1;
+    var best = null;
+    (S.b.refs.rates || []).forEach(function (r) {
+      if (low(r.c) !== low(cur) || (date && r.d > date)) return;
+      if (!best || r.d > best.d) best = r;
+    });
+    return best ? best.r : '';
+  }
+  function glDate() { var el = $('[data-form="glheaders"] [data-k="TRANSDATE"]'); return el ? el.value : today(); }
+  function lineLocal(l) {
+    var rate = Number(l.EXCHANGERATE) || 1;
+    return { dr: (Number(parseNum(l.AMOUNTCURDEBIT)) || 0) * rate, cr: (Number(parseNum(l.AMOUNTCURCREDIT)) || 0) * rate };
+  }
+  function glHasForeign() { return S.glLines.some(function (l) { return l.CURRENCYCODE && l.CURRENCYCODE.toUpperCase() !== localCur(); }); }
+
   function drawGLLines() {
-    var ed = S.glEditable;
+    var ed = S.glEditable, fx = glHasForeign();
+    var head = '<tr><th class="c-no">#</th><th class="c-acc">' + T('الحساب', 'Account') + '</th><th class="c-name">' + T('اسم الحساب', 'Account name') + '</th>' +
+      '<th class="c-cur">' + T('العملة', 'Currency') + '</th><th class="c-rate">' + T('سعر الصرف', 'Exch. rate') + '</th><th class="c-amt">' + T('مدين', 'Debit') + '</th><th class="c-amt">' + T('دائن', 'Credit') + '</th>' +
+      (fx ? '<th class="c-amt">' + T('المحلي', 'Local') + '</th>' : '') + '<th class="c-unit">' + T('الوحدة (الفرعية 2)', 'Unit (sub 2)') + '</th><th class="c-note">' + T('ملاحظة', 'Note') + '</th>' +
+      '<th class="c-ref">' + T('المرجع', 'Reference') + '</th>' + (ed ? '<th class="c-x"></th>' : '') + '</tr>';
+    $('#glHead').innerHTML = head;
     $('#glBody').innerHTML = S.glLines.map(function (l, i) {
+      var loc = lineLocal(l), locTxt = loc.dr ? fmtNum(loc.dr, 3) : loc.cr ? fmtNum(loc.cr, 3) : '';
+      var unitName = lookupName('Sub2_OperatingUnit', l.SUB2_OPERATINGUNIT);
       if (!ed) {
-        return '<tr><td>' + (l.LINENUM || i + 1) + '</td><td><bdi>' + esc(l.MAINACCOUNTID) + '</bdi> <small style="color:#605e5c">' + esc(l.ACCOUNTNAME || lookupName('@allAccounts', l.MAINACCOUNTID)) + '</small></td>' +
-          '<td>' + esc(unitText(l.OPERATINGUNIT, l.SUB1_OPERATINGUNIT, l.SUB2_OPERATINGUNIT)) + '</td><td class="n">' + (Number(l.DEBITAMOUNT) ? fmtNum(l.DEBITAMOUNT, 3) : '') +
-          '</td><td class="n">' + (Number(l.CREDITAMOUNT) ? fmtNum(l.CREDITAMOUNT, 3) : '') + '</td><td>' + esc(l.NOTE) + '</td><td>' + esc(l.REFERENCE) + '</td></tr>';
+        return '<tr><td class="c-no">' + (l.LINENUM || i + 1) + '</td><td dir="ltr">' + esc(l.MAINACCOUNTID) + '</td><td class="c-name">' + esc(l.ACCOUNTNAME || lookupName('@allAccounts', l.MAINACCOUNTID)) + '</td>' +
+          '<td>' + esc(l.CURRENCYCODE || localCur()) + '</td><td class="n">' + fmtNum(Number(l.EXCHANGERATE) || 1, 4) + '</td>' +
+          '<td class="n">' + (Number(l.AMOUNTCURDEBIT) ? fmtNum(l.AMOUNTCURDEBIT, 3) : '') + '</td><td class="n">' + (Number(l.AMOUNTCURCREDIT) ? fmtNum(l.AMOUNTCURCREDIT, 3) : '') + '</td>' +
+          (fx ? '<td class="n">' + locTxt + '</td>' : '') +
+          '<td title="' + esc(unitText(l.OPERATINGUNIT, l.SUB1_OPERATINGUNIT, l.SUB2_OPERATINGUNIT)) + '"><bdi>' + esc(l.SUB2_OPERATINGUNIT || l.SUB1_OPERATINGUNIT || l.OPERATINGUNIT) + '</bdi> <small>' + esc(unitName) + '</small></td>' +
+          '<td class="c-note" title="' + esc(l.NOTE) + '">' + esc(l.NOTE) + '</td><td>' + esc(l.REFERENCE) + '</td></tr>';
       }
-      var inp = function (k, attrs, cls) { return '<input class="inp ' + (cls || '') + '" data-gl="' + k + '" data-i="' + i + '" value="' + esc(k === 'DEBITAMOUNT' || k === 'CREDITAMOUNT' ? (Number(l[k]) ? l[k] : '') : (l[k] || '')) + '" ' + (attrs || '') + ' onchange="FA.glCell(this)">'; };
-      return '<tr><td>' + (i + 1) + '</td><td><div class="lk">' + inp('MAINACCOUNTID', 'list="dl_glacc" dir="ltr" style="max-width:110px"') +
-        '<span class="gl-name">' + esc(lookupName('@accounts', l.MAINACCOUNTID)) + '</span></div></td>' +
-        '<td><div class="lk">' + inp('SUB2_OPERATINGUNIT', 'list="dl_glsub2" dir="ltr" style="max-width:130px"') + '<span class="gl-name">' + esc(lookupName('Sub2_OperatingUnit', l.SUB2_OPERATINGUNIT)) + '</span></div></td>' +
-        '<td>' + inp('DEBITAMOUNT', 'inputmode="decimal" style="max-width:120px"', 'num') + '</td><td>' + inp('CREDITAMOUNT', 'inputmode="decimal" style="max-width:120px"', 'num') + '</td>' +
-        '<td>' + inp('NOTE') + '</td><td>' + inp('REFERENCE', 'style="max-width:110px"') + '</td>' +
-        '<td><button class="ib red" title="' + T('حذف السطر', 'Remove line') + '" onclick="FA.glDelLine(' + i + ')">' + icon('trash') + '</button></td></tr>';
+      var inp = function (k, attrs, cls) {
+        var v = l[k];
+        if ((k === 'AMOUNTCURDEBIT' || k === 'AMOUNTCURCREDIT') && !Number(parseNum(v))) v = '';
+        return '<input class="cell ' + (cls || '') + '" data-gl="' + k + '" data-i="' + i + '" value="' + esc(v === undefined ? '' : v) + '" ' + (attrs || '') + ' onchange="FA.glCell(this)">';
+      };
+      return '<tr><td class="c-no">' + (i + 1) + '</td>' +
+        '<td class="c-acc">' + inp('MAINACCOUNTID', 'list="dl_glacc" dir="ltr"') + '</td>' +
+        '<td class="c-name gl-name">' + esc(lookupName('@accounts', l.MAINACCOUNTID)) + '</td>' +
+        '<td class="c-cur">' + inp('CURRENCYCODE', 'list="dl_glcur" dir="ltr"') + '</td>' +
+        '<td class="c-rate">' + inp('EXCHANGERATE', 'inputmode="decimal"' + ((l.CURRENCYCODE || localCur()).toUpperCase() === localCur() ? ' readonly tabindex="-1"' : ''), 'num') + '</td>' +
+        '<td class="c-amt">' + inp('AMOUNTCURDEBIT', 'inputmode="decimal"', 'num') + '</td><td class="c-amt">' + inp('AMOUNTCURCREDIT', 'inputmode="decimal"', 'num') + '</td>' +
+        (fx ? '<td class="c-amt n loc">' + locTxt + '</td>' : '') +
+        '<td class="c-unit"><div class="unitcell">' + inp('SUB2_OPERATINGUNIT', 'list="dl_glsub2" dir="ltr"') + '<span class="gl-name">' + esc(unitName) + '</span></div></td>' +
+        '<td class="c-note">' + inp('NOTE', 'title="' + esc(l.NOTE || '') + '"') + '</td><td class="c-ref">' + inp('REFERENCE') + '</td>' +
+        '<td class="c-x"><button class="ib red" tabindex="-1" title="' + T('حذف السطر', 'Remove line') + '" onclick="FA.glDelLine(' + i + ')">' + icon('trash') + '</button></td></tr>';
     }).join('');
     drawGLFoot();
   }
 
   function drawGLFoot() {
-    var dr = 0, cr = 0;
-    S.glLines.forEach(function (l) { dr += Number(parseNum(l.DEBITAMOUNT)) || 0; cr += Number(parseNum(l.CREDITAMOUNT)) || 0; });
+    var dr = 0, cr = 0, fx = glHasForeign();
+    S.glLines.forEach(function (l) { var x = lineLocal(l); dr += x.dr; cr += x.cr; });
     var diff = Math.round((dr - cr) * 1000) / 1000;
-    $('#glFoot').innerHTML = '<tr><td colspan="3">' + T('الإجمالي', 'Total') + ' ' + (diff ? '<span class="badge b-err">' + T('الفرق: ', 'Difference: ') + fmtNum(diff, 3) + '</span>' :
-      (dr ? '<span class="badge b-ok">' + T('متوازن', 'Balanced') + '</span>' : '')) + '</td><td class="n">' + fmtNum(dr, 3) + '</td><td class="n">' + fmtNum(cr, 3) + '</td><td colspan="' + (S.glEditable ? 3 : 2) + '"></td></tr>';
+    $('#glFoot').innerHTML = '<tr><td colspan="5">' + T('الإجمالي بالعملة المحلية', 'Total in local currency') + ' (' + esc(localCur()) + ') ' +
+      (diff ? '<span class="badge b-err">' + T('الفرق: ', 'Difference: ') + fmtNum(diff, 3) + '</span>' : (dr ? '<span class="badge b-ok">' + T('متوازن', 'Balanced') + '</span>' : '')) +
+      '</td><td class="n">' + fmtNum(dr, 3) + '</td><td class="n">' + fmtNum(cr, 3) + '</td><td colspan="' + ((fx ? 1 : 0) + 3 + (S.glEditable ? 1 : 0)) + '"></td></tr>';
   }
 
   function glCell(el) {
     var i = Number(el.getAttribute('data-i')), k = el.getAttribute('data-gl');
-    var v = el.value;
-    if (k === 'DEBITAMOUNT' || k === 'CREDITAMOUNT') {
-      v = parseNum(v);
-      if (v !== '' && Number(v) > 0) {
-        var other = k === 'DEBITAMOUNT' ? 'CREDITAMOUNT' : 'DEBITAMOUNT';
-        S.glLines[i][other] = '';
-        var o = $('[data-gl="' + other + '"][data-i="' + i + '"]');
-        if (o) o.value = '';
-      }
+    var l = S.glLines[i], v = el.value, tr = el.closest('tr');
+    var fxBefore = glHasForeign();
+    if (k === 'AMOUNTCURDEBIT' || k === 'AMOUNTCURCREDIT' || k === 'EXCHANGERATE') v = parseNum(v);
+    l[k] = v;
+    if ((k === 'AMOUNTCURDEBIT' || k === 'AMOUNTCURCREDIT') && v !== '' && Number(v) > 0) {
+      var other = k === 'AMOUNTCURDEBIT' ? 'AMOUNTCURCREDIT' : 'AMOUNTCURDEBIT';
+      l[other] = '';
+      var o = $('[data-gl="' + other + '"]', tr); if (o) o.value = '';
     }
-    S.glLines[i][k] = v;
-    var nm = el.parentNode.querySelector('.gl-name');
-    if (nm) nm.textContent = k === 'MAINACCOUNTID' ? lookupName('@accounts', v) : lookupName('Sub2_OperatingUnit', v);
+    if (k === 'MAINACCOUNTID') $('.c-name', tr).textContent = lookupName('@accounts', v);
+    if (k === 'SUB2_OPERATINGUNIT') $('.unitcell .gl-name', tr).textContent = lookupName('Sub2_OperatingUnit', v);
+    if (k === 'CURRENCYCODE') {
+      l.CURRENCYCODE = v = v.toUpperCase(); el.value = v;
+      l.EXCHANGERATE = rateFor(v, glDate());
+      var re = $('[data-gl="EXCHANGERATE"]', tr);
+      re.value = l.EXCHANGERATE; re.readOnly = !v || v === localCur();
+      if (v && v !== localCur() && !l.EXCHANGERATE) toast(T('لا يوجد سعر صرف للعملة ', 'No exchange rate for ') + v + T(' — أدخله يدوياً أو من صفحة أسعار الصرف', ' — enter it or add it in Exchange rates'), 'err');
+    }
+    if (glHasForeign() !== fxBefore) {
+      // ظهور/اختفاء عمود المبلغ المحلي: إعادة رسم مع إعادة التركيز للخلية التالية
+      drawGLLines();
+      var order = ['MAINACCOUNTID', 'CURRENCYCODE', 'EXCHANGERATE', 'AMOUNTCURDEBIT', 'AMOUNTCURCREDIT', 'SUB2_OPERATINGUNIT', 'NOTE', 'REFERENCE'];
+      var nx = $('[data-gl="' + order[Math.min(order.indexOf(k) + 1, order.length - 1)] + '"][data-i="' + i + '"]');
+      if (nx) setTimeout(function () { nx.focus(); }, 0);
+      return;
+    }
+    var lc = $('.loc', tr);
+    if (lc) { var x = lineLocal(l); lc.textContent = x.dr ? fmtNum(x.dr, 3) : x.cr ? fmtNum(x.cr, 3) : ''; }
     drawGLFoot();
   }
   function glAddLine() {
     var last = S.glLines[S.glLines.length - 1] || {};
-    S.glLines.push({ SUB2_OPERATINGUNIT: last.SUB2_OPERATINGUNIT || '', NOTE: last.NOTE || '' });
+    S.glLines.push({ SUB2_OPERATINGUNIT: last.SUB2_OPERATINGUNIT || '', NOTE: last.NOTE || '', REFERENCE: last.REFERENCE || '',
+      CURRENCYCODE: last.CURRENCYCODE || localCur(), EXCHANGERATE: last.EXCHANGERATE || 1 });
     drawGLLines();
+    var el = $('[data-gl="MAINACCOUNTID"][data-i="' + (S.glLines.length - 1) + '"]');
+    if (el) el.focus();
   }
   function glDelLine(i) { S.glLines.splice(i, 1); drawGLLines(); }
 
@@ -2281,12 +2351,14 @@
     var head = readForm(form);
     if (!isNew) head.VOUCHER = S.view.voucher;
     var lines = S.glLines.map(function (l) {
-      return { MAINACCOUNTID: l.MAINACCOUNTID || '', SUB2_OPERATINGUNIT: l.SUB2_OPERATINGUNIT || '', DEBITAMOUNT: parseNum(l.DEBITAMOUNT),
-        CREDITAMOUNT: parseNum(l.CREDITAMOUNT), NOTE: l.NOTE || '', REFERENCE: l.REFERENCE || '' };
+      return { MAINACCOUNTID: l.MAINACCOUNTID || '', SUB2_OPERATINGUNIT: l.SUB2_OPERATINGUNIT || '', CURRENCYCODE: l.CURRENCYCODE || localCur(),
+        EXCHANGERATE: parseNum(l.EXCHANGERATE), AMOUNTCURDEBIT: parseNum(l.AMOUNTCURDEBIT), AMOUNTCURCREDIT: parseNum(l.AMOUNTCURCREDIT),
+        NOTE: l.NOTE || '', REFERENCE: l.REFERENCE || '' };
     });
     try {
       var r = await api('saveGLVoucher', S.token, head, lines, !!isNew);
-      toast(T('تم حفظ القيد ', 'Voucher saved ') + r.voucher + (Math.abs(r.debit - r.credit) > 0.0005 ? T(' — تنبيه: القيد غير متوازن', ' — warning: not balanced') : ''), Math.abs(r.debit - r.credit) > 0.0005 ? 'err' : 'ok');
+      var unb = Math.abs(r.debit - r.credit) > 0.0005;
+      toast(T('تم حفظ القيد ', 'Voucher saved ') + r.voucher + (unb ? T(' — تنبيه: القيد غير متوازن', ' — warning: not balanced') : ''), unb ? 'err' : 'ok');
       await Promise.all([load('glheaders', true), load('gllines', true)]);
       go('gl', { voucher: r.voucher });
     } catch (e) { fail(e); }
@@ -2308,7 +2380,13 @@
     var v = S.view.voucher;
     var h = (S.data.glheaders || []).filter(function (x) { return x.VOUCHER === v; })[0];
     var legs = (S.data.gllines || []).filter(function (l) { return l.VOUCHER === v; }).sort(function (a, b) { return (Number(a.LINENUM) || 0) - (Number(b.LINENUM) || 0); })
-      .map(function (l) { return { acc: l.MAINACCOUNTID, units: unitText(l.OPERATINGUNIT, l.SUB1_OPERATINGUNIT, l.SUB2_OPERATINGUNIT), note: l.NOTE, debit: Number(l.DEBITAMOUNT) || 0, credit: Number(l.CREDITAMOUNT) || 0 }; });
+      .map(function (l) {
+        var fx = l.CURRENCYCODE && String(l.CURRENCYCODE).toUpperCase() !== localCur();
+        var curAmt = Number(l.AMOUNTCURDEBIT) || Number(l.AMOUNTCURCREDIT) || 0;
+        return { acc: l.MAINACCOUNTID, units: unitText(l.OPERATINGUNIT, l.SUB1_OPERATINGUNIT, l.SUB2_OPERATINGUNIT),
+          note: (l.NOTE || '') + (fx ? ' [' + l.CURRENCYCODE + ' ' + fmtNum(curAmt, 2) + ' × ' + fmtNum(l.EXCHANGERATE, 4) + ']' : ''),
+          debit: Number(l.DEBITAMOUNT) || 0, credit: Number(l.CREDITAMOUNT) || 0 };
+      });
     printVoucher(T('قيد يومية', 'Journal voucher'), { number: v, date: h.TRANSDATE, journal: h.JOURNALNAME, status: h.STATUS, desc: h.DESCRIPTION, ref: h.REFERENCE }, legs);
   }
 
@@ -2449,8 +2527,8 @@
     document.addEventListener('focusin', function (e) {
       var el = e.target;
       if (CB.panel && (el === CB.el || CB.panel.contains(el))) return;
-      if (el.classList && el.classList.contains('combo') && !el.readOnly && !el.disabled && CB.justChose !== el) comboOpen(el);
-      else if (CB.panel) comboClose();
+      // لا تُفتح القائمة عند التركيز التلقائي — فقط بالنقر أو الكتابة أو السهم ↓
+      if (CB.panel) comboClose();
     });
     document.addEventListener('mousedown', function (e) {
       if (CB.panel && CB.panel.contains(e.target)) return;
@@ -2467,7 +2545,11 @@
       if (inp && !inp.readOnly && !inp.disabled) { comboOpen(inp); return; }
       if (CB.panel) comboClose();
     }, true);
-    document.addEventListener('input', function (e) { if (CB.el && e.target === CB.el && CB.el.tagName !== 'SELECT') comboFilter(CB.el.value); });
+    document.addEventListener('input', function (e) {
+      var el = e.target;
+      if (CB.el && el === CB.el && el.tagName !== 'SELECT') { comboFilter(el.value); return; }
+      if (!CB.panel && el.classList && el.classList.contains('combo') && !el.readOnly && !el.disabled && e.isTrusted) { comboOpen(el); comboFilter(el.value); }
+    });
     document.addEventListener('change', function (e) { if (CB.el && e.target === CB.el) comboClose(); });
     document.addEventListener('keydown', function (e) {
       if (!CB.panel) {
@@ -2591,7 +2673,8 @@
   /* ---------- Trial balance ---------- */
   function buildTB() {
     var f = S.finF, am = finAcc();
-    var open = sumBy(finLines(dayBefore(f.from))), per = sumBy(finLines(f.to, f.from));
+    var noYE = function (l) { return !f.noClosing || l[LD.src] !== 'YearEnd'; };
+    var open = sumBy(finLines(dayBefore(f.from))), per = sumBy(finLines(f.to, f.from).filter(noYE));
     var codes = {};
     Object.keys(open).concat(Object.keys(per)).forEach(function (k) { codes[k] = 1; });
     S.fin.accounts.forEach(function (a) { if (!a.h) codes[low(a.c)] = 1; });
@@ -2663,7 +2746,8 @@
       rows.push({ k: 'sub', label: T('رصيد أول المدة', 'Opening balance'), v: ['', '', '', '', '', bal] });
       mv.forEach(function (l) {
         bal += l[LD.dr] - l[LD.cr]; td += l[LD.dr]; tc += l[LD.cr];
-        rows.push({ k: 'acc', code: l[LD.voucher], label: (l[LD.desc] || '') + (l[LD.note] && l[LD.note] !== l[LD.desc] ? ' — ' + l[LD.note] : ''), vlink: l[LD.voucher],
+        var fxTxt = l[14] && String(l[14]).toUpperCase() !== localCur() ? ' [' + l[14] + ' ' + fmtNum(l[15] || l[16], 2) + ']' : '';
+        rows.push({ k: 'acc', code: l[LD.voucher], label: (l[LD.desc] || '') + (l[LD.note] && l[LD.note] !== l[LD.desc] ? ' — ' + l[LD.note] : '') + fxTxt, vlink: l[LD.voucher],
           v: [l[LD.date], l[LD.journal], unitText(l[LD.ou], l[LD.s1], l[LD.s2]), l[LD.dr], l[LD.cr], bal] });
       });
       rows.push({ k: 'tot', label: T('الحركة والرصيد الختامي', 'Movement & closing balance'), v: ['', '', '', td, tc, bal] });
@@ -2708,7 +2792,7 @@
 
   function buildIS() {
     var f = S.finF, am = finAcc();
-    var sec = plSections(finLines(f.to, f.from), am);
+    var sec = plSections(finLines(f.to, f.from).filter(function (l) { return l[LD.src] !== 'YearEnd'; }), am);
     var rows = [], r = groupedRows(sec.R, am), x = groupedRows(sec.X, am), p = groupedRows(sec.P, am);
     rows.push({ k: 'sec', label: T('الإيرادات', 'Revenue') });
     rows = rows.concat(r.rows);
@@ -2833,7 +2917,8 @@
       (tab === 'ledger' ? '<label>' + T('الحساب', 'Account') + '<input class="inp" list="dl_finacc" dir="ltr" value="' + esc(f.account) + '" placeholder="' + T('كل الحسابات', 'All accounts') +
         '" onchange="FA.finSet(\'account\', this.value)"><datalist id="dl_finacc">' + datalistOpts('@allAccounts', null, {}) + '</datalist></label>' : '') +
       (tab === 'tb' ? '<label class="ck"><input type="checkbox" ' + (f.zero ? 'checked' : '') + ' onchange="FA.finSet(\'zero\', this.checked)"> ' + T('إظهار الحسابات الصفرية', 'Show zero balances') + '</label>' +
-        '<label class="ck"><input type="checkbox" ' + (f.headersOnly ? 'checked' : '') + ' onchange="FA.finSet(\'headersOnly\', this.checked)"> ' + T('الحسابات الرئيسية فقط', 'Header accounts only') + '</label>' : '') +
+        '<label class="ck"><input type="checkbox" ' + (f.headersOnly ? 'checked' : '') + ' onchange="FA.finSet(\'headersOnly\', this.checked)"> ' + T('الحسابات الرئيسية فقط', 'Header accounts only') + '</label>' +
+        '<label class="ck"><input type="checkbox" ' + (f.noClosing ? 'checked' : '') + ' onchange="FA.finSet(\'noClosing\', this.checked)"> ' + T('قبل قيد الإقفال', 'Before closing entries') + '</label>' : '') +
       '</div>';
     var rep = tab === 'ledger' ? buildLedger() : tab === 'bs' ? buildBS() : tab === 'is' ? buildIS() : tab === 'cf' ? buildCF() : buildTB();
     S.finRep = rep;
@@ -2857,8 +2942,191 @@
     XLSX.writeFile(wb, (S.view.tab || 'tb') + '_' + today() + '.xlsx');
   }
   function finPrint() {
-    printHtml('<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(S.finTitle) + stmtHtml(S.finRep.heads, S.finRep.rows) + '</div>',
-      'size: A4 ' + ((S.view.tab || 'tb') === 'tb' || S.view.tab === 'ledger' ? 'landscape' : 'portrait') + '; margin: 10mm;');
+    printDoc('<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(S.finTitle) + stmtHtml(S.finRep.heads, S.finRep.rows) + '</div>',
+      (S.view.tab || 'tb') === 'tb' || S.view.tab === 'ledger' ? 'landscape' : 'portrait');
+  }
+
+  /* ======================= Print options (orientation / paper / margins) ======================= */
+  function printPrefs() {
+    var d = { orient: 'portrait', paper: 'A4', margin: 'normal' };
+    try { return Object.assign(d, JSON.parse(ls('fa_print') || '{}')); } catch (e) { return d; }
+  }
+  /** نافذة خيارات الطباعة ثم الطباعة. html = محتوى المستند، أو null لطباعة الصفحة الحالية. */
+  function printDoc(html, defOrient) {
+    var p = printPrefs();
+    if (defOrient && !ls('fa_print')) p.orient = defOrient;
+    S.printJob = html;
+    var radio = function (name, val, label, cur) {
+      return '<label class="opt"><input type="radio" name="' + name + '" value="' + val + '"' + (cur === val ? ' checked' : '') + '><span>' + label + '</span></label>';
+    };
+    modal(T('خيارات الطباعة', 'Print options'),
+      '<div class="popts"><div><h5>' + T('اتجاه الصفحة', 'Orientation') + '</h5>' +
+      radio('po', 'portrait', '<i class="pg pg-p"></i>' + T('رأسي', 'Portrait'), p.orient) + radio('po', 'landscape', '<i class="pg pg-l"></i>' + T('أفقي', 'Landscape'), p.orient) + '</div>' +
+      '<div><h5>' + T('حجم الورق', 'Paper') + '</h5>' + radio('pp', 'A4', 'A4', p.paper) + radio('pp', 'A5', 'A5', p.paper) + radio('pp', 'letter', 'Letter', p.paper) + '</div>' +
+      '<div><h5>' + T('الهوامش', 'Margins') + '</h5>' + radio('pm', 'normal', T('عادية', 'Normal'), p.margin) + radio('pm', 'narrow', T('ضيقة', 'Narrow'), p.margin) + radio('pm', 'none', T('بدون', 'None'), p.margin) + '</div></div>',
+      '<button class="btn pri" onclick="FA.printGo()">' + icon('list') + T('طباعة', 'Print') + '</button><button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>');
+  }
+  function printGo() {
+    var val = function (n) { var x = $('#modal input[name="' + n + '"]:checked'); return x ? x.value : ''; };
+    var p = { orient: val('po'), paper: val('pp'), margin: val('pm') };
+    lsSet('fa_print', JSON.stringify(p));
+    closeModal();
+    var css = 'size: ' + p.paper + ' ' + p.orient + '; margin: ' + (p.margin === 'none' ? '0' : p.margin === 'narrow' ? '6mm' : '12mm') + ';';
+    if (S.printJob) printHtml(S.printJob, css);
+    else { $('#pageStyle').textContent = '@page { ' + css + ' }'; setTimeout(function () { window.print(); }, 120); }
+  }
+
+  /* ======================= Fiscal years & closing ======================= */
+  async function pageFiscal() {
+    var s = sch('fiscal');
+    crumbs([S.b.settings.ORGNAME, L(s.title)]);
+    await load('fiscal', true);
+    $('#main').innerHTML = apane([
+      can('fiscal', 'add') && { icon: 'plus', ar: 'سنة مالية جديدة', en: 'New fiscal year', on: 'FA.fyDlg(null)' },
+      '|',
+      can('fiscal', 'post') && { icon: 'lock', ar: 'إقفال السنة المحددة', en: 'Close selected year', on: 'FA.fyClosePrompt()' },
+      can('fiscal', 'post') && { icon: 'undo', ar: 'إعادة فتح السنة', en: 'Reopen year', on: 'FA.fyReopen()' },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.render()' }
+    ]) + phead(T('المحاسبة', 'Accounting'), esc(L(s.title))) +
+      '<div class="content"><div class="note">' + T('الإقفال يرحّل أرصدة الإيرادات والمصروفات (لكل وحدة) إلى حساب الأرباح المحتجزة بقيد إقفال بتاريخ نهاية السنة، ثم يمنع أي قيد أو حركة أصول أو نقل بتاريخ داخل السنة المقفلة. حدد السنة من الجدول ثم اضغط "إقفال".',
+        'Closing moves revenue and expense balances (per unit) to retained earnings with a closing voucher dated at year end, then blocks any voucher, asset transaction or transfer dated inside the closed year. Select a year, then click "Close".') + '</div>' +
+      '<div class="card">' + grid('fy', {
+        rows: function () { return (S.data.fiscal || []).slice().sort(function (a, b) { return String(b.STARTDATE).localeCompare(String(a.STARTDATE)); }); },
+        key: function (r) { return r.YEAR; }, select: true, open: function (r) { fyDlg(r); },
+        cols: schemaCols('fiscal').map(function (c) {
+          if (c.k === 'STATUS') c.html = function (r) { return r.STATUS === 'Closed' ? '<span class="badge b-err">🔒 ' + T('مقفلة', 'Closed') + '</span>' : '<span class="badge b-ok">' + T('مفتوحة', 'Open') + '</span>'; };
+          if (c.k === 'CLOSINGVOUCHER') c.html = function (r) { return r.CLOSINGVOUCHER ? '<a onclick="FA.go(\'gl\',{voucher:' + jsArg(r.CLOSINGVOUCHER) + '})">' + esc(r.CLOSINGVOUCHER) + '</a>' : ''; };
+          return c;
+        })
+      }) + '</div></div>';
+    gridRender('fy');
+  }
+  function fyDlg(rec) {
+    var isNew = !rec;
+    rec = rec || { YEAR: String(new Date().getFullYear()), RETAINEDEARNINGSACCOUNT: S.b.settings.RETAINEDEARNINGSACCOUNT || '' };
+    var ro = rec.STATUS === 'Closed' || !can('fiscal', isNew ? 'add' : 'edit');
+    modal(isNew ? T('سنة مالية جديدة', 'New fiscal year') : T('السنة المالية ', 'Fiscal year ') + rec.YEAR, formHtml('fiscal', rec, isNew, ro, { flat: true }) +
+      (isNew ? '<div class="note">' + T('اكتب السنة (مثل 2026) وتُملأ البداية والنهاية تلقائياً بـ 1 يناير و31 ديسمبر، أو حدد فترة مختلفة.', 'Enter the year (e.g. 2026); start/end default to Jan 1 and Dec 31, or set a different period.') + '</div>' : ''),
+      (ro ? '' : '<button class="btn pri" onclick="FA.fySave(' + (isNew ? 1 : 0) + ')">' + icon('save') + T('حفظ', 'Save') + '</button>') + '<button class="btn" onclick="FA.closeModal()">' + T('إغلاق', 'Close') + '</button>');
+  }
+  async function fySave() {
+    var saved = await saveForm('fiscal', $('#modal [data-form="fiscal"]'));
+    if (saved) { closeModal(); render(); }
+  }
+  async function fyClosePrompt() {
+    var sel = selected('fy');
+    if (sel.length !== 1) return toast(T('حدد سنة واحدة من الجدول', 'Select one year in the table'), 'err');
+    try {
+      var p = await api('fiscalPreview', S.token, sel[0].YEAR);
+      if (p.status === 'Closed') return toast(T('السنة مقفلة مسبقاً', 'Year already closed'), 'err');
+      var pend = p.pending.vouchers + p.pending.faLines + p.pending.transfers;
+      var cur = S.b.settings.CURRENCY;
+      S.fyClose = p.year;
+      modal(T('إقفال السنة المالية ', 'Close fiscal year ') + p.year,
+        '<div class="kv"><span>' + T('الفترة', 'Period') + '</span><b dir="ltr">' + esc(p.start + ' → ' + p.end) + '</b></div>' +
+        '<div class="kv"><span>' + T('الإيرادات', 'Revenue') + '</span><b>' + fmtNum(p.revenue, 3) + ' ' + cur + '</b></div>' +
+        '<div class="kv"><span>' + T('المصروفات', 'Expenses') + '</span><b>' + fmtNum(p.expense, 3) + ' ' + cur + '</b></div>' +
+        (p.other ? '<div class="kv"><span>' + T('أرباح وخسائر أخرى', 'Other gains/losses') + '</span><b>' + fmtNum(p.other, 3) + '</b></div>' : '') +
+        '<div class="kv"><span><b>' + (p.net >= 0 ? T('صافي الربح', 'Net profit') : T('صافي الخسارة', 'Net loss')) + '</b></span><b>' + fmtNum(Math.abs(p.net), 3) + ' ' + cur + '</b></div>' +
+        '<div class="kv"><span>' + T('سطور قيد الإقفال', 'Closing voucher lines') + '</span><b>' + p.lines + '</b></div>' +
+        '<div class="fld" style="margin-top:10px"><label>' + T('حساب الأرباح المحتجزة (حقوق ملكية)', 'Retained earnings account (equity)') + '<span class="req">*</span></label>' +
+        '<div class="lk"><input class="inp" id="fyRE" list="dl_fyre" dir="ltr" value="' + esc(p.account) + '"><input class="inp name" readonly value="' + esc(lookupName('@accounts', p.account)) + '"></div>' +
+        '<datalist id="dl_fyre">' + datalistOpts('@accounts', null, {}) + '</datalist></div>' +
+        (pend ? '<div class="errlist">' + T('لا يمكن الإقفال — مستندات غير مُرحّلة: ', 'Cannot close — unposted documents: ') + p.pending.vouchers + T(' قيد، ', ' vouchers, ') +
+          p.pending.faLines + T(' سطر يومية أصول، ', ' asset journal lines, ') + p.pending.transfers + T(' سطر نقل', ' transfer lines') + '</div>'
+          : '<div class="note">' + T('بعد الإقفال لن يُسمح بأي قيد بتاريخ داخل هذه السنة. يمكن إعادة الفتح لاحقاً (يُحذف قيد الإقفال).', 'After closing, nothing dated inside this year can be posted. You can reopen later (the closing voucher is removed).') + '</div>'),
+        (pend ? '' : '<button class="btn red" onclick="FA.fyCloseGo()">' + icon('lock') + T('إقفال السنة', 'Close year') + '</button>') + '<button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>');
+      $('#fyRE').addEventListener('change', function () { this.parentNode.querySelector('.name').value = lookupName('@accounts', this.value); });
+    } catch (e) { fail(e); }
+  }
+  async function fyCloseGo() {
+    try {
+      var r = await api('fiscalClose', S.token, S.fyClose, $('#fyRE').value);
+      closeModal();
+      toast(T('تم إقفال السنة ', 'Year closed ') + r.year + (r.voucher ? T(' — قيد الإقفال ', ' — closing voucher ') + r.voucher : ''), 'ok');
+      S.fin = null; S.data.glheaders = null; S.data.gllines = null;
+      render();
+    } catch (e) { fail(e); }
+  }
+  async function fyReopen() {
+    var sel = selected('fy');
+    if (sel.length !== 1) return toast(T('حدد سنة واحدة من الجدول', 'Select one year in the table'), 'err');
+    if (!(await confirmBox(T('إعادة فتح السنة ', 'Reopen year ') + sel[0].YEAR + T('؟ سيُحذف قيد الإقفال.', '? The closing voucher will be removed.'), null, true))) return;
+    try {
+      await api('fiscalReopen', S.token, sel[0].YEAR);
+      toast(T('تمت إعادة الفتح', 'Year reopened'), 'ok');
+      S.fin = null; S.data.glheaders = null; S.data.gllines = null;
+      render();
+    } catch (e) { fail(e); }
+  }
+
+  /* ======================= Currencies & exchange rates ======================= */
+  async function pageCurrency() {
+    crumbs([S.b.settings.ORGNAME, T('العملات وأسعار الصرف', 'Currencies & exchange rates')]);
+    var tab = S.view.tab === 'cur' ? 'cur' : 'rates';
+    var e = tab === 'cur' ? 'currencies' : 'exrates';
+    await load(e, true);
+    var head = apane([]).replace('<div class="bar"></div>', '<div class="bar">' +
+      [['rates', 'أسعار الصرف', 'Exchange rates'], ['cur', 'العملات', 'Currencies']].map(function (t) {
+        return '<button class="abtn tab ' + (t[0] === tab ? 'on' : '') + '" onclick="FA.go(\'currency\',{tab:\'' + t[0] + '\'})">' + esc(T(t[1], t[2])) + '</button>';
+      }).join('') + '<span class="sep"></span>' +
+      (can('masterdata', 'add') ? '<button class="abtn" onclick="FA.curDlg(null)">' + icon('plus') + T('جديد', 'New') + '</button>' : '') +
+      (can('masterdata', 'delete') ? '<button class="abtn danger" onclick="FA.deleteSelected(\'' + e + '\',\'cur\')">' + icon('trash') + T('حذف', 'Delete') + '</button>' : '') +
+      ((can('masterdata', 'add') || can('masterdata', 'edit')) ? '<button class="abtn" onclick="FA.importStart(\'' + e + '\')">' + icon('upload') + T('استيراد', 'Import') + '</button>' : '') +
+      '<button class="abtn" onclick="FA.exportGrid(\'' + e + '\',\'cur\')">' + icon('download') + T('تصدير', 'Export') + '</button></div>');
+    var cols = schemaCols(e);
+    if (e === 'exrates') {
+      cols = cols.map(function (c) { if (c.k === 'RATE') c.text = function (r) { return fmtNum(r.RATE, 6); }; return c; });
+      cols.splice(1, 0, { k: '_n', label: T('اسم العملة', 'Name'), text: function (r) { return lookupName('@currencies', r.CURRENCYCODE); } });
+    }
+    $('#main').innerHTML = head + phead(T('المحاسبة', 'Accounting'), T('العملات وأسعار الصرف', 'Currencies & exchange rates') +
+      ' <small style="font-size:13px;color:#605e5c;font-weight:400">' + T('العملة المحلية: ', 'Local currency: ') + esc(localCur()) + '</small>') +
+      '<div class="content"><div class="card">' + grid('cur', {
+        rows: function () {
+          return (S.data[e] || []).slice().sort(function (a, b) {
+            return e === 'exrates' ? String(a.CURRENCYCODE).localeCompare(String(b.CURRENCYCODE)) || String(b.FROMDATE).localeCompare(String(a.FROMDATE)) : String(a.CURRENCYCODE).localeCompare(String(b.CURRENCYCODE));
+          });
+        },
+        key: function (r) { return keyStr(e, r); }, select: can('masterdata', 'delete'), cols: cols, open: function (r) { curDlg(r); }
+      }) + '</div>' + (e === 'exrates' ? '<div class="note">' + T('السعر = عدد وحدات العملة المحلية مقابل وحدة واحدة من العملة الأجنبية. يُستخدم آخر سعر ساري حتى تاريخ القيد.',
+        'Rate = local currency units per 1 unit of foreign currency. The latest rate effective on the voucher date is used.') + '</div>' : '') + '</div>';
+    gridRender('cur');
+  }
+  function curDlg(rec) {
+    var e = S.view.tab === 'cur' ? 'currencies' : 'exrates';
+    var isNew = !rec;
+    rec = rec || (e === 'exrates' ? { FROMDATE: today() } : {});
+    var ro = !can('masterdata', isNew ? 'add' : 'edit');
+    S.curEntity = e;
+    modal(L(sch(e).title), formHtml(e, rec, isNew, ro, { flat: true }),
+      (ro ? '' : '<button class="btn pri" onclick="FA.curSave()">' + icon('save') + T('حفظ', 'Save') + '</button>') + '<button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>');
+  }
+  async function curSave() {
+    var saved = await saveForm(S.curEntity, $('#modal [data-form="' + S.curEntity + '"]'));
+    if (saved) { closeModal(); await refreshRefs(); render(); }
+  }
+
+  /* ======================= Books list (all books) ======================= */
+  async function pageBooksList() {
+    var s = sch('books');
+    crumbs([S.b.settings.ORGNAME, L(s.title)]);
+    await load('books');
+    $('#main').innerHTML = apane([
+      can('books', 'add') && { icon: 'plus', ar: 'جديد', en: 'New', on: "FA.go('books',{isNew:true})" },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('books')" },
+      (can('books', 'add') || can('books', 'edit')) && { icon: 'upload', ar: 'استيراد من Excel', en: 'Import from Excel', on: "FA.importStart('books')" },
+      { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: "FA.exportGrid('books','list_books')" },
+      { icon: 'excel', ar: 'قالب الاستيراد', en: 'Import template', on: "FA.exportTemplate('books')" }
+    ]) + phead(esc(L(s.title)) + ' | ' + T('العرض القياسي', 'Standard view'), esc(L(s.title))) +
+      '<div class="content"><div class="card">' + grid('list_books', {
+        rows: function () { return S.data.books || []; }, cols: [{ k: 'FIXEDASSETNUMBER', label: T('رقم الأصل', 'Fixed asset') },
+          { k: '_n', label: T('اسم الأصل', 'Asset name'), text: function (r) { return lookupName('@assets', r.FIXEDASSETNUMBER); } }]
+          .concat(schemaCols('books').filter(function (c) { return c.k !== 'FIXEDASSETNUMBER'; })),
+        key: function (r) { return keyStr('books', r); }, open: function (r) { go('books', { key: keyStr('books', r) }); }
+      }) + '</div></div>';
+    gridRender('list_books');
   }
 
   /* ======================= Users ======================= */
@@ -2868,13 +3136,13 @@
     var set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
     var data = ['assets', 'books', 'journal', 'vendors', 'masterdata'];
     if (role === 'SuperAdmin' || role === 'Admin') set(S.b.permPages, S.b.permActions);
-    else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
+    else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
     else set(data.concat(['reports', 'transfers', 'gl']), ['view']);
     return p;
   }
   var PAGE_NAMES = { assets: ['الأصول الثابتة', 'Fixed assets'], books: ['دفاتر الأصول', 'Books'], journal: ['يومية الأصول', 'FA journal'],
     vendors: ['الموردون', 'Vendors'], users: ['المستخدمون', 'Users'], settings: ['الإعدادات', 'Settings'],
-    depreciation: ['الإهلاك التلقائي', 'Depreciation'], transfers: ['نقل الأصول', 'Asset transfers'], gl: ['القيود المحاسبية', 'Journal entries'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'] };
+    depreciation: ['الإهلاك التلقائي', 'Depreciation'], transfers: ['نقل الأصول', 'Asset transfers'], gl: ['القيود المحاسبية', 'Journal entries'], fiscal: ['السنوات المالية والإقفال', 'Fiscal years & closing'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'] };
   var ACT_NAMES = { view: ['دخول للصفحة', 'View'], add: ['إضافة', 'Add'], edit: ['تعديل', 'Edit'], delete: ['حذف', 'Delete'], approve: ['اعتماد', 'Approve'], post: ['ترحيل', 'Post'] };
 
   async function pageUsers() {
@@ -3044,7 +3312,9 @@
       sf('DEPMONTHS', T('دورة الإهلاك (شهور)', 'Depreciation cycle (months)'), st.DEPMONTHS, ro) +
       sf('DEPJOURNALNAME', T('اسم يومية الإهلاك الافتراضي', 'Default depreciation journal name'), st.DEPJOURNALNAME, ro) +
       '<div class="fld"><label>' + T('حساب مصروف الإهلاك الافتراضي', 'Default depreciation expense account') + '</label><input class="inp" data-s="DEPOFFSETACCOUNT" list="dl_setacc" dir="ltr" value="' + esc(st.DEPOFFSETACCOUNT) + '" ' + (ro ? 'readonly' : '') + '>' +
-      '<datalist id="dl_setacc">' + datalistOpts('@accounts', null, {}) + '</datalist></div></div>' +
+      '<datalist id="dl_setacc">' + datalistOpts('@accounts', null, {}) + '</datalist></div>' +
+      '<div class="fld"><label>' + T('حساب الأرباح المحتجزة الافتراضي (للإقفال)', 'Default retained earnings account') + '</label><input class="inp" data-s="RETAINEDEARNINGSACCOUNT" list="dl_setacc2" dir="ltr" value="' + esc(st.RETAINEDEARNINGSACCOUNT || '') + '" ' + (ro ? 'readonly' : '') + '>' +
+      '<datalist id="dl_setacc2">' + datalistOpts('@accounts', null, {}) + '</datalist></div></div>' +
       '</div>' + (ro ? '' : '<div style="padding:0 14px 14px"><button class="btn pri" onclick="FA.saveSettings()">' + icon('save') + T('حفظ الإعدادات', 'Save settings') + '</button></div>') + '</div>';
   }
   function sf(k, label, v, ro, type) {
@@ -3159,6 +3429,8 @@
     bcSelectedAssets: function () { go('barcodes', { only: selected('list_assets').map(function (r) { return r.FIXEDASSETNUMBER; }) }); },
     trxFilter: trxFilter, trxExport: trxExport, faPrintEntry: faPrintEntry, glReload: glReload, glDeleteSelected: glDeleteSelected,
     glExport: glExport, glCell: glCell, glAddLine: glAddLine, glDelLine: glDelLine, glSave: glSave, glAct: glAct, glPrint: glPrint,
+    printDoc: printDoc, printGo: printGo, fyDlg: fyDlg, fySave: fySave, fyClosePrompt: fyClosePrompt, fyCloseGo: fyCloseGo, fyReopen: fyReopen,
+    curDlg: curDlg, curSave: curSave,
     finSet: finSet, finRefresh: finRefresh, finLedger: finLedger, finExport: finExport, finPrint: finPrint,
     accSearch: accSearch, accToggle: accToggle, accAll: accAll, exportRowsAcc: exportRowsAcc,
     depCalc: depCalc, depCreate: depCreate, depExport: depExport, repFilter: repFilter, repRefresh: repRefresh, repExport: repExport

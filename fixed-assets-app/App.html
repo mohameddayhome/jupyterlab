@@ -16,6 +16,9 @@
   function L(o) { return o ? (S.lang === 'ar' ? (o.ar || o.en) : (o.en || o.ar)) : ''; }
   function ls(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
+  // رمز الجلسة يُحفظ لهذا التبويب فقط: إغلاق التبويب أو المتصفح يتطلب تسجيل الدخول مجدداً
+  function tokGet() { try { return sessionStorage.getItem('fa_token') || ''; } catch (e) { return ''; } }
+  function tokSet(v) { try { if (v) sessionStorage.setItem('fa_token', v); else sessionStorage.removeItem('fa_token'); } catch (e) { /* ignore */ } }
   function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9؀-ۿ]/g, ''); }
   function low(s) { return String(s === undefined || s === null ? '' : s).trim().toLowerCase(); }
   function jsArg(v) { return esc(JSON.stringify(String(v === undefined || v === null ? '' : v))); }
@@ -74,6 +77,8 @@
     list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
     excel: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/>',
     folder: '<path d="M3 6h6l2 2h10v11H3z"/>',
+    transfer: '<path d="M4 8h13l-4-4M20 16H7l4 4"/>',
+    barcode: '<path d="M4 5v14M7 5v14M10 5v14M14 5v14M16 5v14M20 5v14"/>',
     chart: '<path d="M4 20V10M10 20V4M16 20v-7M2 20h20"/>',
     tree: '<rect x="9" y="3" width="6" height="4" rx="1"/><rect x="3" y="17" width="6" height="4" rx="1"/><rect x="15" y="17" width="6" height="4" rx="1"/><path d="M12 7v5M6 17v-5h12v5"/>',
     pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
@@ -234,7 +239,7 @@
       var fields = s.fields.filter(function (f) { return f.sec === sec.id && (opts.hide || []).indexOf(f.k) < 0; });
       var hidden = s.fields.filter(function (f) { return f.sec === sec.id && (opts.hide || []).indexOf(f.k) >= 0; })
         .map(function (f) { return '<input type="hidden" data-k="' + f.k + '" value="' + esc(rec[f.k]) + '">'; }).join('');
-      if (!fields.length || (sec.id === 'wf' && isNew)) return '';
+      if (!fields.length || (sec.id === 'wf' && isNew) || (opts.only && opts.only.indexOf(sec.id) < 0)) return '';
       var groups = sec.groups.map(function (g) {
         var fs = fields.filter(function (f) { return f.grp === g.id; });
         if (!fs.length) return '';
@@ -312,6 +317,23 @@
       var upF = fld(e, f.up), upEl = $('[data-k="' + f.up + '"]', form);
       if (item && item.p) { setVal(form, f.up, item.p); if (upEl) fchg(upEl); }
       else if (!el.value && upF && upF.calc) { setVal(form, f.up, ''); if (upEl) fchg(upEl); }
+    }
+
+    // تغيير مستوى أعلى يدوياً يمسح المستويات الأدنى التي لا تتبعه
+    sch(e).fields.forEach(function (c) {
+      if (c.up !== k || c.calc) return;
+      var cel = $('[data-k="' + c.k + '"]', form);
+      var it = cel ? refFind(S.b.lookups[c.lk], cel.value) : null;
+      if (it && it.p && low(it.p) !== low(el.value)) { setVal(form, c.k, ''); fchg(cel); }
+    });
+
+    if (e === 'transfers' && k === 'FIXEDASSETNUMBER') {
+      var ta = refFind(S.b.refs.assets, el.value);
+      setVal(form, 'ASSETNAME', ta ? ta.n : '');
+      Object.keys(TRF_MAP).forEach(function (fk) {
+        setVal(form, 'FROM_' + fk, ta ? ta[TRF_MAP[fk]] : '');
+        setVal(form, 'TO_' + fk, ta ? ta[TRF_MAP[fk]] : '');
+      });
     }
 
     if (e === 'assets' && k === 'FIXEDASSETGROUPID') {
@@ -469,8 +491,8 @@
   var qTimer;
   function gq(gid, v) { S.grids[gid].q = v; clearTimeout(qTimer); qTimer = setTimeout(function () { gridRender(gid); }, 200); }
   function gsort(gid, i) { var g = S.grids[gid]; if (g.sort === i) g.dir = -g.dir; else { g.sort = i; g.dir = 1; } gridRender(gid); }
-  function gsel(gid, i, on) { var g = S.grids[gid]; var k = g.key(g.visible[i]); if (on) g.sel[k] = 1; else delete g.sel[k]; gridRender(gid); }
-  function gselAll(gid, on) { var g = S.grids[gid]; g.sel = {}; if (on) g.visible.slice(0, 1500).forEach(function (r) { g.sel[g.key(r)] = 1; }); gridRender(gid); }
+  function gsel(gid, i, on) { var g = S.grids[gid]; var k = g.key(g.visible[i]); if (on) g.sel[k] = 1; else delete g.sel[k]; gridRender(gid); if (g.onSel) g.onSel(); }
+  function gselAll(gid, on) { var g = S.grids[gid]; g.sel = {}; if (on) g.visible.slice(0, 1500).forEach(function (r) { g.sel[g.key(r)] = 1; }); gridRender(gid); if (g.onSel) g.onSel(); }
   function gopen(gid, i) { var g = S.grids[gid]; g.open(g.visible[i]); }
   function selected(gid) {
     var g = S.grids[gid];
@@ -595,7 +617,7 @@
 
   function localLogout(msg) {
     S.token = ''; S.b = null; S.data = {}; S.grids = {};
-    lsSet('fa_token', '');
+    tokSet('');
     closeModal();
     showLogin(msg);
   }
@@ -621,7 +643,7 @@
 
   function enter(b) {
     S.b = b; S.token = b.token; S.data = {}; S.grids = {};
-    lsSet('fa_token', b.token);
+    tokSet(b.token);
     S.info.orgName = b.settings.ORGNAME; S.info.logo = b.settings.LOGO;
     $('#login').classList.add('hidden');
     $('#app').classList.remove('hidden');
@@ -637,6 +659,8 @@
     { id: 'assets', icon: 'box', ar: 'الأصول الثابتة', en: 'Fixed assets', perm: 'assets' },
     { id: 'books', icon: 'book', ar: 'دفاتر الأصول', en: 'Books', perm: 'books' },
     { id: 'journal', icon: 'journal', ar: 'يومية الأصول الثابتة', en: 'Fixed asset journal', perm: 'journal' },
+    { id: 'transfers', icon: 'transfer', ar: 'نقل الأصول', en: 'Asset transfers', perm: 'transfers' },
+    { id: 'barcodes', icon: 'barcode', ar: 'طباعة الباركود', en: 'Barcode labels', perm: 'assets' },
     { id: 'depreciation', icon: 'clock', ar: 'الإهلاك التلقائي', en: 'Depreciation', perm: 'depreciation' },
     { id: 'reports', icon: 'chart', ar: 'التقارير', en: 'Reports', perm: 'reports' },
     { h: 1, ar: 'البيانات الأساسية', en: 'Master data' },
@@ -698,6 +722,8 @@
         case 'units': return await pageMaster('units');
         case 'locations': return await pageMaster('locations');
         case 'depreciation': return await pageDepreciation();
+        case 'transfers': return await (S.view.doc ? pageTransferDoc() : pageTransfers());
+        case 'barcodes': return await pageBarcodes();
         case 'reports': return await pageReports();
         default: return await pageDashboard();
       }
@@ -820,7 +846,10 @@
       { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('" + e + "')" },
       (can(s.perm, 'add') || can(s.perm, 'edit')) && { icon: 'upload', ar: 'استيراد من Excel', en: 'Import from Excel', on: "FA.importStart('" + e + "')" },
       { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: "FA.exportGrid('" + e + "','" + gid + "')" },
-      { icon: 'excel', ar: 'قالب الاستيراد', en: 'Import template', on: "FA.exportTemplate('" + e + "')" }
+      { icon: 'excel', ar: 'قالب الاستيراد', en: 'Import template', on: "FA.exportTemplate('" + e + "')" },
+      e === 'assets' && '|',
+      e === 'assets' && can('transfers', 'add') && { icon: 'transfer', ar: 'نقل المحدد', en: 'Transfer selected', on: "FA.trfSelected()" },
+      e === 'assets' && { icon: 'barcode', ar: 'باركود المحدد', en: 'Barcodes for selected', on: "FA.bcSelectedAssets()" }
     ]) + phead('<a onclick="FA.go(\'' + e + '\')">' + esc(L(s.title)) + '</a> | ' + T('العرض القياسي', 'Standard view'), esc(L(s.title))) +
       '<div class="content"><div class="card">' + grid(gid, {
         rows: function () { return S.data[e] || []; }, cols: schemaCols(e), key: function (r) { return keyStr(e, r); },
@@ -858,7 +887,10 @@
       !isNew && can(s.perm, 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: "FA.deleteCurrent('" + e + "')", cls: 'danger' },
       e === 'assets' && !isNew && '|',
       e === 'assets' && !isNew && can('books') && { icon: 'book', ar: 'الدفاتر', en: 'Books', on: "FA.go('books',{asset:" + jsArg(id) + "})" },
-      e === 'assets' && !isNew && can('journal') && { icon: 'journal', ar: 'المعاملات', en: 'Transactions', on: "FA.assetTrans(" + jsArg(id) + ")" }
+      e === 'assets' && !isNew && can('journal') && { icon: 'journal', ar: 'المعاملات', en: 'Transactions', on: "FA.assetTrans(" + jsArg(id) + ")" },
+      e === 'assets' && !isNew && can('transfers', 'add') && { icon: 'transfer', ar: 'نقل الأصل', en: 'Transfer', on: "FA.trfNew([" + jsArg(id) + "])" },
+      e === 'assets' && !isNew && can('transfers') && { icon: 'clock', ar: 'سجل النقل', en: 'Transfer history', on: "FA.assetTrfHistory(" + jsArg(id) + ")" },
+      e === 'assets' && !isNew && { icon: 'barcode', ar: 'طباعة الملصق', en: 'Print label', on: "FA.go('barcodes',{only:[" + jsArg(id) + "]})" }
     ]) + phead('<a onclick="FA.go(\'' + e + '\')">' + esc(L(s.title)) + '</a> | ' + T('عرضي', 'My view'), title) +
       '<div class="content"><div class="split"><div class="grow">' + formHtml(e, rec, isNew, ro) + '</div>' + factbox + '</div></div>';
   }
@@ -1583,6 +1615,415 @@
     exportPlain(g.cols, g.visible || g.rows(), t[2].replace(/[^A-Za-z]+/g, '_'));
   }
 
+  /* ======================= Asset transfers ======================= */
+  var TRF_MAP = { OPERATINGUNIT: 'ou', SUB1_OPERATINGUNIT: 's1', SUB2_OPERATINGUNIT: 's2', LOCATION: 'loc', BUILDING: 'bld', ROOMNUMBER: 'room', DEPARTMENT: 'dept', RESPONSIBLE: 'emp' };
+
+  function trfDocs() {
+    var m = {};
+    (S.data.transfers || []).forEach(function (r) {
+      var d = m[r.TRANSFERNUMBER] = m[r.TRANSFERNUMBER] || { TRANSFERNUMBER: r.TRANSFERNUMBER, TRANSFERDATE: r.TRANSFERDATE, REASON: r.REASON, LINES: 0, st: {}, CREATEDBY: r.CREATEDBY };
+      d.LINES++;
+      d.st[r.STATUS] = 1;
+    });
+    return Object.keys(m).map(function (k) {
+      var d = m[k];
+      d.STATUS = d.st.Posted ? 'Posted' : d.st.Approved ? (d.st.Draft ? 'Mixed' : 'Approved') : 'Draft';
+      return d;
+    }).sort(function (a, b) { return String(b.TRANSFERNUMBER).localeCompare(String(a.TRANSFERNUMBER), undefined, { numeric: true }); });
+  }
+  function trfLines(n) { return (S.data.transfers || []).filter(function (r) { return r.TRANSFERNUMBER === n; }); }
+  function stBadge(st) { return st === 'Mixed' ? '<span class="badge b-warn">' + T('مختلط', 'Mixed') + '</span>' : badge('journal', st); }
+
+  /** وصف مختصر للموقع والوحدة (من / إلى). */
+  function placeText(r, p) {
+    var parts = [];
+    var room = r[p + 'ROOMNUMBER'], bld = r[p + 'BUILDING'], loc = r[p + 'LOCATION'];
+    if (loc) parts.push(lookupName('Location', loc) || loc);
+    if (bld) parts.push(lookupName('Building', bld) || bld);
+    if (room) parts.push(lookupName('Room', room) || room);
+    if (r[p + 'SUB2_OPERATINGUNIT']) parts.push(lookupName('Sub2_OperatingUnit', r[p + 'SUB2_OPERATINGUNIT']) || r[p + 'SUB2_OPERATINGUNIT']);
+    if (r[p + 'DEPARTMENT']) parts.push(lookupName('Department', r[p + 'DEPARTMENT']) || r[p + 'DEPARTMENT']);
+    if (r[p + 'RESPONSIBLE']) parts.push(lookupName('Employee', r[p + 'RESPONSIBLE']) || r[p + 'RESPONSIBLE']);
+    return parts.join(' / ');
+  }
+
+  async function pageTransfers() {
+    var s = sch('transfers');
+    crumbs([S.b.settings.ORGNAME, L(s.title)]);
+    await load('transfers');
+    $('#main').innerHTML = apane([
+      can('transfers', 'add') && { icon: 'plus', ar: 'نقل جديد', en: 'New transfer', on: 'FA.trfNew([])' },
+      can('transfers', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: 'FA.trfDeleteDocs()', cls: 'danger' },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('transfers')" },
+      (can('transfers', 'add') || can('transfers', 'edit')) && { icon: 'upload', ar: 'استيراد من Excel', en: 'Import from Excel', on: "FA.importStart('transfers')" },
+      { icon: 'download', ar: 'تصدير السجل', en: 'Export history', on: "FA.exportTrf()" }
+    ]) + phead('<a onclick="FA.go(\'transfers\')">' + esc(L(s.title)) + '</a> | ' + T('سجل النقل', 'Transfer history'), esc(L(s.title))) +
+      '<div class="content"><div class="card">' + grid('trfdocs', {
+        rows: trfDocs, key: function (r) { return r.TRANSFERNUMBER; }, select: true,
+        open: function (r) { go('transfers', { doc: r.TRANSFERNUMBER }); },
+        cols: [
+          { k: 'TRANSFERNUMBER', label: T('رقم المستند', 'Transfer number') },
+          { k: 'TRANSFERDATE', label: T('التاريخ', 'Date') },
+          { k: 'REASON', label: T('السبب', 'Reason') },
+          { k: 'LINES', label: T('عدد الأصول', 'Assets'), num: true },
+          { k: 'STATUS', label: T('الحالة', 'Status'), html: function (r) { return stBadge(r.STATUS); }, text: function (r) { return r.STATUS; } },
+          { k: 'CREATEDBY', label: T('أنشئ بواسطة', 'Created by') }
+        ]
+      }) + '</div></div>';
+    gridRender('trfdocs');
+  }
+
+  async function pageTransferDoc() {
+    var s = sch('transfers');
+    await load('transfers');
+    var n = S.view.doc;
+    var lines = trfLines(n);
+    var info = trfDocs().filter(function (d) { return d.TRANSFERNUMBER === n; })[0];
+    var status = info ? info.STATUS : 'Draft';
+    var draft = status === 'Draft';
+    crumbs([S.b.settings.ORGNAME, L(s.title), n]);
+    $('#main').innerHTML = apane([
+      { icon: 'back', ar: 'رجوع', en: 'Back', on: "FA.go('transfers')", cls: 'back' },
+      draft && can('transfers', 'add') && { icon: 'plus', ar: 'إضافة أصل', en: 'Add asset', on: 'FA.trfLineDlg(null)' },
+      draft && can('transfers', 'delete') && { icon: 'trash', ar: 'حذف الأسطر', en: 'Delete lines', on: 'FA.trfDeleteLines()', cls: 'danger' },
+      '|',
+      can('transfers', 'approve') && { icon: 'check', ar: 'اعتماد', en: 'Approve', on: "FA.trfAction('approve')", dis: !(draft && lines.length) },
+      can('transfers', 'approve') && { icon: 'undo', ar: 'إلغاء الاعتماد', en: 'Unapprove', on: "FA.trfAction('unapprove')", dis: status !== 'Approved' },
+      can('transfers', 'post') && { icon: 'send', ar: 'ترحيل (تنفيذ النقل)', en: 'Post (apply transfer)', on: "FA.trfAction('post')", dis: status !== 'Approved' },
+      '|',
+      { icon: 'list', ar: 'طباعة محضر النقل', en: 'Print transfer form', on: 'FA.trfPrint()', dis: !lines.length },
+      { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: "FA.exportTrfDoc()" }
+    ]) + phead('<a onclick="FA.go(\'transfers\')">' + esc(L(s.title)) + '</a>' + (info && info.REASON ? ' | ' + esc(info.REASON) : ''),
+      esc(n) + ' ' + stBadge(status)) +
+      '<div class="content"><div class="card">' + grid('trflines', {
+        rows: function () { return trfLines(n); }, key: function (r) { return r.LINEID; }, select: draft,
+        open: function (r) { trfLineDlg(r); },
+        cols: [
+          { k: 'FIXEDASSETNUMBER', label: T('رقم الأصل', 'Fixed asset') },
+          { k: 'ASSETNAME', label: T('اسم الأصل', 'Name') },
+          { k: 'TRANSFERDATE', label: T('التاريخ', 'Date') },
+          { k: '_from', label: T('من', 'From'), text: function (r) { return placeText(r, 'FROM_'); } },
+          { k: '_to', label: T('إلى', 'To'), text: function (r) { return placeText(r, 'TO_'); } },
+          { k: 'STATUS', label: T('الحالة', 'Status'), html: function (r) { return badge('journal', r.STATUS); }, text: function (r) { return r.STATUS; } }
+        ]
+      }) + '</div></div>';
+    gridRender('trflines');
+  }
+
+  /** نقل جديد: أصل واحد أو عدة أصول إلى نفس الوجهة. */
+  function trfNew(ids) {
+    S.trfAssets = (ids || []).slice();
+    var rec = { TRANSFERDATE: today() };
+    modal(T('نقل أصول', 'Transfer assets'),
+      '<div class="fld"><label>' + T('الأصول المراد نقلها', 'Assets to transfer') + '<span class="req">*</span></label>' +
+      '<div class="lk"><input class="inp" id="trfAdd" list="dl_trfassets" dir="ltr" placeholder="' + T('اكتب أو امسح رقم الأصل ثم Enter', 'Type or scan an asset number, then Enter') + '">' +
+      '<button class="btn" onclick="FA.trfAddAsset()">' + icon('plus') + '</button></div><datalist id="dl_trfassets">' + datalistOpts('@assets', null, {}) + '</datalist>' +
+      '<div id="trfChips" style="margin:6px 0 10px"></div></div>' +
+      formHtml('transfers', rec, true, false, { only: ['hdr', 'to'], hide: ['TRANSFERNUMBER', 'FIXEDASSETNUMBER', 'ASSETNAME'] }) +
+      '<div class="note">' + T('الحقول الفارغة في الوجهة تعني بدون تغيير. اختيار الغرفة يكتب المبنى والموقع، واختيار الوحدة الفرعية 2 يكتب الوحدات الأعلى.',
+        'Empty destination fields mean no change. Picking a room fills building and location; picking sub-unit 2 fills the higher units.') + '</div>',
+      '<button class="btn pri" onclick="FA.trfCreate()">' + icon('save') + T('إنشاء مستند النقل', 'Create transfer document') + '</button>' +
+      '<button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>', { wide: true });
+    $('#trfAdd').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); trfAddAsset(); } });
+    drawTrfChips();
+  }
+  function trfAddAsset() {
+    var el = $('#trfAdd');
+    var a = refFind(S.b.refs.assets, el.value.trim());
+    if (!a) return toast(T('رقم الأصل غير موجود: ', 'Asset not found: ') + el.value, 'err');
+    if (S.trfAssets.map(low).indexOf(low(a.c)) < 0) S.trfAssets.push(a.c);
+    el.value = '';
+    drawTrfChips();
+  }
+  function trfRemove(i) { S.trfAssets.splice(i, 1); drawTrfChips(); }
+  function drawTrfChips() {
+    var el = $('#trfChips');
+    if (!el) return;
+    el.innerHTML = S.trfAssets.length ? S.trfAssets.map(function (c, i) {
+      var a = refFind(S.b.refs.assets, c) || {};
+      return '<span class="chip"><bdi>' + esc(c) + '</bdi> ' + esc(a.n || '') + ' <small>' + esc(placeText({ LOCATION: a.loc, BUILDING: a.bld, ROOMNUMBER: a.room }, '')) + '</small>' +
+        ' <button class="ib" onclick="FA.trfRemove(' + i + ')">' + icon('close') + '</button></span>';
+    }).join('') : '<span style="color:#605e5c">' + T('لم تُضف أصول بعد', 'No assets added yet') + '</span>';
+  }
+  async function trfCreate() {
+    if (!S.trfAssets.length) return toast(T('أضف أصلاً واحداً على الأقل', 'Add at least one asset'), 'err');
+    var f = readForm($('#modal [data-form="transfers"]'));
+    var to = {};
+    Object.keys(f).forEach(function (k) { if (k.indexOf('TO_') === 0) to[k] = f[k]; });
+    try {
+      var r = await api('createTransferDocument', S.token, { assets: S.trfAssets, TRANSFERDATE: f.TRANSFERDATE, REASON: f.REASON, to: to });
+      closeModal();
+      toast(T('تم إنشاء مستند النقل ', 'Transfer document created ') + r.number + ' — ' + r.count, 'ok');
+      if (r.skipped.length) toast(T('تم تخطي: ', 'Skipped: ') + r.skipped.map(function (x) { return x.asset + ' (' + x.msg + ')'; }).join('، '), 'err');
+      S.data.transfers = null;
+      go('transfers', { doc: r.number });
+    } catch (e) { fail(e); }
+  }
+
+  function trfLineDlg(rec) {
+    var isNew = !rec;
+    var n = S.view.doc;
+    if (isNew) {
+      var first = trfLines(n)[0] || {};
+      rec = { TRANSFERNUMBER: n, TRANSFERDATE: first.TRANSFERDATE || today(), REASON: first.REASON || '' };
+    }
+    var ro = rec.STATUS && rec.STATUS !== 'Draft' || !can('transfers', isNew ? 'add' : 'edit');
+    S.trfRec = rec;
+    modal((isNew ? T('إضافة أصل — ', 'Add asset — ') : T('سطر نقل — ', 'Transfer line — ')) + n,
+      formHtml('transfers', rec, isNew, ro, { hide: ['TRANSFERNUMBER'] }),
+      (!ro ? '<button class="btn pri" onclick="FA.trfSaveLine()">' + icon('save') + T('حفظ', 'Save') + '</button>' : '') +
+      (!isNew && rec.STATUS === 'Draft' && can('transfers', 'delete') ? '<button class="btn red" onclick="FA.trfDeleteLine()">' + T('حذف', 'Delete') + '</button>' : '') +
+      '<button class="btn" onclick="FA.closeModal()">' + T('إغلاق', 'Close') + '</button>', { wide: true });
+  }
+  async function trfSaveLine() {
+    var saved = await saveForm('transfers', $('#modal [data-form="transfers"]'));
+    if (saved) { closeModal(); render(); }
+  }
+  async function trfDeleteLine() {
+    if (!(await confirmBox(T('حذف هذا السطر؟', 'Delete this line?'), T('حذف', 'Delete'), true))) return;
+    try {
+      await api('deleteRecords', S.token, 'transfers', [{ LINEID: S.trfRec.LINEID }]);
+      await load('transfers', true); toast(T('تم الحذف', 'Deleted'), 'ok'); render();
+    } catch (e) { fail(e); }
+  }
+  async function trfDeleteLines() {
+    var rows = selected('trflines');
+    if (!rows.length) return toast(T('حدد سطراً واحداً على الأقل', 'Select at least one line'));
+    if (!(await confirmBox(T('حذف ', 'Delete ') + rows.length + T(' سطر؟', ' line(s)?'), T('حذف', 'Delete'), true))) return;
+    try {
+      await api('deleteRecords', S.token, 'transfers', rows.map(function (r) { return { LINEID: r.LINEID }; }));
+      S.grids.trflines.sel = {}; await load('transfers', true); render();
+    } catch (e) { fail(e); }
+  }
+  async function trfDeleteDocs() {
+    var ds = selected('trfdocs');
+    if (!ds.length) return toast(T('حدد مستنداً واحداً على الأقل', 'Select at least one document'));
+    if (ds.some(function (d) { return d.STATUS !== 'Draft'; })) return toast(T('يمكن حذف المستندات في حالة مسودة فقط', 'Only draft documents can be deleted'), 'err');
+    if (!(await confirmBox(T('حذف ', 'Delete ') + ds.length + T(' مستند؟', ' document(s)?'), T('حذف', 'Delete'), true))) return;
+    var ids = {};
+    ds.forEach(function (d) { ids[d.TRANSFERNUMBER] = 1; });
+    try {
+      await api('deleteRecords', S.token, 'transfers', S.data.transfers.filter(function (r) { return ids[r.TRANSFERNUMBER]; }).map(function (r) { return { LINEID: r.LINEID }; }));
+      S.grids.trfdocs.sel = {}; await load('transfers', true); render();
+    } catch (e) { fail(e); }
+  }
+  async function trfAction(action) {
+    var msgs = {
+      approve: T('اعتماد مستند النقل؟', 'Approve the transfer document?'),
+      unapprove: T('إلغاء الاعتماد وإعادته إلى مسودة؟', 'Unapprove and return to draft?'),
+      post: T('ترحيل النقل؟ سيتم تحديث موقع ووحدة ومسؤول الأصول ودفاترها، ولا يمكن التراجع.', 'Post the transfer? Asset location, units and responsibility (and their books) will be updated. This cannot be undone.')
+    };
+    if (!(await confirmBox(msgs[action]))) return;
+    try {
+      var c = await api('transferAction', S.token, S.view.doc, action);
+      toast(T('تم بنجاح — عدد الأصول: ', 'Done — assets: ') + c, 'ok');
+      await load('transfers', true);
+      if (action === 'post') { S.data.assets = null; S.data.books = null; await refreshRefs(); }
+      render();
+    } catch (e) { fail(e); }
+  }
+  function exportTrf() { exportRows('transfers', S.data.transfers || [], 'AssetTransfers'); }
+  function exportTrfDoc() { exportRows('transfers', trfLines(S.view.doc), S.view.doc); }
+
+  /** سجل نقل أصل واحد (من صفحة الأصل). */
+  async function assetTrfHistory(id) {
+    await load('transfers', true);
+    var rows = (S.data.transfers || []).filter(function (r) { return low(r.FIXEDASSETNUMBER) === low(id); })
+      .sort(function (a, b) { return String(b.TRANSFERDATE).localeCompare(String(a.TRANSFERDATE)); });
+    modal(T('سجل نقل الأصل ', 'Transfer history of ') + id, '<div class="card">' + grid('trfhist', {
+      rows: function () { return rows; }, key: function (r) { return r.LINEID; },
+      open: function (r) { closeModal(); go('transfers', { doc: r.TRANSFERNUMBER }); },
+      cols: [
+        { k: 'TRANSFERNUMBER', label: T('المستند', 'Document') }, { k: 'TRANSFERDATE', label: T('التاريخ', 'Date') },
+        { k: '_from', label: T('من', 'From'), text: function (r) { return placeText(r, 'FROM_'); } },
+        { k: '_to', label: T('إلى', 'To'), text: function (r) { return placeText(r, 'TO_'); } },
+        { k: 'REASON', label: T('السبب', 'Reason') },
+        { k: 'STATUS', label: T('الحالة', 'Status'), html: function (r) { return badge('journal', r.STATUS); }, text: function (r) { return r.STATUS; } }
+      ]
+    }) + '</div>', (can('transfers', 'add') ? '<button class="btn pri" onclick="FA.closeModal();FA.trfNew([' + jsArg(id) + '])">' + icon('plus') + T('نقل هذا الأصل', 'Transfer this asset') + '</button>' : '') +
+      '<button class="btn" onclick="FA.closeModal()">' + T('إغلاق', 'Close') + '</button>', { wide: true });
+    gridRender('trfhist');
+  }
+
+  /* ======================= Printing ======================= */
+  function printHtml(html, pageCss) {
+    $('#printArea').innerHTML = html;
+    $('#pageStyle').textContent = '@page { ' + pageCss + ' }';
+    document.body.classList.add('print-mode');
+    var done = function () { document.body.classList.remove('print-mode'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    setTimeout(function () { window.print(); setTimeout(done, 1000); }, 120);
+  }
+
+  function printHeader(title) {
+    var st = S.b.settings;
+    return '<div class="ph"><div>' + (st.LOGO ? '<img src="' + esc(st.LOGO) + '" alt="">' : '') + '<b>' + esc(st.ORGNAME) + '</b></div><h2>' + esc(title) + '</h2></div>';
+  }
+
+  function trfPrint() {
+    var n = S.view.doc, lines = trfLines(n);
+    var info = trfDocs().filter(function (d) { return d.TRANSFERNUMBER === n; })[0] || {};
+    var cell = function (r, p) {
+      return '<div>' + esc(placeText({ LOCATION: r[p + 'LOCATION'], BUILDING: r[p + 'BUILDING'], ROOMNUMBER: r[p + 'ROOMNUMBER'] }, '')) + '</div>' +
+        '<small>' + esc([lookupName('Sub2_OperatingUnit', r[p + 'SUB2_OPERATINGUNIT']), lookupName('Department', r[p + 'DEPARTMENT']), lookupName('Employee', r[p + 'RESPONSIBLE'])].filter(String).join(' / ')) + '</small>';
+    };
+    var html = '<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(T('محضر نقل أصول ثابتة', 'Fixed asset transfer form')) +
+      '<table class="meta"><tr><td>' + T('رقم المستند: ', 'Document: ') + '<b>' + esc(n) + '</b></td><td>' + T('التاريخ: ', 'Date: ') + '<b>' + esc(info.TRANSFERDATE || '') + '</b></td><td>' +
+      T('الحالة: ', 'Status: ') + '<b>' + esc(displayVal(fld('transfers', 'STATUS'), info.STATUS === 'Mixed' ? 'Draft' : info.STATUS)) + '</b></td></tr>' +
+      '<tr><td colspan="3">' + T('السبب: ', 'Reason: ') + esc(info.REASON || '') + '</td></tr></table>' +
+      '<table class="lines"><thead><tr><th>#</th><th>' + T('رقم الأصل', 'Asset') + '</th><th>' + T('اسم الأصل', 'Name') + '</th><th>' + T('من', 'From') + '</th><th>' + T('إلى', 'To') + '</th></tr></thead><tbody>' +
+      lines.map(function (r, i) { return '<tr><td>' + (i + 1) + '</td><td dir="ltr">' + esc(r.FIXEDASSETNUMBER) + '</td><td>' + esc(r.ASSETNAME) + '</td><td>' + cell(r, 'FROM_') + '</td><td>' + cell(r, 'TO_') + '</td></tr>'; }).join('') +
+      '</tbody></table><div class="signs">' + [T('المُسلِّم', 'Handed over by'), T('المُستلِم', 'Received by'), T('أمين العهدة', 'Custodian'), T('المعتمد', 'Approved by')].map(function (x) {
+        return '<div><b>' + esc(x) + '</b><span>' + T('الاسم:', 'Name:') + '</span><span>' + T('التوقيع:', 'Signature:') + '</span></div>';
+      }).join('') + '</div></div>';
+    printHtml(html, 'size: A4 portrait; margin: 12mm;');
+  }
+
+  /* ======================= Barcode labels ======================= */
+  var LAYOUTS = {
+    a4_3x8: { ar: 'ورق A4 — 24 ملصق (3×8) مقاس 70×37 مم', en: 'A4 sheet — 24 labels (3×8) 70×37 mm', w: 70, h: 37, cols: 3, rows: 8, mt: 0, ml: 0, gx: 0, gy: 0 },
+    a4_3x7: { ar: 'ورق A4 — 21 ملصق (3×7) مقاس 63.5×38.1 مم', en: 'A4 sheet — 21 labels (3×7) 63.5×38.1 mm', w: 63.5, h: 38.1, cols: 3, rows: 7, mt: 15.15, ml: 7.2, gx: 2.5, gy: 0 },
+    a4_4x10: { ar: 'ورق A4 — 40 ملصق (4×10) مقاس 48.5×25.4 مم', en: 'A4 sheet — 40 labels (4×10) 48.5×25.4 mm', w: 48.5, h: 25.4, cols: 4, rows: 10, mt: 21.5, ml: 8, gx: 0, gy: 0 },
+    roll_50x25: { ar: 'طابعة ملصقات (رول) 50×25 مم', en: 'Label printer roll 50×25 mm', w: 50, h: 25, roll: 1 },
+    roll_100x50: { ar: 'طابعة ملصقات (رول) 100×50 مم', en: 'Label printer roll 100×50 mm', w: 100, h: 50, roll: 1 }
+  };
+
+  function code128Svg(value) {
+    if (typeof JsBarcode === 'undefined') return '<div class="bc-err">' + T('مكتبة الباركود غير محمّلة', 'Barcode library not loaded') + '</div>';
+    try {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      JsBarcode(svg, String(value), { format: 'CODE128', width: 2, height: 60, displayValue: false, margin: 0 });
+      var w = parseFloat(svg.getAttribute('width')) || 200, h = parseFloat(svg.getAttribute('height')) || 60;
+      svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+      svg.removeAttribute('width'); svg.removeAttribute('height'); svg.removeAttribute('style');
+      svg.setAttribute('preserveAspectRatio', 'none');
+      return svg.outerHTML;
+    } catch (e) {
+      return '<div class="bc-err">' + T('لا يمكن ترميز: ', 'Cannot encode: ') + esc(value) + '</div>';
+    }
+  }
+
+  function qrSvg(value) {
+    if (typeof qrcode === 'undefined') return '<div class="bc-err">' + T('مكتبة QR غير محمّلة', 'QR library not loaded') + '</div>';
+    try {
+      if (qrcode.stringToBytesFuncs && qrcode.stringToBytesFuncs['UTF-8']) qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+      var q = qrcode(0, 'M');
+      q.addData(String(value));
+      q.make();
+      var n = q.getModuleCount(), d = '';
+      for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) d += 'M' + c + ' ' + r + 'h1v1h-1z';
+      return '<svg viewBox="-1 -1 ' + (n + 2) + ' ' + (n + 2) + '" shape-rendering="crispEdges"><path d="' + d + '" fill="#000"/></svg>';
+    } catch (e) {
+      return '<div class="bc-err">' + T('لا يمكن ترميز: ', 'Cannot encode: ') + esc(value) + '</div>';
+    }
+  }
+
+  function labelHtml(a, o) {
+    var st = S.b.settings;
+    var loc = [lookupName('Location', a.LOCATION) || a.LOCATION, lookupName('Building', a.BUILDING) || a.BUILDING, lookupName('Room', a.ROOMNUMBER) || a.ROOMNUMBER].filter(String).join(' / ');
+    var top = (o.showLogo && st.LOGO ? '<img src="' + esc(st.LOGO) + '" alt="">' : '') + (o.showOrg ? '<span>' + esc(st.ORGNAME) + '</span>' : '');
+    var text = '<div class="l-no" dir="ltr">' + esc(a.FIXEDASSETNUMBER) + '</div>' +
+      (o.showName ? '<div class="l-name">' + esc(a.NAME) + '</div>' : '') +
+      (o.showLoc && loc ? '<div class="l-loc">' + esc(loc) + '</div>' : '');
+    if (o.type === 'qr') {
+      return '<div class="lbl qr">' + (top ? '<div class="l-top">' + top + '</div>' : '') + '<div class="l-body"><div class="l-qr">' + qrSvg(a.FIXEDASSETNUMBER) + '</div><div class="l-txt">' + text + '</div></div></div>';
+    }
+    return '<div class="lbl">' + (top ? '<div class="l-top">' + top + '</div>' : '') + '<div class="l-code">' + code128Svg(a.FIXEDASSETNUMBER) + '</div>' + text + '</div>';
+  }
+
+  function labelsSheet(list, o) {
+    var L0 = LAYOUTS[o.layout];
+    var labels = [];
+    list.forEach(function (a) { for (var i = 0; i < Math.max(1, Math.min(50, Number(o.copies) || 1)); i++) labels.push(labelHtml(a, o)); });
+    var vars = '--lw:' + L0.w + 'mm;--lh:' + L0.h + 'mm;';
+    if (L0.roll) return '<div class="labels roll" dir="' + document.documentElement.dir + '" style="' + vars + '">' + labels.map(function (l) { return '<div class="rollpage">' + l + '</div>'; }).join('') + '</div>';
+    var per = L0.cols * L0.rows, pages = [];
+    for (var i = 0; i < labels.length; i += per) {
+      pages.push('<div class="sheet" style="padding:' + L0.mt + 'mm ' + L0.ml + 'mm 0;grid-template-columns:repeat(' + L0.cols + ',' + L0.w + 'mm);grid-auto-rows:' + L0.h + 'mm;column-gap:' + L0.gx + 'mm;row-gap:' + L0.gy + 'mm">' +
+        labels.slice(i, i + per).join('') + '</div>');
+    }
+    return '<div class="labels" dir="' + document.documentElement.dir + '" style="' + vars + '">' + pages.join('') + '</div>';
+  }
+
+  async function pageBarcodes() {
+    crumbs([S.b.settings.ORGNAME, T('طباعة الباركود', 'Barcode labels')]);
+    await load('assets');
+    var o = S.bc = S.bc || { type: 'code128', layout: 'a4_3x8', copies: 1, showOrg: true, showName: true, showLoc: true, showLogo: false };
+    if (S.view.only) {
+      S.grids.bc = S.grids.bc || { sel: {} };
+      S.grids.bc.sel = {};
+      S.view.only.forEach(function (id) { S.grids.bc.sel[low(id)] = 1; });
+      S.view.only = null;
+    }
+    var opt = function (list, v) { return list.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (String(x[0]) === String(v) ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
+    var ck = function (k, label) { return '<label style="display:flex;gap:6px;align-items:center;margin:4px 0"><input type="checkbox" data-bc="' + k + '"' + (o[k] ? ' checked' : '') + '>' + esc(label) + '</label>'; };
+    $('#main').innerHTML = apane([
+      { icon: 'list', ar: 'طباعة الملصقات المحددة', en: 'Print selected labels', on: 'FA.bcPrint()' },
+      { icon: 'check', ar: 'تحديد الكل', en: 'Select all', on: "FA.gselAll('bc', true)" },
+      { icon: 'close', ar: 'إلغاء التحديد', en: 'Clear selection', on: "FA.gselAll('bc', false)" }
+    ]) + phead(T('الأصول الثابتة', 'Fixed assets'), T('طباعة ملصقات الباركود', 'Print barcode labels')) +
+      '<div class="content"><div class="card ftab"><div class="ftab-h" style="cursor:default"><h3>' + T('إعدادات الملصق', 'Label settings') + '</h3></div><div class="ftab-b">' +
+      '<div class="fgroup"><h5>' + T('النوع والمقاس', 'Type & size') + '</h5>' +
+      '<div class="fld"><label>' + T('نوع الرمز', 'Code type') + '</label><select class="inp" data-bc="type">' +
+      opt([['code128', T('باركود خطي Code 128', 'Linear barcode Code 128')], ['qr', T('رمز QR', 'QR code')]], o.type) + '</select></div>' +
+      '<div class="fld"><label>' + T('مقاس الملصق', 'Label size') + '</label><select class="inp" data-bc="layout" style="max-width:340px">' +
+      opt(Object.keys(LAYOUTS).map(function (k) { return [k, L(LAYOUTS[k])]; }), o.layout) + '</select></div>' +
+      '<div class="fld"><label>' + T('عدد النسخ لكل أصل', 'Copies per asset') + '</label><input class="inp num" data-bc="copies" value="' + esc(o.copies) + '" style="max-width:80px"></div></div>' +
+      '<div class="fgroup"><h5>' + T('محتوى الملصق', 'Label content') + '</h5>' + ck('showOrg', T('اسم المؤسسة', 'Organization name')) + ck('showLogo', T('الشعار', 'Logo')) +
+      ck('showName', T('اسم الأصل', 'Asset name')) + ck('showLoc', T('الموقع / المبنى / الغرفة', 'Location / building / room')) + '</div>' +
+      '<div class="fgroup"><h5>' + T('قارئ الباركود', 'Barcode scanner') + '</h5><div class="fld"><label>' + T('امسح ملصقاً لفتح الأصل', 'Scan a label to open the asset') + '</label>' +
+      '<input class="inp" id="bcScan" dir="ltr" placeholder="' + T('امسح أو اكتب الرقم ثم Enter', 'Scan or type, then Enter') + '"></div></div>' +
+      '</div></div>' +
+      '<div class="split"><div class="grow"><div class="card">' + grid('bc', {
+        rows: function () { return S.data.assets || []; }, key: function (r) { return low(r.FIXEDASSETNUMBER); }, select: true, onSel: drawBcPreview,
+        cols: [
+          { k: 'FIXEDASSETNUMBER', label: T('رقم الأصل', 'Fixed asset') }, { k: 'NAME', label: T('اسم الأصل', 'Name') },
+          { k: 'FIXEDASSETGROUPID', label: T('المجموعة', 'Group') }, { k: 'LOCATION', label: T('الموقع', 'Location') },
+          { k: 'ROOMNUMBER', label: T('الغرفة', 'Room') }, { k: 'OPERATINGUNIT', label: T('الوحدة', 'Unit') }
+        ]
+      }) + '</div></div><div class="bc-prev-wrap"><div class="card"><h4 style="margin:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px">' +
+      T('معاينة', 'Preview') + ' <small id="bcCount" style="color:#605e5c"></small></h4><div id="bcPreview" class="bc-preview"></div></div></div></div></div>';
+    gridRender('bc');
+    $$('[data-bc]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        var k = el.getAttribute('data-bc');
+        o[k] = el.type === 'checkbox' ? el.checked : el.value;
+        drawBcPreview();
+      });
+    });
+    $('#bcScan').addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter') return;
+      var a = refFind(S.b.refs.assets, ev.target.value.trim());
+      if (a) go('assets', { key: low(a.c) }); else toast(T('الأصل غير موجود: ', 'Asset not found: ') + ev.target.value, 'err');
+    });
+    drawBcPreview();
+  }
+
+  function bcSelected() {
+    var g = S.grids.bc;
+    return (S.data.assets || []).filter(function (r) { return g && g.sel[low(r.FIXEDASSETNUMBER)]; });
+  }
+
+  function drawBcPreview() {
+    var el = $('#bcPreview');
+    if (!el) return;
+    var list = bcSelected();
+    var copies = Math.max(1, Number(S.bc.copies) || 1);
+    $('#bcCount').textContent = list.length ? '(' + list.length * copies + T(' ملصق', ' labels') + ')' : '';
+    if (!list.length) { el.innerHTML = '<div class="empty">' + T('حدد الأصول من الجدول', 'Select assets in the table') + '</div>'; return; }
+    var L0 = LAYOUTS[S.bc.layout];
+    el.innerHTML = '<div class="labels preview" style="--lw:' + L0.w + 'mm;--lh:' + L0.h + 'mm">' + list.slice(0, 6).map(function (a) { return labelHtml(a, S.bc); }).join('') + '</div>' +
+      (list.length > 6 ? '<div class="empty" style="padding:6px">+' + (list.length - 6) + '</div>' : '');
+  }
+
+  function bcPrint() {
+    var list = bcSelected();
+    if (!list.length) return toast(T('حدد الأصول المراد طباعة ملصقاتها', 'Select the assets to print'), 'err');
+    var L0 = LAYOUTS[S.bc.layout];
+    printHtml(labelsSheet(list, S.bc), L0.roll ? 'size: ' + L0.w + 'mm ' + L0.h + 'mm; margin: 0;' : 'size: A4 portrait; margin: 0;');
+  }
+
   /* ======================= Users ======================= */
   function roleTemplate(role) {
     var p = {};
@@ -1590,13 +2031,13 @@
     var set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
     var data = ['assets', 'books', 'journal', 'vendors', 'masterdata'];
     if (role === 'SuperAdmin' || role === 'Admin') set(S.b.permPages, S.b.permActions);
-    else if (role === 'Accountant') { set(data, ['view', 'add', 'edit']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
-    else set(data.concat(['reports']), ['view']);
+    else if (role === 'Accountant') { set(data.concat(['transfers']), ['view', 'add', 'edit']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
+    else set(data.concat(['reports', 'transfers']), ['view']);
     return p;
   }
   var PAGE_NAMES = { assets: ['الأصول الثابتة', 'Fixed assets'], books: ['دفاتر الأصول', 'Books'], journal: ['يومية الأصول', 'FA journal'],
     vendors: ['الموردون', 'Vendors'], users: ['المستخدمون', 'Users'], settings: ['الإعدادات', 'Settings'],
-    depreciation: ['الإهلاك التلقائي', 'Depreciation'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'] };
+    depreciation: ['الإهلاك التلقائي', 'Depreciation'], transfers: ['نقل الأصول', 'Asset transfers'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'] };
   var ACT_NAMES = { view: ['دخول للصفحة', 'View'], add: ['إضافة', 'Add'], edit: ['تعديل', 'Edit'], delete: ['حذف', 'Delete'], approve: ['اعتماد', 'Approve'], post: ['ترحيل', 'Post'] };
 
   async function pageUsers() {
@@ -1848,9 +2289,10 @@
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && $('#modal .overlay') && !S.b?.user?.mustChange) closeModal(); });
     $('#fileInput').addEventListener('change', function () { if (this.files[0]) onImportFile(this.files[0]); });
     try { S.info = await api('getPublicInfo'); } catch (e) { S.info = {}; }
-    var tok = ls('fa_token');
+    try { localStorage.removeItem('fa_token'); } catch (e) { /* رمز قديم من الإصدارات السابقة */ }
+    var tok = tokGet();
     if (tok) {
-      try { enter(await api('bootstrap', tok)); return; } catch (e) { lsSet('fa_token', ''); }
+      try { enter(await api('bootstrap', tok)); return; } catch (e) { tokSet(''); }
     }
     showLogin();
   }
@@ -1868,6 +2310,15 @@
     resetPwDlg: resetPwDlg, resetPw: resetPw, changePasswordDlg: changePasswordDlg, changePw: changePw, logout: logout,
     saveSettings: saveSettings, logoPicked: logoPicked, removeLogo: removeLogo, endSession: endSession,
     lookupDlg: lookupDlg, saveLookup: saveLookup, ltab: ltab, tip: tip,
+    trfNew: trfNew, trfAddAsset: trfAddAsset, trfRemove: trfRemove, trfCreate: trfCreate, trfLineDlg: trfLineDlg, trfSaveLine: trfSaveLine,
+    trfDeleteLine: trfDeleteLine, trfDeleteLines: trfDeleteLines, trfDeleteDocs: trfDeleteDocs, trfAction: trfAction, trfPrint: trfPrint,
+    exportTrf: exportTrf, exportTrfDoc: exportTrfDoc, assetTrfHistory: assetTrfHistory, bcPrint: bcPrint,
+    trfSelected: function () {
+      var sel = selected('list_assets');
+      if (!sel.length) return toast(T('حدد الأصول المراد نقلها', 'Select the assets to transfer'), 'err');
+      trfNew(sel.map(function (r) { return r.FIXEDASSETNUMBER; }));
+    },
+    bcSelectedAssets: function () { go('barcodes', { only: selected('list_assets').map(function (r) { return r.FIXEDASSETNUMBER; }) }); },
     accSearch: accSearch, accToggle: accToggle, accAll: accAll, exportRowsAcc: exportRowsAcc,
     depCalc: depCalc, depCreate: depCreate, depExport: depExport, repFilter: repFilter, repRefresh: repRefresh, repExport: repExport
   };

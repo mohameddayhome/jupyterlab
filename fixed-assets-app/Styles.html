@@ -250,6 +250,47 @@
   ul.tree ul { list-style: none; padding-inline-start: 16px; margin: 4px 0; border-inline-start: 1px dashed var(--input-border); }
   ul.tree li { padding: 3px 0; }
   ul.tree li span { color: var(--muted); }
+  /* ---------- Phase 4: chips, labels, printing ---------- */
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--primary-soft); border-radius: 14px; padding: 2px 4px 2px 10px; margin: 3px; font-size: 12px; }
+  .chip small { color: var(--muted); }
+  .bc-prev-wrap { width: 340px; flex: none; }
+  .bc-preview { padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; max-height: 70vh; overflow: auto; }
+  .labels.preview { display: flex; flex-direction: column; gap: 8px; }
+  .labels .lbl { width: var(--lw); height: var(--lh); box-sizing: border-box; padding: 1.5mm 2mm; overflow: hidden; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; background: #fff; color: #000; font-family: var(--font); line-height: 1.15; }
+  .labels.preview .lbl { outline: 1px dashed #a19f9d; }
+  .lbl .l-top { display: flex; align-items: center; justify-content: center; gap: 1.5mm; font-size: calc(var(--lh) * 0.075); font-weight: 700; max-width: 100%; white-space: nowrap; overflow: hidden; }
+  .lbl .l-top img { height: calc(var(--lh) * 0.14); }
+  .lbl .l-code { width: 92%; height: calc(var(--lh) * 0.36); margin: 0.6mm 0; }
+  .lbl .l-code svg { width: 100%; height: 100%; display: block; }
+  .lbl .l-no { font-size: calc(var(--lh) * 0.1); font-weight: 700; letter-spacing: .3px; font-family: Consolas, "Courier New", monospace; }
+  .lbl .l-name, .lbl .l-loc { font-size: calc(var(--lh) * 0.075); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lbl .l-loc { color: #333; }
+  .lbl.qr .l-body { display: flex; align-items: center; gap: 2mm; width: 100%; flex: 1; min-height: 0; }
+  .lbl.qr .l-qr { height: calc(var(--lh) * 0.72); aspect-ratio: 1; flex: none; }
+  .lbl.qr .l-qr svg { width: 100%; height: 100%; display: block; }
+  .lbl.qr .l-txt { flex: 1; min-width: 0; text-align: start; }
+  .lbl .bc-err { font-size: 9px; color: #c50f1f; }
+  #printArea { display: none; }
+  .labels .sheet { display: grid; width: 210mm; height: 297mm; box-sizing: border-box; page-break-after: always; break-after: page; }
+  .labels .rollpage { width: var(--lw); height: var(--lh); page-break-after: always; break-after: page; }
+  .doc { font-family: var(--font); font-size: 12px; color: #000; }
+  .doc .ph { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1f2a44; padding-bottom: 8px; margin-bottom: 12px; }
+  .doc .ph div { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .doc .ph img { height: 40px; }
+  .doc .ph h2 { margin: 0; font-size: 18px; }
+  .doc table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  .doc .meta td { padding: 4px 6px; }
+  .doc .lines th, .doc .lines td { border: 1px solid #555; padding: 5px 6px; text-align: start; vertical-align: top; }
+  .doc .lines th { background: #eef1f8; }
+  .doc .lines small { color: #444; }
+  .doc .signs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 30px; }
+  .doc .signs div { border-top: 1px solid #555; padding-top: 6px; display: flex; flex-direction: column; gap: 14px; }
+  @media print {
+    body.print-mode > *:not(#printArea) { display: none !important; }
+    body.print-mode #printArea { display: block !important; }
+    body.print-mode { background: #fff; }
+  }
   .print-head { display: none; }
   @media print {
     .topbar, .navpane, .apane, .gridtools, .phead, .toasts, .busy, #modal, .grid .ck { display: none !important; }
@@ -270,7 +311,7 @@
     .crumbs { display: none; }
     .topbar .brand { border: 0; flex: 1; }
     .split { flex-direction: column; align-items: stretch; }
-    .split > .grow, .factbox { width: 100%; }
+    .split > .grow, .factbox, .bc-prev-wrap { width: 100%; }
     .lpane { width: 100%; position: static; max-height: 240px; }
     .content { padding: 0 8px; }
     .apane { top: 52px; margin: 6px; }

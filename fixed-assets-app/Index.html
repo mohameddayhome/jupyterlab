@@ -47,9 +47,13 @@
   <div id="modal"></div>
   <div class="toasts" id="toasts"></div>
   <div class="busy hidden" id="busy"></div>
+  <div id="printArea"></div>
+  <style id="pageStyle"></style>
   <input type="file" id="fileInput" class="hidden" accept=".xlsx,.xls,.csv">
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
   <?!= include_('App'); ?>
 </body>
 </html>

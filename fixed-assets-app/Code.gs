@@ -10,8 +10,8 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '2.0.0';
-const SETUP_VERSION = '2';
+const APP_VERSION = '3.0.0';
+const SETUP_VERSION = '3';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
@@ -57,24 +57,48 @@ const TRANS_TYPES = [
 ];
 
 const JOURNAL_STATUS = [o('Draft', 'مسودة'), o('Approved', 'معتمد'), o('Posted', 'مُرحّل')];
-const OFFSET_TYPES = [o('Ledger', 'دفتر الأستاذ', 'Ledger'), o('Vendor', 'مورد', 'Vendor')];
-
-const LOOKUP_TYPES = [
-  o('AssetGroup', 'مجموعات الأصول', 'Fixed asset groups'), o('Location', 'المواقع', 'Locations'),
-  o('Department', 'الإدارات / الأقسام', 'Departments'), o('OperatingUnit', 'الوحدة التشغيلية', 'A_OperatingUnit'),
-  o('Sub1_OperatingUnit', 'الوحدة الفرعية 1', 'A_Sub1_OperatingUnit'),
-  o('Sub2_OperatingUnit', 'الوحدة الفرعية 2', 'A_Sub2_OperatingUnit'),
-  o('JournalName', 'أسماء اليوميات', 'Journal names'), o('Building', 'المباني', 'Buildings'),
-  o('Room', 'الغرف', 'Rooms'), o('Employee', 'الموظفون المسؤولون', 'Responsible employees')
-];
-
-/** أنواع القوائم التي لها أب (الكود الأب يُختار من النوع المذكور). */
-const LOOKUP_PARENTS = { Sub1_OperatingUnit: 'OperatingUnit', Sub2_OperatingUnit: 'Sub1_OperatingUnit', Room: 'Building' };
 
 const ACCOUNT_TYPES = [o('ProfitAndLoss', 'أرباح وخسائر', 'Profit and loss'), o('Revenue', 'إيرادات', 'Revenue'),
   o('Expense', 'مصروفات', 'Expense'), o('BalanceSheet', 'الميزانية العمومية', 'Balance sheet'), o('Asset', 'أصول', 'Asset'),
   o('Liability', 'خصوم', 'Liability'), o('Equity', 'حقوق ملكية', 'Equity'), o('Total', 'إجمالي', 'Total'),
   o('Reporting', 'تقارير', 'Reporting')];
+const ACCOUNT_LEVELS = [o('Header', 'رئيسي', 'Header'), o('Posting', 'فرعي', 'Posting')];
+
+/**
+ * القوائم الأساسية — كل نوع في صفحة (شيت) مستقلة: كود + اسم + كود الأب.
+ * parent: النوع الأعلى في الشجرة.
+ */
+const LK = [
+  { v: 'OperatingUnit', sheet: 'OperatingUnits', ar: 'الوحدات الرئيسية', en: 'Operating units', d365: 'A_OperatingUnit' },
+  { v: 'Sub1_OperatingUnit', sheet: 'Sub1OperatingUnits', parent: 'OperatingUnit', req: 1, ar: 'الوحدات الفرعية 1', en: 'Sub 1 operating units', d365: 'A_Sub1_OperatingUnit' },
+  { v: 'Sub2_OperatingUnit', sheet: 'Sub2OperatingUnits', parent: 'Sub1_OperatingUnit', req: 1, ar: 'الوحدات الفرعية 2', en: 'Sub 2 operating units', d365: 'A_Sub2_OperatingUnit' },
+  { v: 'Location', sheet: 'Locations', ar: 'المواقع', en: 'Locations' },
+  { v: 'Building', sheet: 'Buildings', parent: 'Location', ar: 'المباني', en: 'Buildings' },
+  { v: 'Room', sheet: 'Rooms', parent: 'Building', ar: 'الغرف', en: 'Rooms' },
+  { v: 'Department', sheet: 'Departments', ar: 'الإدارات / الأقسام', en: 'Departments' },
+  { v: 'Employee', sheet: 'Employees', ar: 'الموظفون المسؤولون', en: 'Responsible employees' },
+  { v: 'JournalName', sheet: 'JournalNames', ar: 'أسماء اليوميات', en: 'Journal names' }
+];
+const LKMAP = {};
+LK.forEach(function (t) { LKMAP[t.v] = t; });
+
+/** سلاسل الشجرة (من الأدنى إلى الأعلى): المستخدم يختار الأدنى والنظام يملأ الأعلى. */
+const UNIT_CHAIN = [['SUB2_OPERATINGUNIT', 'Sub2_OperatingUnit'], ['SUB1_OPERATINGUNIT', 'Sub1_OperatingUnit'], ['OPERATINGUNIT', 'OperatingUnit']];
+const OFFSET_CHAIN = [['OFFSET_SUB2_OPERATINGUNIT', 'Sub2_OperatingUnit'], ['OFFSET_SUB1_OPERATINGUNIT', 'Sub1_OperatingUnit'], ['OFFSET_OPERATINGUNIT', 'OperatingUnit']];
+const LOCATION_CHAIN = [['ROOMNUMBER', 'Room'], ['BUILDING', 'Building'], ['LOCATION', 'Location']];
+
+/** حقول الوحدات الثلاثة: المستخدم يسجّل الفرعية 2 والباقي يُكتب تلقائياً. */
+function unitFields_(prefix, sec, grp, x) {
+  x = x || {};
+  return [
+    F(prefix + 'OPERATINGUNIT', 'الوحدة الرئيسية', 'A_A_OperatingUnit', 'lookup', Object.assign({ lk: 'OperatingUnit', calc: 1, sec: sec, grp: grp,
+      aliases: prefix ? [] : ['A_OperatingUnit', 'A_A_OperatingUnit', 'OperatingUnit'] }, x.ou || {})),
+    F(prefix + 'SUB1_OPERATINGUNIT', 'الوحدة الفرعية 1', 'A_Sub1_OperatingUnit', 'lookup', { lk: 'Sub1_OperatingUnit', up: prefix + 'OPERATINGUNIT', calc: 1, sec: sec, grp: grp,
+      aliases: prefix ? [] : ['A_Sub1_OperatingUnit', 'Sub1_OperatingUnit'] }),
+    F(prefix + 'SUB2_OPERATINGUNIT', 'الوحدة الفرعية 2', 'A_Sub2_OperatingUnit', 'lookup', { lk: 'Sub2_OperatingUnit', up: prefix + 'SUB1_OPERATINGUNIT',
+      calc: x.calc ? 1 : 0, sec: sec, grp: grp, aliases: prefix ? [] : ['A_Sub2_OperatingUnit', 'Sub2_OperatingUnit'] })
+  ];
+}
 
 const SCHEMAS = {
   assets: {
@@ -83,31 +107,36 @@ const SCHEMAS = {
       { id: 'general', ar: 'عام', en: 'General', groups: [
         { id: 'id', ar: 'التعريف', en: 'Identification' }, { id: 'desc', ar: 'الوصف', en: 'Description' },
         { id: 'type', ar: 'النوع', en: 'Type' }, { id: 'qty', ar: 'الكمية', en: 'Quantity' }] },
+      { id: 'dims', ar: 'الوحدات التشغيلية (الأبعاد المالية)', en: 'Operating units (financial dimensions)', groups: [
+        { id: 'dims', ar: 'سجّل الوحدة الفرعية 2 وتُكتب الوحدات الأعلى تلقائياً', en: 'Enter sub-unit 2; higher units fill automatically' }] },
       { id: 'tech', ar: 'معلومات فنية', en: 'Technical information', groups: [
         { id: 'model', ar: 'الموديل', en: 'Model' }] },
       { id: 'loc', ar: 'الموقع والمسؤولية', en: 'Location & responsibility', groups: [
-        { id: 'loc', ar: 'الموقع', en: 'Location' }, { id: 'emp', ar: 'المسؤول', en: 'Responsible' }] }
+        { id: 'loc', ar: 'الموقع (اختر الغرفة ويُكتب المبنى والموقع)', en: 'Location (pick the room; building and location fill in)' },
+        { id: 'emp', ar: 'المسؤول', en: 'Responsible' }] }
     ],
     fields: [
       F('FIXEDASSETNUMBER', 'رقم الأصل', 'Number', 'text', { req: 1, key: 1, sec: 'general', grp: 'id', list: 1, sum: 1,
         aliases: ['Fixed asset number', 'Asset ID', 'ASSETID', 'Fixed asset'] }),
       F('FIXEDASSETGROUPID', 'مجموعة الأصل', 'Fixed asset group', 'lookup', { lk: 'AssetGroup', req: 1, sec: 'general', grp: 'id', list: 1,
         aliases: ['Fixed asset group', 'Asset group', 'ASSETGROUP', 'GROUPID'] }),
+      F('ASSETACCOUNT', 'حساب الأصل (من المجموعة)', 'Asset account', 'lookup', { lk: '@allAccounts', calc: 1, sec: 'general', grp: 'id' }),
       F('NAME', 'اسم الأصل', 'Name', 'text', { req: 1, sec: 'general', grp: 'desc', list: 1, sum: 1, aliases: ['Asset name', 'Fixed asset name'] }),
       F('ASSETTYPE', 'النوع', 'Type', 'select', { opts: ASSET_TYPES, dflt: 'Tangible', sec: 'general', grp: 'type', list: 1, sum: 1,
         aliases: ['Asset type', 'TYPE'] }),
-      F('QUANTITY', 'الكمية', 'Quantity', 'number', { dec: 2, dflt: 1, sec: 'general', grp: 'qty', list: 1 }),
+      F('QUANTITY', 'الكمية', 'Quantity', 'number', { dec: 2, dflt: 1, sec: 'general', grp: 'qty', list: 1 })
+    ].concat(unitFields_('', 'dims', 'dims', { ou: { list: 1, sum: 1 } })).concat([
       F('MODEL', 'الموديل', 'Model', 'text', { sec: 'tech', grp: 'model', list: 1, sum: 1 }),
       F('GUARANTEEDATE', 'تاريخ الضمان', 'Guarantee date', 'date', { sec: 'tech', grp: 'model', sum: 1,
         aliases: ['Warranty date', 'WARRANTYDATE'] }),
       F('LOCATION', 'الموقع', 'Location', 'lookup', { lk: 'Location', sec: 'loc', grp: 'loc', list: 1, sum: 1,
         aliases: ['Location ID', 'LOCATIONID', 'Location memo', 'LOCATIONMEMO'] }),
-      F('DEPARTMENT', 'الإدارة / القسم', 'Department', 'lookup', { lk: 'Department', sec: 'loc', grp: 'loc', list: 1 }),
-      F('BUILDING', 'المبنى', 'Building', 'lookup', { lk: 'Building', sec: 'loc', grp: 'loc', list: 1, aliases: ['Building ID'] }),
-      F('ROOMNUMBER', 'رقم الغرفة', 'Room number', 'lookup', { lk: 'Room', parent: 'BUILDING', sec: 'loc', grp: 'loc', aliases: ['Room'] }),
+      F('BUILDING', 'المبنى', 'Building', 'lookup', { lk: 'Building', up: 'LOCATION', sec: 'loc', grp: 'loc', list: 1, aliases: ['Building ID'] }),
+      F('ROOMNUMBER', 'رقم الغرفة', 'Room number', 'lookup', { lk: 'Room', up: 'BUILDING', sec: 'loc', grp: 'loc', aliases: ['Room'] }),
+      F('DEPARTMENT', 'الإدارة / القسم', 'Department', 'lookup', { lk: 'Department', sec: 'loc', grp: 'emp', list: 1 }),
       F('RESPONSIBLE', 'الموظف المسؤول', 'Employee', 'lookup', { lk: 'Employee', sec: 'loc', grp: 'emp', list: 1, sum: 1,
         aliases: ['Worker responsible', 'WORKERRESPONSIBLE', 'Responsible', 'Employee', 'WORKERRESPONSIBLEPERSONNELNUMBER'] })
-    ]
+    ])
   },
 
   books: {
@@ -118,7 +147,7 @@ const SCHEMAS = {
         { id: 'bal', ar: 'الرصيد', en: 'Balance' }] },
       { id: 'dep', ar: 'الإهلاك', en: 'Depreciation', groups: [
         { id: 'life', ar: 'العمر الإنتاجي', en: 'Service life' }, { id: 'run', ar: 'الإهلاك', en: 'Depreciation' }] },
-      { id: 'dims', ar: 'الأبعاد المالية الافتراضية', en: 'Default financial dimensions', groups: [
+      { id: 'dims', ar: 'الأبعاد المالية الافتراضية (من الأصل)', en: 'Default financial dimensions (from the asset)', groups: [
         { id: 'dims', ar: 'الأبعاد المالية', en: 'Financial dimensions' }] }
     ],
     fields: [
@@ -144,16 +173,11 @@ const SCHEMAS = {
       F('DEPRECIATIONSTARTDATE', 'تاريخ تشغيل الإهلاك', 'Depreciation run date', 'date', { sec: 'dep', grp: 'run',
         aliases: ['DEPRECIATIONRUNDATE', 'Depreciation start date'] }),
       F('LASTDEPRECIATIONDATE', 'تاريخ آخر إهلاك', 'Date when depreciation was last run', 'date', { sec: 'dep', grp: 'run', list: 1,
-        aliases: ['Last depreciation date', 'LASTDEPRECIATIONRUNDATE'] }),
-      F('OPERATINGUNIT', 'الوحدة التشغيلية', 'A_A_OperatingUnit', 'lookup', { lk: 'OperatingUnit', sec: 'dims', grp: 'dims', list: 1,
-        aliases: ['A_OperatingUnit', 'A_A_OperatingUnit', 'OperatingUnit'] }),
-      F('SUB1_OPERATINGUNIT', 'الوحدة الفرعية 1', 'A_Sub1_OperatingUnit', 'lookup', { lk: 'Sub1_OperatingUnit', parent: 'OPERATINGUNIT', sec: 'dims', grp: 'dims',
-        aliases: ['A_Sub1_OperatingUnit', 'Sub1_OperatingUnit'] }),
-      F('SUB2_OPERATINGUNIT', 'الوحدة الفرعية 2', 'A_Sub2_OperatingUnit', 'lookup', { lk: 'Sub2_OperatingUnit', parent: 'SUB1_OPERATINGUNIT', sec: 'dims', grp: 'dims',
-        aliases: ['A_Sub2_OperatingUnit', 'Sub2_OperatingUnit'] }),
+        aliases: ['Last depreciation date', 'LASTDEPRECIATIONRUNDATE'] })
+    ].concat(unitFields_('', 'dims', 'dims', { calc: 1, ou: { list: 1 } })).concat([
       F('DEFAULTDIMENSIONDISPLAYVALUE', 'قيمة الأبعاد الافتراضية', 'Default dimension display value', 'text', { calc: 1, sec: 'dims', grp: 'dims',
         aliases: ['Default dimension', 'DEFAULTDIMENSION', 'Financial dimensions'] })
-    ]
+    ])
   },
 
   journal: {
@@ -162,8 +186,8 @@ const SCHEMAS = {
       { id: 'line', ar: 'السطر', en: 'Line', groups: [
         { id: 'batch', ar: 'اليومية', en: 'Journal' }, { id: 'asset', ar: 'الأصل', en: 'Fixed asset' },
         { id: 'amt', ar: 'المبلغ', en: 'Amount' }] },
-      { id: 'offset', ar: 'الحساب المقابل', en: 'Offset account', groups: [
-        { id: 'offset', ar: 'الحساب المقابل', en: 'Offset account' }] },
+      { id: 'offset', ar: 'الحساب المقابل (من دليل الحسابات)', en: 'Offset account (chart of accounts)', groups: [
+        { id: 'offset', ar: 'الحساب المقابل', en: 'Offset account' }, { id: 'odims', ar: 'الوحدات (سجّل الفرعية 2)', en: 'Units (enter sub-unit 2)' }] },
       { id: 'wf', ar: 'سير العمل', en: 'Workflow', groups: [{ id: 'wf', ar: 'الحالة', en: 'Status' }] }
     ],
     fields: [
@@ -179,17 +203,16 @@ const SCHEMAS = {
         aliases: ['Fixed asset', 'Asset ID', 'ACCOUNTDISPLAYVALUE', 'ASSETID'] }),
       F('ASSETNAME', 'اسم الأصل', 'Asset name', 'text', { calc: 1, sec: 'line', grp: 'asset', list: 1, aliases: ['Name', 'Fixed asset name'] }),
       F('BOOKID', 'الدفتر', 'Book', 'lookup', { lk: '@books', dflt: 'General', sec: 'line', grp: 'asset', list: 1, aliases: ['Book ID', 'FIXEDASSETBOOKID'] }),
+      F('LEDGERACCOUNT', 'حساب الأصل في القيد (من المجموعة)', 'Fixed asset ledger account', 'lookup', { lk: '@allAccounts', calc: 1, sec: 'line', grp: 'asset' }),
       F('TEXT', 'الوصف', 'Description', 'text', { sec: 'line', grp: 'amt', list: 1, aliases: ['Description', 'TRANSTEXT', 'Transaction text'] }),
       F('DEBITAMOUNT', 'مدين', 'Debit', 'number', { dec: 3, sec: 'line', grp: 'amt', list: 1, aliases: ['AMOUNTCURDEBIT', 'Debit amount'] }),
       F('CREDITAMOUNT', 'دائن', 'Credit', 'number', { dec: 3, sec: 'line', grp: 'amt', list: 1, aliases: ['AMOUNTCURCREDIT', 'Credit amount'] }),
       F('DEPRECIATIONMONTHS', 'عدد شهور الإهلاك', 'Depreciation months', 'number', { dec: 0, sec: 'line', grp: 'amt',
         aliases: ['Depreciation periods', 'PERIODS'] }),
-      F('OFFSETACCOUNTTYPE', 'نوع الحساب المقابل', 'Offset account type', 'select', { opts: OFFSET_TYPES, dflt: 'Ledger', sec: 'offset', grp: 'offset' }),
-      F('OFFSETACCOUNT', 'رقم الحساب', 'Account number', 'lookup', { lkBy: 'OFFSETACCOUNTTYPE', lkMap: { Ledger: '@accounts', Vendor: '@vendors' },
-        sec: 'offset', grp: 'offset', aliases: ['Offset main account', 'OFFSETMAINACCOUNT', 'MAINACCOUNT'] }),
-      F('OFFSET_OPERATINGUNIT', 'الوحدة التشغيلية', 'A_A_OperatingUnit', 'lookup', { lk: 'OperatingUnit', sec: 'offset', grp: 'offset' }),
-      F('OFFSET_SUB1_OPERATINGUNIT', 'الوحدة الفرعية 1', 'A_Sub1_OperatingUnit', 'lookup', { lk: 'Sub1_OperatingUnit', parent: 'OFFSET_OPERATINGUNIT', sec: 'offset', grp: 'offset' }),
-      F('OFFSET_SUB2_OPERATINGUNIT', 'الوحدة الفرعية 2', 'A_Sub2_OperatingUnit', 'lookup', { lk: 'Sub2_OperatingUnit', parent: 'OFFSET_SUB1_OPERATINGUNIT', sec: 'offset', grp: 'offset' }),
+      F('VENDORACCOUNT', 'المورد (يملأ حسابه تلقائياً)', 'Vendor', 'lookup', { lk: '@vendors', sec: 'offset', grp: 'offset', aliases: ['Vendor account'] }),
+      F('OFFSETACCOUNT', 'رقم الحساب المقابل', 'Offset main account', 'lookup', { lk: '@accounts', sec: 'offset', grp: 'offset',
+        aliases: ['Offset account number', 'OFFSETMAINACCOUNT', 'MAINACCOUNT'] })
+    ].concat(unitFields_('OFFSET_', 'offset', 'odims')).concat([
       F('OFFSETACCOUNTDISPLAYVALUE', 'الحساب المقابل', 'Offset account', 'text', { calc: 1, sec: 'offset', grp: 'offset', list: 1,
         aliases: ['Offset account display value'] }),
       F('STATUS', 'الحالة', 'Status', 'select', { opts: JOURNAL_STATUS, sys: 1, sec: 'wf', grp: 'wf', list: 1 }),
@@ -197,13 +220,13 @@ const SCHEMAS = {
       F('APPROVEDON', 'تاريخ الاعتماد', 'Approved on', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
       F('POSTEDBY', 'رحّل بواسطة', 'Posted by', 'text', { sys: 1, sec: 'wf', grp: 'wf' }),
       F('POSTEDON', 'تاريخ الترحيل', 'Posted on', 'text', { sys: 1, sec: 'wf', grp: 'wf' })
-    ]
+    ])
   },
 
   vendors: {
     sheet: 'Vendors', perm: 'vendors', key: ['VENDORACCOUNTNUMBER'], title: { ar: 'الموردون', en: 'Vendors' },
     sections: [{ id: 'general', ar: 'عام', en: 'General', groups: [
-      { id: 'id', ar: 'التعريف', en: 'Identification' }, { id: 'contact', ar: 'الاتصال', en: 'Contact' }] }],
+      { id: 'id', ar: 'التعريف', en: 'Identification' }, { id: 'contact', ar: 'الاتصال', en: 'Contact' }, { id: 'acc', ar: 'المحاسبة', en: 'Accounting' }] }],
     fields: [
       F('VENDORACCOUNTNUMBER', 'رقم المورد', 'Vendor account', 'text', { req: 1, key: 1, sec: 'general', grp: 'id', list: 1,
         aliases: ['Vendor account number', 'Vendor', 'ACCOUNTNUM'] }),
@@ -212,36 +235,67 @@ const SCHEMAS = {
       F('ADDRESS', 'العنوان', 'Address', 'textarea', { sec: 'general', grp: 'contact', list: 1,
         aliases: ['FULLPRIMARYADDRESS', 'Primary address', 'ADDRESSDESCRIPTION', 'ADDRESSSTREET'] }),
       F('PRIMARYEMAILADDRESS', 'البريد الإلكتروني', 'Email', 'email', { sec: 'general', grp: 'contact', list: 1,
-        aliases: ['Primary email', 'EMAIL', 'Email address'] })
+        aliases: ['Primary email', 'EMAIL', 'Email address'] }),
+      F('VENDORLEDGERACCOUNT', 'حساب المورد في الدليل', 'Vendor ledger account', 'lookup', { lk: '@accounts', sec: 'general', grp: 'acc', list: 1,
+        aliases: ['Summary account', 'Ledger account', 'Payable account'] })
+    ]
+  },
+
+  groups: {
+    sheet: 'AssetGroups', perm: 'masterdata', key: ['FIXEDASSETGROUPID'], title: { ar: 'مجموعات الأصول', en: 'Fixed asset groups' },
+    sections: [
+      { id: 'general', ar: 'عام', en: 'General', groups: [{ id: 'id', ar: 'المجموعة', en: 'Group' }] },
+      { id: 'acc', ar: 'حسابات الترحيل (من دليل الحسابات)', en: 'Posting accounts (chart of accounts)', groups: [
+        { id: 'asset', ar: 'حسابات الأصل', en: 'Asset accounts' }, { id: 'pl', ar: 'حسابات المصروف والاستبعاد', en: 'Expense & disposal accounts' }] }
+    ],
+    fields: [
+      F('FIXEDASSETGROUPID', 'كود المجموعة', 'Fixed asset group', 'text', { req: 1, key: 1, sec: 'general', grp: 'id', list: 1,
+        aliases: ['Group', 'Fixed asset group ID', 'GROUPID', 'CODE'] }),
+      F('NAME', 'اسم المجموعة', 'Name', 'text', { req: 1, sec: 'general', grp: 'id', list: 1, aliases: ['Description'] }),
+      F('ASSETACCOUNT', 'حساب الأصل (التكلفة / الاقتناء)', 'Fixed asset account (acquisition)', 'lookup', { lk: '@accounts', sec: 'acc', grp: 'asset', list: 1 }),
+      F('ACCUMDEPACCOUNT', 'حساب مجمع الإهلاك', 'Accumulated depreciation account', 'lookup', { lk: '@accounts', sec: 'acc', grp: 'asset', list: 1 }),
+      F('DEPEXPENSEACCOUNT', 'حساب مصروف الإهلاك', 'Depreciation expense account', 'lookup', { lk: '@accounts', sec: 'acc', grp: 'pl', list: 1 }),
+      F('DISPOSALACCOUNT', 'حساب أرباح / خسائر الاستبعاد', 'Disposal gain/loss account', 'lookup', { lk: '@accounts', sec: 'acc', grp: 'pl', list: 1 })
     ]
   },
 
   accounts: {
     sheet: 'MainAccounts', perm: 'masterdata', key: ['MAINACCOUNTID'], title: { ar: 'دليل الحسابات', en: 'Chart of accounts' },
     sections: [{ id: 'general', ar: 'عام', en: 'General', groups: [
-      { id: 'id', ar: 'الحساب', en: 'Account' }, { id: 'cls', ar: 'التصنيف', en: 'Classification' }] }],
+      { id: 'id', ar: 'الحساب', en: 'Account' }, { id: 'tree', ar: 'الشجرة', en: 'Hierarchy' }, { id: 'cls', ar: 'التصنيف', en: 'Classification' }] }],
     fields: [
       F('MAINACCOUNTID', 'رقم الحساب', 'Account number', 'text', { req: 1, key: 1, sec: 'general', grp: 'id', list: 1,
         aliases: ['Main account', 'Main account ID', 'MAINACCOUNT', 'Account', 'AccountNumber'] }),
       F('NAME', 'اسم الحساب', 'Account name', 'text', { req: 1, sec: 'general', grp: 'id', list: 1, aliases: ['Name', 'AccountName'] }),
+      F('ACCOUNTLEVEL', 'مستوى الحساب', 'Account level', 'select', { opts: ACCOUNT_LEVELS, req: 1, dflt: 'Posting', sec: 'general', grp: 'tree', list: 1,
+        aliases: ['Level'] }),
+      F('PARENTACCOUNT', 'الحساب الأب (الرئيسي)', 'Parent (header) account', 'lookup', { lk: '@accountHeaders', sec: 'general', grp: 'tree', list: 1,
+        aliases: ['Parent account', 'Parent'] }),
       F('MAINACCOUNTCATEGORY', 'مجموعة الحساب الرئيسي', 'Main account group', 'text', { sec: 'general', grp: 'cls', list: 1,
         aliases: ['Main account category', 'MainAccountGroup', 'Account category', 'MAINACCOUNTCATEGORYID'] }),
       F('MAINACCOUNTTYPE', 'نوع الحساب', 'Account type', 'select', { opts: ACCOUNT_TYPES, req: 1, sec: 'general', grp: 'cls', list: 1,
         aliases: ['Main account type', 'Type', 'AccountType'] })
     ]
-  },
-
-  lookups: {
-    sheet: 'Lookups', perm: 'masterdata', key: ['TYPE', 'CODE'], title: { ar: 'القوائم المرجعية', en: 'Lookups' },
-    sections: [{ id: 'general', ar: 'عام', en: 'General', groups: [{ id: 'g', ar: 'القيمة', en: 'Value' }] }],
-    fields: [
-      F('TYPE', 'النوع', 'Type', 'select', { opts: LOOKUP_TYPES, req: 1, key: 1, sec: 'general', grp: 'g', list: 1 }),
-      F('CODE', 'الكود', 'Code', 'text', { req: 1, key: 1, sec: 'general', grp: 'g', list: 1, aliases: ['Value', 'ID'] }),
-      F('NAME', 'الاسم', 'Name', 'text', { sec: 'general', grp: 'g', list: 1, aliases: ['Description'] }),
-      F('PARENT', 'الكود الأب', 'Parent code', 'lookup', { lkBy: 'TYPE', lkMap: LOOKUP_PARENTS, sec: 'general', grp: 'g', list: 1 })
-    ]
   }
 };
+
+// إنشاء مخطط لكل قائمة أساسية (شيت مستقل لكل نوع)
+LK.forEach(function (t) {
+  const fields = [
+    F('CODE', 'الكود', 'ID', 'text', { req: 1, key: 1, sec: 'general', grp: 'g', list: 1,
+      aliases: ['Value', 'ID', 'Code', t.d365 || t.v, 'DIMENSIONVALUE'] }),
+    F('NAME', 'الاسم', 'Name', 'text', { req: 1, sec: 'general', grp: 'g', list: 1, aliases: ['Description'] })
+  ];
+  if (t.parent) {
+    fields.push(F('PARENT', 'يتبع: ' + LKMAP[t.parent].ar, 'Parent: ' + LKMAP[t.parent].en, 'lookup', { lk: t.parent, req: t.req ? 1 : 0,
+      sec: 'general', grp: 'g', list: 1, aliases: ['Parent', 'Parent code', LKMAP[t.parent].d365 || t.parent] }));
+  }
+  SCHEMAS[t.v] = {
+    sheet: t.sheet, perm: 'masterdata', key: ['CODE'], title: { ar: t.ar, en: t.en }, lkType: t.v, parentType: t.parent || '',
+    sections: [{ id: 'general', ar: 'عام', en: 'General', groups: [{ id: 'g', ar: 'القيمة', en: 'Value' }] }],
+    fields: fields
+  };
+});
 
 /* ============================== Web app ============================== */
 
@@ -305,42 +359,112 @@ function setup() {
       });
     }
 
-    const lt = readTable_('Lookups');
-    if (!lt.rows.some(function (r) { return r.CODE; })) {
-      [
-        ['AssetGroup', 'BLD', 'المباني', ''], ['AssetGroup', 'VEH', 'السيارات', ''], ['AssetGroup', 'MED', 'الأجهزة الطبية', ''],
-        ['AssetGroup', 'FUR', 'الأثاث', ''], ['AssetGroup', 'IT', 'أجهزة الحاسب', ''],
-        ['OperatingUnit', 'HE01', 'مستشفيات', ''],
-        ['Sub1_OperatingUnit', 'DJI_HE0101', 'مستشفى جيبوتي', 'HE01'],
-        ['Sub2_OperatingUnit', 'DJI_HE010001', 'عام المستشفى', 'DJI_HE0101'],
-        ['JournalName', 'FAJ', 'Fixed asset journal - يومية الأصول', ''],
-        ['JournalName', 'FADEP', 'Depreciation - الإهلاك', ''],
-        ['Location', 'MAIN', 'المبنى الرئيسي', ''], ['Department', 'ADMIN', 'الإدارة', '']
-      ].forEach(function (a) {
-        appendRow_(lt, { TYPE: a[0], CODE: a[1], NAME: a[2], PARENT: a[3], CREATEDBY: 'setup', CREATEDON: stamp_(), MODIFIEDBY: '', MODIFIEDON: '' });
-      });
-    }
-    // المرحلة 2: أمثلة للمباني والغرف والموظفين إن لم تكن موجودة
-    const types = {};
-    lt.rows.forEach(function (r) { types[r.TYPE] = 1; });
-    [['Building', 'B01', 'المبنى الإداري', ''], ['Room', 'R101', 'غرفة 101', 'B01'], ['Employee', 'E001', 'أمين العهدة', '']]
-      .forEach(function (a) {
-        if (types[a[0]]) return;
-        appendRow_(lt, { TYPE: a[0], CODE: a[1], NAME: a[2], PARENT: a[3], CREATEDBY: 'setup', CREATEDON: stamp_(), MODIFIEDBY: '', MODIFIEDON: '' });
-      });
-    // نقل الحسابات الرئيسية القديمة (إن وُجدت) إلى دليل الحسابات
-    const at = readTable_('MainAccounts');
-    if (!at.rows.some(function (r) { return r.MAINACCOUNTID; })) {
-      lt.rows.filter(function (r) { return r.TYPE === 'MainAccount' && r.CODE; }).forEach(function (r) {
-        appendRow_(at, { MAINACCOUNTID: r.CODE, NAME: r.NAME, MAINACCOUNTCATEGORY: '', MAINACCOUNTTYPE: 'BalanceSheet', CREATEDBY: 'setup', CREATEDON: stamp_() });
-      });
-    }
+    migrateV3_(ss);
 
     const def = ss.getSheetByName('Sheet1') || ss.getSheetByName('ورقة1');
     if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
     PropertiesService.getScriptProperties().setProperty('FA_SETUP', SETUP_VERSION);
   });
   CacheService.getScriptCache().remove('SETTINGS');
+}
+
+/* ============================== Default data & migration ============================== */
+
+// [رقم، اسم، المستوى، الأب، النوع، المجموعة]
+const DEFAULT_ACCOUNTS = [
+  ['1100', 'النقدية والبنوك', 'Header', '', 'Asset', 'CASH'], ['110100', 'البنك', 'Posting', '1100', 'Asset', 'CASH'],
+  ['1200', 'الأصول الثابتة', 'Header', '', 'Asset', 'FA'],
+  ['120100', 'المباني', 'Posting', '1200', 'Asset', 'FA'], ['120200', 'السيارات', 'Posting', '1200', 'Asset', 'FA'],
+  ['120300', 'الأجهزة الطبية', 'Posting', '1200', 'Asset', 'FA'], ['120400', 'الأثاث', 'Posting', '1200', 'Asset', 'FA'],
+  ['120500', 'أجهزة الحاسب', 'Posting', '1200', 'Asset', 'FA'],
+  ['1290', 'مجمع إهلاك الأصول الثابتة', 'Header', '', 'Asset', 'FA'],
+  ['129100', 'مجمع إهلاك المباني', 'Posting', '1290', 'Asset', 'FA'], ['129200', 'مجمع إهلاك السيارات', 'Posting', '1290', 'Asset', 'FA'],
+  ['129300', 'مجمع إهلاك الأجهزة الطبية', 'Posting', '1290', 'Asset', 'FA'], ['129400', 'مجمع إهلاك الأثاث', 'Posting', '1290', 'Asset', 'FA'],
+  ['129500', 'مجمع إهلاك أجهزة الحاسب', 'Posting', '1290', 'Asset', 'FA'],
+  ['2100', 'الموردون', 'Header', '', 'Liability', 'AP'], ['210100', 'ذمم الموردين', 'Posting', '2100', 'Liability', 'AP'],
+  ['6100', 'مصروفات الإهلاك', 'Header', '', 'Expense', 'DEP'],
+  ['610100', 'مصروف إهلاك المباني', 'Posting', '6100', 'Expense', 'DEP'], ['610200', 'مصروف إهلاك السيارات', 'Posting', '6100', 'Expense', 'DEP'],
+  ['610300', 'مصروف إهلاك الأجهزة الطبية', 'Posting', '6100', 'Expense', 'DEP'], ['610400', 'مصروف إهلاك الأثاث', 'Posting', '6100', 'Expense', 'DEP'],
+  ['610500', 'مصروف إهلاك أجهزة الحاسب', 'Posting', '6100', 'Expense', 'DEP'],
+  ['7100', 'أرباح وخسائر الأصول', 'Header', '', 'ProfitAndLoss', 'GL'], ['710100', 'أرباح / خسائر استبعاد الأصول', 'Posting', '7100', 'ProfitAndLoss', 'GL']
+];
+// [كود، اسم، حساب الأصل، مجمع الإهلاك، مصروف الإهلاك، الاستبعاد]
+const DEFAULT_GROUPS = [
+  ['BLD', 'المباني', '120100', '129100', '610100', '710100'], ['VEH', 'السيارات', '120200', '129200', '610200', '710100'],
+  ['MED', 'الأجهزة الطبية', '120300', '129300', '610300', '710100'], ['FUR', 'الأثاث', '120400', '129400', '610400', '710100'],
+  ['IT', 'أجهزة الحاسب', '120500', '129500', '610500', '710100']
+];
+const DEFAULT_LK = {
+  OperatingUnit: [['HE01', 'مستشفيات']], Sub1_OperatingUnit: [['DJI_HE0101', 'مستشفى جيبوتي', 'HE01']],
+  Sub2_OperatingUnit: [['DJI_HE010001', 'عام المستشفى', 'DJI_HE0101']],
+  Location: [['MAIN', 'المقر الرئيسي']], Building: [['B01', 'المبنى الإداري', 'MAIN']], Room: [['R101', 'غرفة 101', 'B01']],
+  Department: [['ADMIN', 'الإدارة']], Employee: [['E001', 'أمين العهدة']],
+  JournalName: [['FAJ', 'Fixed asset journal - يومية الأصول'], ['FADEP', 'Depreciation - الإهلاك']]
+};
+
+/** ينقل بيانات الإصدارات السابقة (شيت Lookups الموحّد) إلى الشيتات المستقلة ويملأ البيانات الافتراضية. */
+function migrateV3_(ss) {
+  const stamp = stamp_();
+  const add = function (t, rec) { rec.CREATEDBY = 'setup'; rec.CREATEDON = stamp; appendRow_(t, rec); };
+  const oldSheet = ss.getSheetByName('Lookups');
+  const old = oldSheet ? readTable_('Lookups').rows.filter(function (r) { return r.CODE; }) : [];
+  const legacy = function (type) { return old.filter(function (r) { return r.TYPE === type; }); };
+
+  const at = readTable_('MainAccounts');
+  if (!at.rows.some(function (r) { return r.MAINACCOUNTID; })) {
+    if (legacy('MainAccount').length) {
+      legacy('MainAccount').forEach(function (r) { add(at, { MAINACCOUNTID: r.CODE, NAME: r.NAME, ACCOUNTLEVEL: 'Posting', MAINACCOUNTTYPE: 'BalanceSheet' }); });
+    } else {
+      DEFAULT_ACCOUNTS.forEach(function (a) {
+        add(at, { MAINACCOUNTID: a[0], NAME: a[1], ACCOUNTLEVEL: a[2], PARENTACCOUNT: a[3], MAINACCOUNTTYPE: a[4], MAINACCOUNTCATEGORY: a[5] });
+      });
+    }
+  } else {
+    at.rows.forEach(function (r, i) { if (r.MAINACCOUNTID && !r.ACCOUNTLEVEL) { r.ACCOUNTLEVEL = 'Posting'; writeRow_(at, i, r); } });
+  }
+  const accs = {};
+  at.rows.forEach(function (r) { accs[low_(r.MAINACCOUNTID)] = 1; });
+  const acc = function (c) { return c && accs[low_(c)] ? c : ''; };
+
+  const gt = readTable_('AssetGroups');
+  if (!gt.rows.some(function (r) { return r.FIXEDASSETGROUPID; })) {
+    const src = legacy('AssetGroup').length ? legacy('AssetGroup').map(function (r) { return [r.CODE, r.NAME]; }) : DEFAULT_GROUPS;
+    src.forEach(function (g) {
+      const d = DEFAULT_GROUPS.filter(function (x) { return x[0] === g[0]; })[0] || [];
+      add(gt, { FIXEDASSETGROUPID: g[0], NAME: g[1], ASSETACCOUNT: acc(d[2]), ACCUMDEPACCOUNT: acc(d[3]), DEPEXPENSEACCOUNT: acc(d[4]), DISPOSALACCOUNT: acc(d[5]) });
+    });
+  }
+
+  LK.forEach(function (t) {
+    const tt = readTable_(t.sheet);
+    if (tt.rows.some(function (r) { return r.CODE; })) return;
+    // عند الترقية تُنقل البيانات القديمة فقط؛ البيانات الافتراضية للتثبيت الجديد
+    const src = legacy(t.v).length ? legacy(t.v).map(function (r) { return [r.CODE, r.NAME, r.PARENT || '']; }) : (oldSheet ? [] : (DEFAULT_LK[t.v] || []));
+    src.forEach(function (x) {
+      const rec = { CODE: x[0], NAME: x[1] || x[0] };
+      if (t.parent) rec.PARENT = x[2] || '';
+      add(tt, rec);
+    });
+  });
+  if (oldSheet && !ss.getSheetByName('Lookups_archive')) oldSheet.setName('Lookups_archive');
+
+  // الوحدات أصبحت على الأصل: تُنقل من الدفتر الرئيسي إن لم تكن مسجلة على الأصل
+  const ast = readTable_('FixedAssets');
+  const pb = primaryBooks_(readTable_('AssetBooks').rows);
+  const groups = {};
+  readTable_('AssetGroups').rows.forEach(function (g) { groups[low_(g.FIXEDASSETGROUPID)] = g; });
+  ast.rows.forEach(function (a, i) {
+    if (!a.FIXEDASSETNUMBER) return;
+    let changed = false;
+    const b = pb[low_(a.FIXEDASSETNUMBER)];
+    if (!a.OPERATINGUNIT && !a.SUB2_OPERATINGUNIT && b && b.OPERATINGUNIT) {
+      a.OPERATINGUNIT = b.OPERATINGUNIT; a.SUB1_OPERATINGUNIT = b.SUB1_OPERATINGUNIT || ''; a.SUB2_OPERATINGUNIT = b.SUB2_OPERATINGUNIT || '';
+      changed = true;
+    }
+    const g = groups[low_(a.FIXEDASSETGROUPID)];
+    if (!a.ASSETACCOUNT && g && g.ASSETACCOUNT) { a.ASSETACCOUNT = g.ASSETACCOUNT; changed = true; }
+    if (changed) writeRow_(ast, i, a);
+  });
 }
 
 /** بيانات تجريبية اختيارية مطابقة للصور (BLD_00001). */
@@ -350,7 +474,8 @@ function seedDemoData() {
     const at = readTable_('FixedAssets');
     if (!at.rows.some(function (r) { return r.FIXEDASSETNUMBER === 'BLD_00001'; })) {
       appendRow_(at, { FIXEDASSETNUMBER: 'BLD_00001', FIXEDASSETGROUPID: 'BLD', NAME: 'غرفة الومتال +تشطيب السقف', ASSETTYPE: 'Tangible',
-        QUANTITY: 1, MODEL: '', GUARANTEEDATE: '', LOCATION: 'MAIN', DEPARTMENT: 'ADMIN', ROOMNUMBER: '', RESPONSIBLE: '',
+        QUANTITY: 1, MODEL: '', GUARANTEEDATE: '', LOCATION: 'MAIN', BUILDING: 'B01', ROOMNUMBER: 'R101', DEPARTMENT: 'ADMIN', RESPONSIBLE: 'E001',
+        ASSETACCOUNT: '120100', OPERATINGUNIT: 'HE01', SUB1_OPERATINGUNIT: 'DJI_HE0101', SUB2_OPERATINGUNIT: 'DJI_HE010001',
         CREATEDBY: 'setup', CREATEDON: stamp_() });
     }
     const bt = readTable_('AssetBooks');
@@ -705,7 +830,7 @@ function bootstrap(token) {
     lookups: lookups_(),
     refs: refs_(s),
     roles: ROLES,
-    lookupTypes: LOOKUP_TYPES,
+    lookupTypes: LK.map(function (t) { return { v: t.v, ar: t.ar, en: t.en, parent: t.parent || '' }; }),
     permPages: PERM_PAGES,
     permActions: PERM_ACTIONS
   };
@@ -731,33 +856,36 @@ function changePassword(token, oldPw, newPw) {
 
 function lookups_() {
   const out = {};
-  LOOKUP_TYPES.forEach(function (t) { out[t.v] = []; });
-  readTable_('Lookups').rows.forEach(function (r) {
-    if (!r.TYPE || !r.CODE) return;
-    (out[r.TYPE] = out[r.TYPE] || []).push({ c: String(r.CODE), n: String(r.NAME || ''), p: String(r.PARENT || '') });
-  });
-  Object.keys(out).forEach(function (k) { out[k].sort(function (a, b) { return a.c.localeCompare(b.c); }); });
+  const rd = function (sheet, code, name, parent) {
+    return readTable_(sheet).rows.filter(function (r) { return r[code]; })
+      .map(function (r) { return { c: String(r[code]), n: String(r[name] || ''), p: String(parent ? r[parent] || '' : '') }; })
+      .sort(function (a, b) { return a.c.localeCompare(b.c); });
+  };
+  LK.forEach(function (t) { out[t.v] = rd(t.sheet, 'CODE', 'NAME', t.parent ? 'PARENT' : ''); });
+  out.AssetGroup = rd('AssetGroups', 'FIXEDASSETGROUPID', 'NAME', '');
   return out;
 }
 
 function refs_(s) {
-  const out = { assets: [], vendors: [], books: [], accounts: [] };
-  if (['journal', 'masterdata', 'depreciation', 'settings'].some(function (pg) { return can_(s, pg, 'view'); })) {
-    out.accounts = readTable_('MainAccounts').rows.filter(function (r) { return r.MAINACCOUNTID; })
-      .map(function (r) { return { c: String(r.MAINACCOUNTID), n: String(r.NAME || '') }; });
-  }
+  const out = { assets: [], vendors: [], books: [], accounts: [], groups: [] };
+  out.accounts = readTable_('MainAccounts').rows.filter(function (r) { return r.MAINACCOUNTID; })
+    .map(function (r) { return { c: String(r.MAINACCOUNTID), n: String(r.NAME || ''), p: String(r.PARENTACCOUNT || ''), h: r.ACCOUNTLEVEL === 'Header' ? 1 : 0 }; });
+  out.groups = readTable_('AssetGroups').rows.filter(function (r) { return r.FIXEDASSETGROUPID; }).map(function (r) {
+    return { c: String(r.FIXEDASSETGROUPID), n: String(r.NAME || ''), a: r.ASSETACCOUNT || '', ad: r.ACCUMDEPACCOUNT || '',
+      de: r.DEPEXPENSEACCOUNT || '', di: r.DISPOSALACCOUNT || '' };
+  });
   if (['assets', 'books', 'journal', 'depreciation', 'reports'].some(function (pg) { return can_(s, pg, 'view'); })) {
     out.assets = readTable_('FixedAssets').rows.filter(function (r) { return r.FIXEDASSETNUMBER; })
-      .map(function (r) { return { c: String(r.FIXEDASSETNUMBER), n: String(r.NAME || '') }; });
-    out.books = readTable_('AssetBooks').rows.filter(function (r) { return r.FIXEDASSETNUMBER; })
       .map(function (r) {
-        return { a: String(r.FIXEDASSETNUMBER), c: String(r.BOOKID), n: String(r.STATUS || ''),
-          ou: r.OPERATINGUNIT, s1: r.SUB1_OPERATINGUNIT, s2: r.SUB2_OPERATINGUNIT };
+        return { c: String(r.FIXEDASSETNUMBER), n: String(r.NAME || ''), g: r.FIXEDASSETGROUPID || '',
+          ou: r.OPERATINGUNIT || '', s1: r.SUB1_OPERATINGUNIT || '', s2: r.SUB2_OPERATINGUNIT || '' };
       });
+    out.books = readTable_('AssetBooks').rows.filter(function (r) { return r.FIXEDASSETNUMBER; })
+      .map(function (r) { return { a: String(r.FIXEDASSETNUMBER), c: String(r.BOOKID), n: String(r.STATUS || '') }; });
   }
   if (can_(s, 'vendors', 'view') || can_(s, 'journal', 'view')) {
     out.vendors = readTable_('Vendors').rows.filter(function (r) { return r.VENDORACCOUNTNUMBER; })
-      .map(function (r) { return { c: String(r.VENDORACCOUNTNUMBER), n: String(r.VENDORORGANIZATIONNAME || '') }; });
+      .map(function (r) { return { c: String(r.VENDORACCOUNTNUMBER), n: String(r.VENDORORGANIZATIONNAME || ''), acc: r.VENDORLEDGERACCOUNT || '' }; });
   }
   return out;
 }
@@ -850,9 +978,24 @@ function ctx_(s, entity) {
       }
       return index[e];
     },
-    asset: function (n) {
-      const i = ctx.index('assets')[low_(n)];
-      return i === undefined ? null : ctx.table('assets').rows[i];
+    /** بحث بالمفتاح لكيان مفتاحه حقل واحد. */
+    find: function (e, code) {
+      if (code === '' || code === undefined || code === null) return null;
+      const i = ctx.index(e)[low_(code)];
+      return i === undefined ? null : ctx.table(e).rows[i];
+    },
+    asset: function (n) { return ctx.find('assets', n); },
+    dirty: {},
+    touch: function (e, row) {
+      const i = ctx.table(e).rows.indexOf(row);
+      if (i >= 0) (ctx.dirty[e] = ctx.dirty[e] || {})[i] = 1;
+    },
+    flush: function () {
+      Object.keys(ctx.dirty).forEach(function (e) {
+        const t = ctx.table(e);
+        Object.keys(ctx.dirty[e]).forEach(function (i) { writeRow_(t, Number(i), t.rows[i]); });
+      });
+      ctx.dirty = {};
     },
     batchStatus: function (b) {
       let st = '';
@@ -877,9 +1020,74 @@ function nextBatch_() {
   return (st.JOURNALPREFIX || 'FAJ-') + ('000000' + n).slice(-6);
 }
 
+/** يملأ المستويات الأعلى من الشجرة بدءاً من أدنى مستوى مُدخل (مثلاً: الفرعية 2 ← الفرعية 1 ← الرئيسية). */
+function deriveChain_(ctx, rec, chain) {
+  for (let i = 0; i < chain.length; i++) {
+    const v = rec[chain[i][0]];
+    if (v === '' || v === undefined) continue;
+    let row = ctx.find(chain[i][1], v);
+    if (!row) throw new Error(LKMAP[chain[i][1]].ar + ': الكود غير موجود "' + v + '" — أضفه أولاً من البيانات الأساسية');
+    rec[chain[i][0]] = row.CODE;
+    for (let j = i + 1; j < chain.length && row && row.PARENT; j++) {
+      const parent = ctx.find(chain[j][1], row.PARENT);
+      rec[chain[j][0]] = parent ? parent.CODE : row.PARENT;
+      row = parent;
+    }
+    return;
+  }
+}
+
+function checkLk_(ctx, rec, field, type) {
+  if (!rec[field]) return;
+  const row = ctx.find(type, rec[field]);
+  if (!row) throw new Error(LKMAP[type].ar + ': الكود غير موجود "' + rec[field] + '"');
+  rec[field] = row.CODE;
+}
+
+/** يتحقق أن الحساب موجود في الدليل وأنه حساب فرعي (يقبل الترحيل). */
+function postingAccount_(ctx, code, label) {
+  if (!code) return '';
+  const a = ctx.find('accounts', code);
+  if (!a) throw new Error(label + ': الحساب غير موجود في دليل الحسابات "' + code + '"');
+  if (a.ACCOUNTLEVEL === 'Header') throw new Error(label + ': الحساب ' + code + ' رئيسي، اختر حساباً فرعياً');
+  return a.MAINACCOUNTID;
+}
+
+const DEP_TYPES = { Depreciation: 1, DepreciationAdj: 1, ExtraordinaryDepreciation: 1 };
+const DISPOSAL_TYPES = { DisposalSale: 1, DisposalScrap: 1 };
+
+/** حساب الأصل في القيد حسب نوع المعاملة (من مجموعة الأصل). */
+function ledgerAccountFor_(type, g) {
+  if (!g) return '';
+  return DEP_TYPES[type] ? (g.ACCUMDEPACCOUNT || '') : (g.ASSETACCOUNT || '');
+}
+
+/** الحساب المقابل الافتراضي حسب نوع المعاملة (من مجموعة الأصل). */
+function defaultOffsetFor_(type, g) {
+  if (!g) return '';
+  if (DEP_TYPES[type]) return g.DEPEXPENSEACCOUNT || '';
+  if (DISPOSAL_TYPES[type]) return g.DISPOSALACCOUNT || '';
+  return '';
+}
+
+function copyUnits_(from, to, prefixTo) {
+  prefixTo = prefixTo || '';
+  to[prefixTo + 'OPERATINGUNIT'] = from.OPERATINGUNIT || '';
+  to[prefixTo + 'SUB1_OPERATINGUNIT'] = from.SUB1_OPERATINGUNIT || '';
+  to[prefixTo + 'SUB2_OPERATINGUNIT'] = from.SUB2_OPERATINGUNIT || '';
+}
+
 const HOOKS = {
-  assets: function (rec) {
+  assets: function (rec, ex, ctx) {
     if (rec.QUANTITY !== '' && rec.QUANTITY < 0) throw new Error('الكمية لا يمكن أن تكون سالبة');
+    const g = ctx.find('groups', rec.FIXEDASSETGROUPID);
+    if (!g) throw new Error('مجموعة الأصل غير موجودة: ' + rec.FIXEDASSETGROUPID + ' — أضفها من صفحة مجموعات الأصول');
+    rec.FIXEDASSETGROUPID = g.FIXEDASSETGROUPID;
+    rec.ASSETACCOUNT = g.ASSETACCOUNT || '';
+    deriveChain_(ctx, rec, UNIT_CHAIN);
+    deriveChain_(ctx, rec, LOCATION_CHAIN);
+    checkLk_(ctx, rec, 'DEPARTMENT', 'Department');
+    checkLk_(ctx, rec, 'RESPONSIBLE', 'Employee');
   },
 
   books: function (rec, ex, ctx) {
@@ -893,9 +1101,19 @@ const HOOKS = {
       throw new Error('فترات الإهلاك المتبقية أكبر من إجمالي فترات الإهلاك');
     }
     if (rec.ACQUISITIONPRICE !== '' && rec.ACQUISITIONPRICE < 0) throw new Error('سعر الاقتناء لا يمكن أن يكون سالباً');
-    if (!rec.OPERATINGUNIT && rec.DEFAULTDIMENSIONDISPLAYVALUE) {
-      const p = dimSplit_(rec.DEFAULTDIMENSIONDISPLAYVALUE);
-      rec.OPERATINGUNIT = p[0] || ''; rec.SUB1_OPERATINGUNIT = p[1] || ''; rec.SUB2_OPERATINGUNIT = p[2] || '';
+    // الأبعاد تأتي من الأصل. إن لم تكن على الأصل (استيراد من D365) تُنقل من الدفتر إلى الأصل.
+    if (a.OPERATINGUNIT || a.SUB2_OPERATINGUNIT) {
+      copyUnits_(a, rec);
+    } else {
+      if (!rec.OPERATINGUNIT && rec.DEFAULTDIMENSIONDISPLAYVALUE) {
+        const p = dimSplit_(rec.DEFAULTDIMENSIONDISPLAYVALUE);
+        rec.OPERATINGUNIT = p[0] || ''; rec.SUB1_OPERATINGUNIT = p[1] || ''; rec.SUB2_OPERATINGUNIT = p[2] || '';
+      }
+      if (rec.OPERATINGUNIT || rec.SUB2_OPERATINGUNIT) {
+        deriveChain_(ctx, rec, UNIT_CHAIN);
+        copyUnits_(rec, a);
+        ctx.touch('assets', a);
+      }
     }
     rec.DEFAULTDIMENSIONDISPLAYVALUE = dimJoin_([rec.OPERATINGUNIT, rec.SUB1_OPERATINGUNIT, rec.SUB2_OPERATINGUNIT]);
     if (rec.ACCUMULATEDDEPRECIATION !== '' && rec.ACCUMULATEDDEPRECIATION < 0) rec.ACCUMULATEDDEPRECIATION = -rec.ACCUMULATEDDEPRECIATION; // D365 يصدّره بالسالب
@@ -903,10 +1121,42 @@ const HOOKS = {
     rec.NETBOOKVALUE = nbv_(rec);
   },
 
-  lookups: function (rec, ex, ctx) {
-    const pt = LOOKUP_PARENTS[rec.TYPE];
-    if (!pt) { rec.PARENT = ''; return; }
-    if (rec.PARENT && !ctx.index('lookups')[low_(pt) + '|' + low_(rec.PARENT)]) throw new Error('الكود الأب غير موجود: ' + rec.PARENT);
+  _lk: function (rec, ex, ctx, entity) {
+    const sch = SCHEMAS[entity];
+    if (!sch.parentType || !rec.PARENT) return;
+    const p = ctx.find(sch.parentType, rec.PARENT);
+    if (!p) throw new Error('الكود الأب غير موجود في ' + LKMAP[sch.parentType].ar + ': ' + rec.PARENT);
+    rec.PARENT = p.CODE;
+  },
+
+  groups: function (rec, ex, ctx) {
+    rec.ASSETACCOUNT = postingAccount_(ctx, rec.ASSETACCOUNT, 'حساب الأصل');
+    rec.ACCUMDEPACCOUNT = postingAccount_(ctx, rec.ACCUMDEPACCOUNT, 'حساب مجمع الإهلاك');
+    rec.DEPEXPENSEACCOUNT = postingAccount_(ctx, rec.DEPEXPENSEACCOUNT, 'حساب مصروف الإهلاك');
+    rec.DISPOSALACCOUNT = postingAccount_(ctx, rec.DISPOSALACCOUNT, 'حساب الاستبعاد');
+  },
+
+  accounts: function (rec, ex, ctx) {
+    const id = low_(rec.MAINACCOUNTID);
+    if (rec.ACCOUNTLEVEL === 'Header') {
+      rec.PARENTACCOUNT = '';
+      if (ex && ex.ACCOUNTLEVEL !== 'Header' && accountUsed_(ctx, id)) throw new Error('لا يمكن تحويل الحساب إلى رئيسي لأنه مستخدم في المجموعات أو الموردين أو اليوميات');
+    } else {
+      if (ex && ex.ACCOUNTLEVEL === 'Header' && ctx.table('accounts').rows.some(function (r) { return low_(r.PARENTACCOUNT) === id; })) {
+        throw new Error('لا يمكن تحويل الحساب إلى فرعي لأن له حسابات فرعية');
+      }
+      if (rec.PARENTACCOUNT) {
+        if (low_(rec.PARENTACCOUNT) === id) throw new Error('الحساب لا يمكن أن يكون أباً لنفسه');
+        const p = ctx.find('accounts', rec.PARENTACCOUNT);
+        if (!p) throw new Error('الحساب الأب غير موجود: ' + rec.PARENTACCOUNT);
+        if (p.ACCOUNTLEVEL !== 'Header') throw new Error('الحساب الأب يجب أن يكون حساباً رئيسياً: ' + rec.PARENTACCOUNT);
+        rec.PARENTACCOUNT = p.MAINACCOUNTID;
+      }
+    }
+  },
+
+  vendors: function (rec, ex, ctx) {
+    rec.VENDORLEDGERACCOUNT = postingAccount_(ctx, rec.VENDORLEDGERACCOUNT, 'حساب المورد');
   },
 
   journal: function (rec, ex, ctx) {
@@ -917,35 +1167,65 @@ const HOOKS = {
       const st = ctx.batchStatus(rec.JOURNALBATCHNUMBER);
       if (st && st !== 'Draft') throw new Error('لا يمكن إضافة أسطر إلى يومية معتمدة أو مُرحّلة: ' + rec.JOURNALBATCHNUMBER);
     }
+    checkLk_(ctx, rec, 'JOURNALNAME', 'JournalName');
     const a = ctx.asset(rec.FIXEDASSETNUMBER);
     if (!a) throw new Error('رقم الأصل غير موجود: ' + rec.FIXEDASSETNUMBER);
     rec.FIXEDASSETNUMBER = a.FIXEDASSETNUMBER;
     rec.ASSETNAME = a.NAME;
     if (!rec.BOOKID) rec.BOOKID = 'General';
+    const g = ctx.find('groups', a.FIXEDASSETGROUPID);
+    rec.LEDGERACCOUNT = ledgerAccountFor_(rec.TRANSACTIONTYPE, g);
     const d = num_(rec.DEBITAMOUNT), c = num_(rec.CREDITAMOUNT);
     if (d < 0 || c < 0) throw new Error('المبالغ لا يمكن أن تكون سالبة');
     if (d > 0 && c > 0) throw new Error('أدخل مبلغاً في المدين أو الدائن فقط، وليس كليهما');
     if (!d && !c) throw new Error('أدخل مبلغ المدين أو الدائن');
     rec.DEBITAMOUNT = d; rec.CREDITAMOUNT = c;
-    if (!rec.OFFSETACCOUNTTYPE) rec.OFFSETACCOUNTTYPE = 'Ledger';
     if (!rec.OFFSETACCOUNT && rec.OFFSETACCOUNTDISPLAYVALUE) {
       const p = dimSplit_(rec.OFFSETACCOUNTDISPLAYVALUE);
       rec.OFFSETACCOUNT = p[0] || '';
-      if (rec.OFFSETACCOUNTTYPE === 'Ledger') {
+      if (!rec.OFFSET_OPERATINGUNIT && !rec.OFFSET_SUB2_OPERATINGUNIT) {
         rec.OFFSET_OPERATINGUNIT = p[1] || ''; rec.OFFSET_SUB1_OPERATINGUNIT = p[2] || ''; rec.OFFSET_SUB2_OPERATINGUNIT = p[3] || '';
       }
     }
-    if (rec.OFFSETACCOUNTTYPE === 'Vendor') {
-      rec.OFFSET_OPERATINGUNIT = rec.OFFSET_SUB1_OPERATINGUNIT = rec.OFFSET_SUB2_OPERATINGUNIT = '';
-      rec.OFFSETACCOUNTDISPLAYVALUE = rec.OFFSETACCOUNT;
-    } else {
-      rec.OFFSETACCOUNTDISPLAYVALUE = rec.OFFSETACCOUNT ? dimJoin_([rec.OFFSETACCOUNT, rec.OFFSET_OPERATINGUNIT,
-        rec.OFFSET_SUB1_OPERATINGUNIT, rec.OFFSET_SUB2_OPERATINGUNIT]) : '';
+    if (rec.VENDORACCOUNT) {
+      const v = ctx.find('vendors', rec.VENDORACCOUNT);
+      if (!v) throw new Error('المورد غير موجود: ' + rec.VENDORACCOUNT);
+      rec.VENDORACCOUNT = v.VENDORACCOUNTNUMBER;
+      if (!rec.OFFSETACCOUNT) rec.OFFSETACCOUNT = v.VENDORLEDGERACCOUNT;
+      if (!rec.OFFSETACCOUNT) throw new Error('المورد ' + v.VENDORACCOUNTNUMBER + ' ليس له حساب في دليل الحسابات — حدده من صفحة الموردين');
     }
+    if (!rec.OFFSETACCOUNT) rec.OFFSETACCOUNT = defaultOffsetFor_(rec.TRANSACTIONTYPE, g);
+    if (!rec.OFFSETACCOUNT) throw new Error('حدد الحساب المقابل من دليل الحسابات');
+    rec.OFFSETACCOUNT = postingAccount_(ctx, rec.OFFSETACCOUNT, 'الحساب المقابل');
+    if (!rec.OFFSET_OPERATINGUNIT && !rec.OFFSET_SUB1_OPERATINGUNIT && !rec.OFFSET_SUB2_OPERATINGUNIT) copyUnits_(a, rec, 'OFFSET_');
+    deriveChain_(ctx, rec, OFFSET_CHAIN);
+    rec.OFFSETACCOUNTDISPLAYVALUE = dimJoin_([rec.OFFSETACCOUNT, rec.OFFSET_OPERATINGUNIT, rec.OFFSET_SUB1_OPERATINGUNIT, rec.OFFSET_SUB2_OPERATINGUNIT]);
     if (rec.TRANSACTIONTYPE === 'Depreciation' && rec.DEPRECIATIONMONTHS === '') rec.DEPRECIATIONMONTHS = 1;
     if (!rec.STATUS) rec.STATUS = 'Draft';
   }
 };
+
+/** بعد حفظ الأصل: تحديث أبعاد دفاتره (الأبعاد على الدفتر نسخة من الأصل). */
+const AFTER = {
+  assets: function (rec, ctx) {
+    const bt = ctx.table('books');
+    const id = low_(rec.FIXEDASSETNUMBER);
+    bt.rows.forEach(function (b, i) {
+      if (low_(b.FIXEDASSETNUMBER) !== id) return;
+      if (b.OPERATINGUNIT === rec.OPERATINGUNIT && b.SUB1_OPERATINGUNIT === rec.SUB1_OPERATINGUNIT && b.SUB2_OPERATINGUNIT === rec.SUB2_OPERATINGUNIT) return;
+      copyUnits_(rec, b);
+      b.DEFAULTDIMENSIONDISPLAYVALUE = dimJoin_([b.OPERATINGUNIT, b.SUB1_OPERATINGUNIT, b.SUB2_OPERATINGUNIT]);
+      writeRow_(bt, i, b);
+    });
+  }
+};
+
+function accountUsed_(ctx, id) {
+  return ctx.table('groups').rows.some(function (g) {
+    return [g.ASSETACCOUNT, g.ACCUMDEPACCOUNT, g.DEPEXPENSEACCOUNT, g.DISPOSALACCOUNT].some(function (x) { return low_(x) === id; });
+  }) || ctx.table('vendors').rows.some(function (v) { return low_(v.VENDORLEDGERACCOUNT) === id; }) ||
+    ctx.table('journal').rows.some(function (j) { return low_(j.OFFSETACCOUNT) === id || low_(j.LEDGERACCOUNT) === id; });
+}
 
 /** يجهّز سجلاً للحفظ. mode: add | edit | upsert */
 function prepare_(entity, raw, mode, ctx) {
@@ -964,7 +1244,8 @@ function prepare_(entity, raw, mode, ctx) {
     if (f.sys && !f.key) rec[f.k] = ex ? ex[f.k] : '';
     if (!ex && rec[f.k] === '' && f.dflt !== undefined) rec[f.k] = f.dflt === '@today' ? today_() : f.dflt;
   });
-  if (HOOKS[entity]) HOOKS[entity](rec, ex, ctx);
+  const hook = HOOKS[entity] || (sch.lkType ? HOOKS._lk : null);
+  if (hook) hook(rec, ex, ctx, entity);
   sch.fields.forEach(function (f) {
     if (f.req && rec[f.k] === '') throw new Error('الحقل مطلوب: ' + f.ar + ' (' + f.en + ')');
   });
@@ -983,6 +1264,7 @@ function commit_(entity, p, ctx) {
     const i = appendRow_(t, p.rec);
     ctx.index(entity)[keyOf_(SCHEMAS[entity], p.rec)] = i;
   }
+  if (AFTER[entity]) AFTER[entity](p.rec, ctx);
 }
 
 /* ============================== CRUD API ============================== */
@@ -1008,6 +1290,7 @@ function saveRecord(token, entity, rec, isNew) {
     const ctx = ctx_(s);
     const p = prepare_(entity, rec, isNew ? 'add' : 'edit', ctx);
     commit_(entity, p, ctx);
+    ctx.flush();
     return p.rec;
   });
 }
@@ -1040,9 +1323,27 @@ function deleteRecords(token, entity, keys) {
       }
       if (entity === 'vendors') {
         const v = low_(r.VENDORACCOUNTNUMBER);
-        if (ctx.table('journal').rows.some(function (j) { return j.OFFSETACCOUNTTYPE === 'Vendor' && low_(j.OFFSETACCOUNT) === v; })) {
+        if (ctx.table('journal').rows.some(function (j) { return low_(j.VENDORACCOUNT) === v; })) {
           throw new Error('لا يمكن حذف المورد ' + r.VENDORACCOUNTNUMBER + ' لوجود معاملات مرتبطة به');
         }
+      }
+      if (sch.lkType) {
+        const code = low_(r.CODE);
+        const child = LK.filter(function (t) { return t.parent === sch.lkType; })[0];
+        if (child && ctx.table(child.v).rows.some(function (x) { return low_(x.PARENT) === code; })) {
+          throw new Error('لا يمكن حذف ' + r.CODE + ' لأن له عناصر تابعة في ' + child.ar);
+        }
+      }
+      if (entity === 'groups') {
+        const gid = low_(r.FIXEDASSETGROUPID);
+        if (ctx.table('assets').rows.some(function (a) { return low_(a.FIXEDASSETGROUPID) === gid; })) {
+          throw new Error('لا يمكن حذف المجموعة ' + r.FIXEDASSETGROUPID + ' لوجود أصول مرتبطة بها');
+        }
+      }
+      if (entity === 'accounts') {
+        const id = low_(r.MAINACCOUNTID);
+        if (t.rows.some(function (x) { return low_(x.PARENTACCOUNT) === id; })) throw new Error('لا يمكن حذف الحساب ' + r.MAINACCOUNTID + ' لأن له حسابات فرعية');
+        if (accountUsed_(ctx, id)) throw new Error('لا يمكن حذف الحساب ' + r.MAINACCOUNTID + ' لأنه مستخدم في المجموعات أو الموردين أو اليوميات');
       }
       idxs.push(i);
     });
@@ -1067,7 +1368,15 @@ function importRecords(token, entity, rows, opts) {
     const canAdd = can_(s, sch.perm, 'add'), canEdit = can_(s, sch.perm, 'edit');
     const startLen = t.rows.length;
     const changed = {};
-    rows.forEach(function (raw, n) {
+    const done = [];
+    let order = rows.map(function (r, n) { return { raw: r, n: n }; });
+    if (entity === 'accounts') {
+      // الحسابات الرئيسية أولاً حتى تجد الحسابات الفرعية آباءها
+      order = order.filter(function (x) { return norm_(x.raw.ACCOUNTLEVEL) === 'header' || norm_(x.raw.ACCOUNTLEVEL) === 'رئيسي'; })
+        .concat(order.filter(function (x) { return !(norm_(x.raw.ACCOUNTLEVEL) === 'header' || norm_(x.raw.ACCOUNTLEVEL) === 'رئيسي'); }));
+    }
+    order.forEach(function (o) {
+      const raw = o.raw, n = o.n;
       try {
         const p = prepare_(entity, raw, 'upsert', ctx);
         if (p.isNew && !canAdd) throw new Error('ليس لديك صلاحية الإضافة');
@@ -1081,6 +1390,7 @@ function importRecords(token, entity, rows, opts) {
           changed[p.idx] = 1;
           res.updated++;
         }
+        done.push(p.rec);
       } catch (e) {
         res.errors.push({ row: (opts.offset || 0) + n + 1, msg: e.message });
       }
@@ -1094,6 +1404,9 @@ function importRecords(token, entity, rows, opts) {
       if (need > t.sh.getMaxRows()) t.sh.insertRowsAfter(t.sh.getMaxRows(), need - t.sh.getMaxRows() + 100);
       t.sh.getRange(startLen + 2, 1, added.length, t.head.length).setValues(added.map(function (r) { return toRow_(t.head, r); }));
     }
+    if (AFTER[entity]) done.forEach(function (r) { AFTER[entity](r, ctx); });
+    ctx.flush();
+    res.errors.sort(function (a, b) { return a.row - b.row; });
     res.batch = ctx.importBatch;
     return res;
   });
@@ -1250,8 +1563,8 @@ function dashboard(token) {
 /* ============================== Automatic depreciation ============================== */
 
 /**
- * يحسب مقترح الإهلاك (القسط الثابت حسب العمر الافتراضي):
- *   الإهلاك = سعر الاقتناء ÷ العمر بالسنوات ÷ 12 × عدد الشهور
+ * يحسب مقترح الإهلاك (القسط الثابت على العمر المتبقي — Straight line life remaining في D365):
+ *   الإهلاك = (صافي القيمة الدفترية − قيمة الخردة) ÷ فترات الإهلاك المتبقية × عدد الشهور
  * يُحسب من الشهر التالي لآخر إهلاك حتى نهاية الفترة المحددة (عادةً 3 شهور = ربع سنة)،
  * ولا يتجاوز الفترات المتبقية، ولا ينزل بصافي القيمة الدفترية عن قيمة الخردة.
  */
@@ -1271,30 +1584,35 @@ function depProposal_(ctx, p) {
     if (!b.FIXEDASSETNUMBER || low_(b.BOOKID) !== fBook) return;
     const a = ctx.asset(b.FIXEDASSETNUMBER) || {};
     if (fGroup && low_(a.FIXEDASSETGROUPID) !== fGroup) return;
-    if (fOU && low_(b.OPERATINGUNIT) !== fOU) return;
+    if (fOU && low_(a.OPERATINGUNIT || b.OPERATINGUNIT) !== fOU) return;
     const id = b.FIXEDASSETNUMBER;
     const skip = function (why) { skipped.push({ asset: id, name: a.NAME || '', book: b.BOOKID, reason: why }); };
     if (b.STATUS !== 'Open') return skip('حالة الدفتر ليست مفتوح');
-    const price = num_(b.ACQUISITIONPRICE), life = num_(b.SERVICELIFE);
+    const price = num_(b.ACQUISITIONPRICE);
     if (price <= 0) return skip('لا يوجد سعر اقتناء');
-    if (life <= 0) return skip('لا يوجد عمر افتراضي');
+    if (b.DEPRECIATIONPERIODSREMAINING === '' || num_(b.DEPRECIATIONPERIODSREMAINING) <= 0) return skip('لا توجد فترات إهلاك متبقية');
     if (pending[low_(id) + '|' + low_(b.BOOKID)]) return skip('يوجد إهلاك غير مُرحّل في اليومية ' + pending[low_(id) + '|' + low_(b.BOOKID)]);
     const startYM = b.LASTDEPRECIATIONDATE ? ym_(b.LASTDEPRECIATIONDATE) + 1 : ym_(b.DEPRECIATIONSTARTDATE || b.ACQUISITIONDATE);
     if (startYM === null) return skip('لا يوجد تاريخ بداية للإهلاك');
     let n = endYM - startYM + 1;
     if (n <= 0) return skip('تم إهلاكه حتى ' + b.LASTDEPRECIATIONDATE);
-    if (b.DEPRECIATIONPERIODSREMAINING !== '' && b.DEPRECIATIONPERIODSREMAINING !== null) n = Math.min(n, Math.floor(num_(b.DEPRECIATIONPERIODSREMAINING)));
-    if (n <= 0) return skip('لا توجد فترات متبقية');
+    const remaining = num_(b.DEPRECIATIONPERIODSREMAINING);
+    n = Math.min(n, Math.ceil(remaining));
     const accum = num_(b.ACCUMULATEDDEPRECIATION);
-    const room = round_(price - num_(b.SCRAPVALUE) - accum, 3);
+    const nbv = round_(price - accum, 3);
+    const room = round_(nbv - num_(b.SCRAPVALUE), 3);
     if (room <= 0) return skip('وصل إلى قيمة الخردة');
-    const monthly = price / life / 12;
-    const amount = Math.min(round_(monthly * n, 3), room);
+    // القسط الثابت على العمر المتبقي: (صافي القيمة − الخردة) ÷ الفترات المتبقية × عدد الشهور
+    const monthly = room / remaining;
+    const amount = n >= remaining ? room : Math.min(round_(monthly * n, 3), room);
+    const g = ctx.find('groups', a.FIXEDASSETGROUPID) || {};
     lines.push({
       FIXEDASSETNUMBER: id, NAME: a.NAME || '', GROUP: a.FIXEDASSETGROUPID || '', BOOKID: b.BOOKID,
-      PRICE: price, LIFE: life, ANNUAL: round_(price / life, 3), FROM: ymStr_(startYM), TO: end, MONTHS: n,
-      CATCHUP: n > months, AMOUNT: -amount, ACCUM: accum, ACCUMAFTER: round_(accum + amount, 3), NBVAFTER: round_(price - accum - amount, 3),
-      OU: b.OPERATINGUNIT || '', SUB1: b.SUB1_OPERATINGUNIT || '', SUB2: b.SUB2_OPERATINGUNIT || ''
+      PRICE: price, NBV: nbv, SCRAP: num_(b.SCRAPVALUE), REMAINING: remaining, MONTHLY: round_(monthly, 3),
+      FROM: ymStr_(startYM), TO: end, MONTHS: n, CATCHUP: n > months, AMOUNT: -amount, ACCUM: accum,
+      ACCUMAFTER: round_(accum + amount, 3), NBVAFTER: round_(nbv - amount, 3),
+      LEDGER: g.ACCUMDEPACCOUNT || '', OFFSET: g.DEPEXPENSEACCOUNT || '',
+      OU: a.OPERATINGUNIT || b.OPERATINGUNIT || '', SUB1: a.SUB1_OPERATINGUNIT || b.SUB1_OPERATINGUNIT || '', SUB2: a.SUB2_OPERATINGUNIT || b.SUB2_OPERATINGUNIT || ''
     });
   });
   lines.sort(function (x, y) { return String(x.FIXEDASSETNUMBER).localeCompare(String(y.FIXEDASSETNUMBER)); });
@@ -1328,7 +1646,7 @@ function createDepreciationJournal(token, p) {
       const rec = {
         JOURNALBATCHNUMBER: ctx.importBatch, TRANSDATE: prop.periodEnd, JOURNALNAME: jname, TRANSACTIONTYPE: 'Depreciation',
         FIXEDASSETNUMBER: l.FIXEDASSETNUMBER, BOOKID: l.BOOKID, TEXT: 'إهلاك ' + l.FROM + ' → ' + prop.periodEnd.slice(0, 7) + ' (' + l.MONTHS + ' شهر)',
-        DEBITAMOUNT: 0, CREDITAMOUNT: -l.AMOUNT, DEPRECIATIONMONTHS: l.MONTHS, OFFSETACCOUNTTYPE: 'Ledger', OFFSETACCOUNT: acct,
+        DEBITAMOUNT: 0, CREDITAMOUNT: -l.AMOUNT, DEPRECIATIONMONTHS: l.MONTHS, OFFSETACCOUNT: l.OFFSET || acct,
         OFFSET_OPERATINGUNIT: l.OU, OFFSET_SUB1_OPERATINGUNIT: l.SUB1, OFFSET_SUB2_OPERATINGUNIT: l.SUB2
       };
       commit_('journal', prepare_('journal', rec, 'add', ctx), ctx);
@@ -1354,7 +1672,8 @@ function reportData(token) {
       BOOKID: b.BOOKID, STATUS: b.STATUS, ACQUISITIONDATE: b.ACQUISITIONDATE, SERVICELIFE: b.SERVICELIFE,
       LASTDEPRECIATIONDATE: b.LASTDEPRECIATIONDATE, DEPRECIATIONPERIODSREMAINING: b.DEPRECIATIONPERIODSREMAINING,
       ACQUISITIONPRICE: num_(b.ACQUISITIONPRICE), ACCUMULATEDDEPRECIATION: num_(b.ACCUMULATEDDEPRECIATION), NETBOOKVALUE: nbv_(b),
-      OPERATINGUNIT: b.OPERATINGUNIT || '', SUB1_OPERATINGUNIT: b.SUB1_OPERATINGUNIT || '', SUB2_OPERATINGUNIT: b.SUB2_OPERATINGUNIT || ''
+      OPERATINGUNIT: a.OPERATINGUNIT || b.OPERATINGUNIT || '', SUB1_OPERATINGUNIT: a.SUB1_OPERATINGUNIT || b.SUB1_OPERATINGUNIT || '',
+      SUB2_OPERATINGUNIT: a.SUB2_OPERATINGUNIT || b.SUB2_OPERATINGUNIT || '', ASSETACCOUNT: a.ASSETACCOUNT || ''
     };
   });
   const DEP = { Depreciation: 1, DepreciationAdj: 1, ExtraordinaryDepreciation: 1 };

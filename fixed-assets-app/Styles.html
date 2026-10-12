@@ -245,6 +245,7 @@
     padding: 8px 10px; border-radius: 2px; font-size: 12px; pointer-events: none; white-space: nowrap; z-index: 5; direction: rtl; text-align: start; }
   [dir="ltr"] .tooltip { direction: ltr; }
   .tooltip b { display: block; margin-bottom: 4px; }
+  table.grid tr.acc-h td { background: #f3f6fb; }
   ul.tree { list-style: none; margin: 0; padding: 8px 12px; }
   ul.tree ul { list-style: none; padding-inline-start: 16px; margin: 4px 0; border-inline-start: 1px dashed var(--input-border); }
   ul.tree li { padding: 3px 0; }
@@ -260,7 +261,7 @@
   }
 
   @media (max-width: 900px) {
-    .factbox { display: none; }
+    .factbox { width: 220px; }
     .lpane { width: 200px; }
   }
   @media (max-width: 680px) {
@@ -268,7 +269,8 @@
     .navpane.collapsed { width: 0; padding: 0; border: 0; }
     .crumbs { display: none; }
     .topbar .brand { border: 0; flex: 1; }
-    .split { flex-direction: column; }
+    .split { flex-direction: column; align-items: stretch; }
+    .split > .grow, .factbox { width: 100%; }
     .lpane { width: 100%; position: static; max-height: 240px; }
     .content { padding: 0 8px; }
     .apane { top: 52px; margin: 6px; }

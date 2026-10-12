@@ -74,6 +74,9 @@
     list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
     excel: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/>',
     folder: '<path d="M3 6h6l2 2h10v11H3z"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M2 20h20"/>',
+    tree: '<rect x="9" y="3" width="6" height="4" rx="1"/><rect x="3" y="17" width="6" height="4" rx="1"/><rect x="15" y="17" width="6" height="4" rx="1"/><path d="M12 7v5M6 17v-5h12v5"/>',
+    pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
   };
   function icon(n, cls) {
@@ -160,6 +163,7 @@
     var r = S.b.refs, l;
     if (key === '@assets') l = r.assets;
     else if (key === '@vendors') l = r.vendors;
+    else if (key === '@accounts') l = r.accounts;
     else if (key === '@books') {
       l = r.books.filter(function (b) { return all || !rec.FIXEDASSETNUMBER || low(b.a) === low(rec.FIXEDASSETNUMBER); });
     } else {
@@ -362,7 +366,7 @@
       var i = list.findIndex(function (r) { return keyStr(e, r) === k; });
       if (i >= 0) list[i] = saved; else list.push(saved);
       toast(T('تم الحفظ', 'Saved'), 'ok');
-      if (['assets', 'books', 'vendors', 'lookups'].indexOf(e) >= 0) refreshRefs();
+      if (['assets', 'books', 'vendors', 'lookups', 'accounts'].indexOf(e) >= 0) await refreshRefs();
       return saved;
     } catch (err) { fail(err); return null; }
   }
@@ -388,7 +392,7 @@
 
   function grid(gid, cfg) {
     var old = S.grids[gid] || {};
-    S.grids[gid] = Object.assign({ q: old.q || '', sort: old.sort === undefined ? -1 : old.sort, dir: old.dir || 1, sel: old.sel || {} }, cfg);
+    S.grids[gid] = Object.assign({ q: old.q || '', sort: old.sort === undefined ? -1 : old.sort, dir: old.dir || 1, sel: old.sel || {}, init: old.init }, cfg);
     return '<div class="gridtools"><div class="search">' + icon('search') + '<input class="inp" placeholder="' + T('تصفية', 'Filter') + '" value="' + esc(S.grids[gid].q) +
       '" oninput="FA.gq(\'' + gid + '\', this.value)"></div>' + (cfg.tools || '') + '</div><div id="g_' + gid + '"></div>';
   }
@@ -440,7 +444,7 @@
         if (i === 0) return '<td>' + T('الإجمالي', 'Total') + '</td>';
         if (!c.total) return '<td></td>';
         var sum = rows.reduce(function (a, r) { return a + (Number(r[c.k]) || 0); }, 0);
-        return '<td class="n">' + fmtNum(sum, 3) + '</td>';
+        return '<td class="n">' + fmtNum(sum, c.dec === undefined ? 3 : c.dec) + '</td>';
       }).join('') + '</tr></tfoot>';
     }
     h += '</table></div><div class="gridfoot">' + T('عدد السجلات: ', 'Records: ') + rows.length +
@@ -615,11 +619,17 @@
   }
 
   var NAV = [
-    { id: 'dashboard', icon: 'home', ar: 'الرئيسية', en: 'Home' },
+    { id: 'dashboard', icon: 'home', ar: 'لوحة المعلومات', en: 'Dashboard' },
     { h: 1, ar: 'الأصول الثابتة', en: 'Fixed assets' },
     { id: 'assets', icon: 'box', ar: 'الأصول الثابتة', en: 'Fixed assets', perm: 'assets' },
     { id: 'books', icon: 'book', ar: 'دفاتر الأصول', en: 'Books', perm: 'books' },
     { id: 'journal', icon: 'journal', ar: 'يومية الأصول الثابتة', en: 'Fixed asset journal', perm: 'journal' },
+    { id: 'depreciation', icon: 'clock', ar: 'الإهلاك التلقائي', en: 'Depreciation', perm: 'depreciation' },
+    { id: 'reports', icon: 'chart', ar: 'التقارير', en: 'Reports', perm: 'reports' },
+    { h: 1, ar: 'البيانات الأساسية', en: 'Master data' },
+    { id: 'units', icon: 'tree', ar: 'الوحدات التشغيلية', en: 'Operating units', perm: 'masterdata' },
+    { id: 'locations', icon: 'pin', ar: 'المواقع والمسؤولون', en: 'Locations & responsibility', perm: 'masterdata' },
+    { id: 'accounts', icon: 'list', ar: 'دليل الحسابات', en: 'Chart of accounts', perm: 'masterdata' },
     { id: 'vendors', icon: 'truck', ar: 'الموردون', en: 'Vendors', perm: 'vendors' },
     { h: 1, ar: 'الإدارة', en: 'Administration' },
     { id: 'users', icon: 'users', ar: 'المستخدمون والصلاحيات', en: 'Users & permissions', perm: 'users' },
@@ -669,6 +679,11 @@
         case 'journal': return await (S.view.batch ? pageBatch() : pageJournal());
         case 'users': return await pageUsers();
         case 'settings': return await pageSettings();
+        case 'accounts': return await (S.view.key !== undefined || S.view.isNew ? pageRecord('accounts') : pageList('accounts'));
+        case 'units': return await pageMaster('units');
+        case 'locations': return await pageMaster('locations');
+        case 'depreciation': return await pageDepreciation();
+        case 'reports': return await pageReports();
         default: return await pageDashboard();
       }
     } catch (e) {
@@ -678,32 +693,103 @@
 
   /* ======================= Dashboard ======================= */
   async function pageDashboard() {
-    crumbs([S.b.settings.ORGNAME, T('الرئيسية', 'Home')]);
+    crumbs([S.b.settings.ORGNAME, T('لوحة المعلومات', 'Dashboard')]);
     var main = $('#main');
-    main.innerHTML = phead('', T('مرحباً، ', 'Welcome, ') + esc(S.b.user.fullName || S.b.user.username)) + '<div class="content"><div class="empty">…</div></div>';
+    var hello = T('مرحباً، ', 'Welcome, ') + esc(S.b.user.fullName || S.b.user.username);
+    main.innerHTML = phead(esc(S.b.settings.ORGNAME), hello) + '<div class="content"><div class="empty">…</div></div>';
     var d = await api('dashboard', S.token);
+    S.dash = d;
     var cur = S.b.settings.CURRENCY;
-    var tiles = '';
-    if (d.assets) tiles += tile('assets', 'box', T('الأصول الثابتة', 'Fixed assets'), d.assets.count, '');
-    if (d.books) tiles += tile('books', 'book', T('دفاتر الأصول', 'Asset books'), d.books.count, T('إجمالي تكلفة الاقتناء: ', 'Total acquisition cost: ') + fmtNum(d.books.cost, 3) + ' ' + cur);
-    if (d.journal) tiles += tile('journal', 'journal', T('يوميات بانتظار الاعتماد', 'Journals awaiting approval'), d.journal.Draft,
-      T('معتمدة: ', 'Approved: ') + d.journal.Approved + ' · ' + T('مُرحّلة: ', 'Posted: ') + d.journal.Posted);
-    if (d.vendors) tiles += tile('vendors', 'truck', T('الموردون', 'Vendors'), d.vendors.count, '');
     var cards = '';
-    if (d.books) {
-      var opts = fld('books', 'STATUS').opts;
-      cards += '<div class="card" style="padding:14px"><h3 style="margin:0 0 8px;font-size:14px">' + T('الدفاتر حسب الحالة', 'Books by status') + '</h3>' +
-        (Object.keys(d.books.byStatus).map(function (k) { return '<div class="kv"><span>' + badge('book', k) + '</span><b>' + d.books.byStatus[k] + '</b></div>'; }).join('') || '<div class="empty">—</div>') + '</div>';
+    if (d.assets) cards += kpi('assets', 'box', T('عدد الأصول', 'Number of assets'), fmtNum(d.assets.count, 0), '');
+    if (d.totals) {
+      cards += kpi('reports', 'book', T('قيمة الأصول', 'Assets value'), fmtNum(d.totals.cost, 0), cur + ' — ' + T('تكلفة الاقتناء', 'acquisition cost'));
+      cards += kpi('depreciation', 'clock', T('مجمع الإهلاك', 'Accumulated depreciation'), fmtNum(d.totals.accum, 0), cur);
+      cards += kpi('reports', 'check', T('صافي قيمة الأصول بعد الإهلاك', 'Net book value'), fmtNum(d.totals.nbv, 0), cur);
     }
-    if (d.assets) {
-      cards += '<div class="card" style="padding:14px"><h3 style="margin:0 0 8px;font-size:14px">' + T('الأصول حسب المجموعة', 'Assets by group') + '</h3>' +
-        (Object.keys(d.assets.byGroup).map(function (k) { return '<div class="kv"><span>' + esc(k) + ' <small style="color:#605e5c">' + esc(lookupName('AssetGroup', k)) + '</small></span><b>' + d.assets.byGroup[k] + '</b></div>'; }).join('') || '<div class="empty">—</div>') + '</div>';
+    var chart = '';
+    if (d.byOU) {
+      chart = '<div class="card"><div class="ftab-h" style="cursor:default"><h3>' + T('قيمة الأصول حسب الوحدة التشغيلية الرئيسية', 'Assets value by main operating unit') +
+        '</h3><div class="sum"><span>' + esc(cur) + '</span></div></div><div style="padding:14px">' + barChart(d.byOU) + '</div>' +
+        '<div class="gridwrap" style="max-height:none"><table class="grid"><thead><tr><th>' + T('الوحدة التشغيلية', 'Operating unit') + '</th><th class="n">' + T('عدد الأصول', 'Assets') +
+        '</th><th class="n">' + T('قيمة الأصول', 'Assets value') + '</th><th class="n">' + T('مجمع الإهلاك', 'Accum. depreciation') + '</th><th class="n">' + T('صافي القيمة', 'Net book value') + '</th></tr></thead><tbody>' +
+        d.byOU.map(function (g) {
+          return '<tr><td><bdi>' + esc(g.ou) + '</bdi> <small style="color:#605e5c">' + esc(lookupName('OperatingUnit', g.ou)) + '</small></td><td class="n">' + g.count + '</td><td class="n">' + fmtNum(g.cost, 3) +
+            '</td><td class="n">' + fmtNum(g.accum, 3) + '</td><td class="n">' + fmtNum(g.nbv, 3) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>';
     }
-    main.innerHTML = phead(esc(S.b.settings.ORGNAME), T('مرحباً، ', 'Welcome, ') + esc(S.b.user.fullName || S.b.user.username)) +
-      '<div class="content"><div class="tiles">' + tiles + '</div><div class="tiles" style="margin-top:12px">' + cards + '</div></div>';
+    var side = '';
+    if (d.journal) {
+      side += '<div class="card" style="padding:14px"><h3 style="margin:0 0 8px;font-size:14px">' + T('اليوميات', 'Journals') + '</h3>' +
+        ['Draft', 'Approved', 'Posted'].map(function (k) { return '<div class="kv"><span>' + badge('journal', k) + '</span><b>' + d.journal[k] + '</b></div>'; }).join('') + '</div>';
+    }
+    if (d.byStatus) {
+      side += '<div class="card" style="padding:14px"><h3 style="margin:0 0 8px;font-size:14px">' + T('الدفاتر حسب الحالة', 'Books by status') + '</h3>' +
+        (Object.keys(d.byStatus).map(function (k) { return '<div class="kv"><span>' + badge('book', k) + '</span><b>' + d.byStatus[k] + '</b></div>'; }).join('') || '<div class="empty">—</div>') + '</div>';
+    }
+    main.innerHTML = phead(esc(S.b.settings.ORGNAME), hello) + '<div class="content"><div class="tiles kpis">' + cards + '</div>' +
+      '<div class="split" style="margin-top:12px"><div class="grow">' + chart + '</div>' + (side ? '<div class="factbox">' + side + '</div>' : '') + '</div></div>';
   }
-  function tile(page, ic, t, v, d) {
-    return '<div class="tile" onclick="FA.go(\'' + page + '\')"><div class="t">' + icon(ic) + esc(t) + '</div><div class="v">' + esc(v) + '</div><div class="d">' + esc(d) + '</div></div>';
+
+  function kpi(page, ic, t, v, d) {
+    var go = can(page) ? ' onclick="FA.go(\'' + page + '\')"' : ' style="cursor:default"';
+    return '<div class="tile"' + go + '><div class="t">' + icon(ic) + esc(t) + '</div><div class="v" dir="ltr">' + esc(v) + '</div><div class="d">' + esc(d) + '</div></div>';
+  }
+
+  function compact(n) {
+    var a = Math.abs(n);
+    if (a >= 1e9) return (n / 1e9).toFixed(a >= 1e10 ? 0 : 1) + 'B';
+    if (a >= 1e6) return (n / 1e6).toFixed(a >= 1e7 ? 0 : 1) + 'M';
+    if (a >= 1e3) return (n / 1e3).toFixed(a >= 1e4 ? 0 : 1) + 'K';
+    return String(Math.round(n));
+  }
+
+  /** مخطط أعمدة SVG لسلسلة واحدة (قيمة الأصول) مع تلميح عند المرور. */
+  function barChart(rows) {
+    if (!rows.length) return '<div class="empty">' + T('لا توجد بيانات', 'No data') + '</div>';
+    var max = Math.max.apply(null, rows.map(function (r) { return r.cost; })) || 1;
+    var step = Math.pow(10, Math.floor(Math.log10(max)));
+    var top = Math.ceil(max / step) * step;
+    if (top / step < 3) { step = step / 2; top = Math.ceil(max / step) * step; }
+    var W = Math.max(520, rows.length * 96 + 70), H = 280, padL = 60, padB = 52, padT = 22;
+    var plotW = W - padL - 12, plotH = H - padB - padT;
+    var bw = Math.min(56, plotW / rows.length * 0.55);
+    var g = '';
+    for (var v = 0; v <= top + 1e-9; v += step) {
+      var y = padT + plotH - v / top * plotH;
+      g += '<line x1="' + padL + '" x2="' + (W - 12) + '" y1="' + y + '" y2="' + y + '" stroke="#edebe9" stroke-width="1"/>' +
+        '<text x="' + (padL - 8) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="#605e5c">' + compact(v) + '</text>';
+    }
+    rows.forEach(function (r, i) {
+      var cx = padL + plotW / rows.length * (i + 0.5);
+      var h = Math.max(1, r.cost / top * plotH);
+      var x = cx - bw / 2, y0 = padT + plotH, y1 = y0 - h, rad = Math.min(4, h, bw / 2);
+      var path = 'M' + x + ',' + y0 + 'V' + (y1 + rad) + 'Q' + x + ',' + y1 + ' ' + (x + rad) + ',' + y1 + 'H' + (x + bw - rad) + 'Q' + (x + bw) + ',' + y1 + ' ' + (x + bw) + ',' + (y1 + rad) + 'V' + y0 + 'Z';
+      var name = lookupName('OperatingUnit', r.ou);
+      var tip = esc(r.ou + (name ? ' — ' + name : '')) + '|' + esc(T('قيمة الأصول: ', 'Assets value: ') + fmtNum(r.cost, 3)) + '|' +
+        esc(T('مجمع الإهلاك: ', 'Accum. depreciation: ') + fmtNum(r.accum, 3)) + '|' + esc(T('صافي القيمة: ', 'Net book value: ') + fmtNum(r.nbv, 3)) + '|' + esc(T('عدد الأصول: ', 'Assets: ') + r.count);
+      g += '<g class="bar" data-tip="' + tip + '"><rect x="' + (cx - plotW / rows.length / 2) + '" y="' + padT + '" width="' + (plotW / rows.length) + '" height="' + plotH + '" fill="transparent"/>' +
+        '<path d="' + path + '" fill="#0f6cbd"/>' +
+        '<text x="' + cx + '" y="' + (y1 - 6) + '" text-anchor="middle" font-size="11" fill="#323130">' + compact(r.cost) + '</text>' +
+        '<text x="' + cx + '" y="' + (y0 + 16) + '" text-anchor="middle" font-size="12" fill="#201f1e" direction="ltr">' + esc(r.ou) + '</text>' +
+        '<text x="' + cx + '" y="' + (y0 + 32) + '" text-anchor="middle" font-size="11" fill="#605e5c">' + esc(name.length > 16 ? name.slice(0, 15) + '…' : name) + '</text></g>';
+    });
+    g += '<line x1="' + padL + '" x2="' + (W - 12) + '" y1="' + (padT + plotH) + '" y2="' + (padT + plotH) + '" stroke="#8a8886" stroke-width="1"/>';
+    return '<div class="chartwrap" dir="ltr"><svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:' + W + 'px" role="img" aria-label="' +
+      esc(T('قيمة الأصول حسب الوحدة التشغيلية', 'Assets value by operating unit')) + '" onmousemove="FA.tip(event)" onmouseleave="FA.tip(null)">' + g + '</svg><div class="tooltip hidden" id="chartTip"></div></div>';
+  }
+
+  function tip(ev) {
+    var t = $('#chartTip');
+    if (!t) return;
+    var gEl = ev && ev.target.closest ? ev.target.closest('g.bar') : null;
+    if (!gEl) { t.classList.add('hidden'); return; }
+    t.innerHTML = gEl.getAttribute('data-tip').split('|').map(function (x, i) { return i ? '<div>' + esc(x) + '</div>' : '<b>' + esc(x) + '</b>'; }).join('');
+    var box = t.parentNode.getBoundingClientRect();
+    t.classList.remove('hidden');
+    var x = ev.clientX - box.left + 14, y = ev.clientY - box.top + 10;
+    if (x + t.offsetWidth > box.width) x = ev.clientX - box.left - t.offsetWidth - 14;
+    t.style.left = x + 'px'; t.style.top = y + 'px';
   }
 
   /* ======================= Generic list + record (assets, vendors) ======================= */
@@ -1082,19 +1168,321 @@
     gridRender('assetTrans');
   }
 
+  /* ======================= Master data: units, locations, lookups ======================= */
+  var MASTER = {
+    units: { types: ['OperatingUnit', 'Sub1_OperatingUnit', 'Sub2_OperatingUnit'], icon: 'gear', ar: 'الوحدات التشغيلية', en: 'Operating units' },
+    locations: { types: ['Location', 'Building', 'Room', 'Department', 'Employee'], icon: 'home', ar: 'المواقع والمسؤولون', en: 'Locations & responsibility' }
+  };
+
+  function ltab(type) { S.view.ltype = type; render(); }
+
+  async function lookupsPanel(types) {
+    await load('lookups');
+    var type = types.indexOf(S.view.ltype) >= 0 ? S.view.ltype : types[0];
+    S.view.ltype = type;
+    var pt = (fld('lookups', 'PARENT').lkMap || {})[type];
+    var cols = [
+      { k: 'CODE', label: T('الكود', 'ID') },
+      { k: 'NAME', label: T('الاسم', 'Name') }
+    ];
+    if (pt) {
+      var ptName = L(S.b.lookupTypes.filter(function (t) { return t.v === pt; })[0]);
+      cols.push({ k: 'PARENT', label: T('يتبع: ', 'Parent: ') + ptName });
+      cols.push({ k: '_pn', label: T('اسم الأب', 'Parent name'), text: function (r) { return lookupName(pt, r.PARENT); } });
+    }
+    var canAdd = can('masterdata', 'add'), canDel = can('masterdata', 'delete');
+    return '<div class="tabs">' + S.b.lookupTypes.filter(function (t) { return types.indexOf(t.v) >= 0; }).map(function (t) {
+      var n = (S.data.lookups || []).filter(function (r) { return r.TYPE === t.v; }).length;
+      return '<button class="' + (t.v === type ? 'on' : '') + '" onclick="FA.ltab(\'' + t.v + '\')">' + esc(L(t)) + ' (' + n + ')</button>';
+    }).join('') + '</div><div class="card">' + grid('lookups', {
+      rows: function () { return (S.data.lookups || []).filter(function (r) { return r.TYPE === type; }); },
+      key: function (r) { return keyStr('lookups', r); }, select: canDel, cols: cols,
+      open: function (r) { lookupDlg(r); },
+      tools: (canAdd ? '<button class="btn" onclick="FA.lookupDlg(null)">' + icon('plus') + T('جديد', 'New') + '</button>' : '') +
+        (canDel ? '<button class="btn" onclick="FA.deleteSelected(\'lookups\',\'lookups\')">' + icon('trash') + T('حذف', 'Delete') + '</button>' : '') +
+        (canAdd ? '<button class="btn" onclick="FA.importStart(\'lookups\',{TYPE:\'' + type + '\'})">' + icon('upload') + T('استيراد', 'Import') + '</button>' : '') +
+        '<button class="btn" onclick="FA.exportGrid(\'lookups\',\'lookups\')">' + icon('download') + T('تصدير', 'Export') + '</button>'
+    }) + '</div>';
+  }
+
+  function unitTree() {
+    var l = S.b.lookups;
+    var kids = function (type, p) { return (l[type] || []).filter(function (x) { return low(x.p) === low(p); }); };
+    var item = function (x, inner) { return '<li><b dir="ltr">' + esc(x.c) + '</b> <span>' + esc(x.n) + '</span>' + (inner ? '<ul>' + inner + '</ul>' : '') + '</li>'; };
+    var orphans1 = (l.Sub1_OperatingUnit || []).filter(function (x) { return !x.p; });
+    var html = (l.OperatingUnit || []).map(function (ou) {
+      return item(ou, kids('Sub1_OperatingUnit', ou.c).map(function (s1) {
+        return item(s1, kids('Sub2_OperatingUnit', s1.c).map(function (s2) { return item(s2); }).join(''));
+      }).join(''));
+    }).join('') + orphans1.map(function (x) { return item(x); }).join('');
+    return '<div class="card"><h4 style="margin:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px">' + T('الهيكل الشجري', 'Hierarchy') + '</h4><ul class="tree">' +
+      (html || '<li class="empty">—</li>') + '</ul></div>';
+  }
+
+  async function pageMaster(kind) {
+    var m = MASTER[kind];
+    crumbs([S.b.settings.ORGNAME, T(m.ar, m.en)]);
+    var body = await lookupsPanel(m.types);
+    $('#main').innerHTML = apane([
+      can('masterdata', 'add') && { icon: 'plus', ar: 'جديد', en: 'New', on: 'FA.lookupDlg(null)' },
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('lookups')" }
+    ]) + phead(T('البيانات الأساسية', 'Master data'), T(m.ar, m.en)) +
+      '<div class="content"><div class="split"><div class="grow">' + body + '</div>' + (kind === 'units' ? '<div class="factbox">' + unitTree() + '</div>' : '') + '</div></div>';
+    gridRender('lookups');
+  }
+
+  /* ======================= Depreciation ======================= */
+  function quarterEnd(y, q) { var m = q * 3; return y + '-' + pad(m) + '-' + pad(new Date(Date.UTC(y, m, 0)).getUTCDate()); }
+
+  async function pageDepreciation() {
+    crumbs([S.b.settings.ORGNAME, T('الإهلاك التلقائي', 'Depreciation')]);
+    var st = S.b.settings;
+    var now = new Date();
+    var p = S.depParams = S.depParams || {
+      year: now.getFullYear(), quarter: Math.floor(now.getMonth() / 3) + 1, months: Number(st.DEPMONTHS) || 3,
+      group: '', ou: '', book: 'General', journalName: st.DEPJOURNALNAME || 'FADEP', offsetAccount: st.DEPOFFSETACCOUNT || ''
+    };
+    var years = [];
+    for (var y = now.getFullYear() + 1; y >= now.getFullYear() - 10; y--) years.push(y);
+    var opt = function (list, v) { return list.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (String(x[0]) === String(v) ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
+    var lk = function (type) { return [['', T('الكل', 'All')]].concat((S.b.lookups[type] || []).map(function (x) { return [x.c, x.c + ' - ' + x.n]; })); };
+    var res = S.depResult;
+    var canCreate = can('depreciation', 'add') && can('journal', 'add');
+    var params = '<div class="card ftab"><div class="ftab-h" style="cursor:default"><h3>' + T('معايير الحساب', 'Parameters') + '</h3></div><div class="ftab-b">' +
+      '<div class="fgroup"><h5>' + T('الفترة (ربع سنوي)', 'Period (quarterly)') + '</h5>' +
+      '<div class="fld"><label>' + T('السنة', 'Year') + '</label><select class="inp" data-p="year">' + opt(years.map(function (y) { return [y, y]; }), p.year) + '</select></div>' +
+      '<div class="fld"><label>' + T('الربع', 'Quarter') + '</label><select class="inp" data-p="quarter">' +
+      opt([[1, T('الربع الأول (يناير - مارس)', 'Q1 (Jan - Mar)')], [2, T('الربع الثاني (أبريل - يونيو)', 'Q2 (Apr - Jun)')], [3, T('الربع الثالث (يوليو - سبتمبر)', 'Q3 (Jul - Sep)')], [4, T('الربع الرابع (أكتوبر - ديسمبر)', 'Q4 (Oct - Dec)')]], p.quarter) + '</select></div>' +
+      '<div class="fld"><label>' + T('تاريخ نهاية الفترة', 'Period end date') + '</label><input class="inp" readonly dir="ltr" value="' + quarterEnd(Number(p.year), Number(p.quarter)) + '"></div></div>' +
+      '<div class="fgroup"><h5>' + T('التصفية', 'Filter') + '</h5>' +
+      '<div class="fld"><label>' + T('مجموعة الأصل', 'Fixed asset group') + '</label><select class="inp" data-p="group">' + opt(lk('AssetGroup'), p.group) + '</select></div>' +
+      '<div class="fld"><label>' + T('الوحدة التشغيلية', 'Operating unit') + '</label><select class="inp" data-p="ou">' + opt(lk('OperatingUnit'), p.ou) + '</select></div>' +
+      '<div class="fld"><label>' + T('الدفتر', 'Book') + '</label><input class="inp" data-p="book" dir="ltr" value="' + esc(p.book) + '"></div></div>' +
+      '<div class="fgroup"><h5>' + T('اليومية', 'Journal') + '</h5>' +
+      '<div class="fld"><label>' + T('اسم اليومية', 'Journal name') + '</label><select class="inp" data-p="journalName">' +
+      opt((S.b.lookups.JournalName || []).map(function (x) { return [x.c, x.c + ' - ' + x.n]; }), p.journalName) + '</select></div>' +
+      '<div class="fld"><label>' + T('حساب مصروف الإهلاك (الحساب المقابل)', 'Depreciation expense (offset) account') + '</label><div class="lk"><input class="inp" data-p="offsetAccount" list="dl_depacc" dir="ltr" value="' + esc(p.offsetAccount) +
+      '"><input class="inp name" readonly value="' + esc(lookupName('@accounts', p.offsetAccount)) + '"></div><datalist id="dl_depacc">' + datalistOpts('@accounts', null, {}) + '</datalist></div></div>' +
+      '</div><div class="note" style="margin:0 14px 14px">' +
+      T('طريقة الحساب: الإهلاك = سعر الاقتناء ÷ العمر الافتراضي بالسنوات ÷ 12 × عدد الشهور، ويُسجَّل بالسالب (دائن). يُحسب من الشهر التالي لآخر إهلاك حتى نهاية الربع، ولا يتجاوز الفترات المتبقية أو قيمة الخردة.',
+        'Formula: depreciation = acquisition price ÷ service life (years) ÷ 12 × months, recorded as a negative (credit). Calculated from the month after the last depreciation to the quarter end, capped by remaining periods and scrap value.') + '</div></div>';
+    var out = '';
+    if (res) {
+      var total = res.lines.reduce(function (a, l) { return a + l.AMOUNT; }, 0);
+      out = '<div class="tiles kpis" style="margin-bottom:12px">' +
+        kpiStatic(T('أصول تستحق الإهلاك', 'Assets to depreciate'), fmtNum(res.lines.length, 0), T('حتى ', 'up to ') + res.periodEnd) +
+        kpiStatic(T('إجمالي الإهلاك', 'Total depreciation'), fmtNum(total, 3), S.b.settings.CURRENCY) +
+        kpiStatic(T('أصول مستبعدة', 'Skipped assets'), fmtNum(res.skipped.length, 0), T('انظر التفاصيل أسفل الجدول', 'see details below the table')) + '</div>' +
+        '<div class="card">' + grid('dep', {
+          rows: function () { return S.depResult.lines; }, key: function (r) { return low(r.FIXEDASSETNUMBER); }, select: true,
+          cols: [
+            { k: 'FIXEDASSETNUMBER', label: T('رقم الأصل', 'Fixed asset') },
+            { k: 'NAME', label: T('اسم الأصل', 'Name') },
+            { k: 'GROUP', label: T('المجموعة', 'Group') },
+            { k: 'PRICE', label: T('سعر الاقتناء', 'Acquisition price'), num: true, text: function (r) { return fmtNum(r.PRICE, 3); } },
+            { k: 'LIFE', label: T('العمر (سنوات)', 'Life (years)'), num: true },
+            { k: 'ANNUAL', label: T('الإهلاك السنوي', 'Annual depreciation'), num: true, text: function (r) { return fmtNum(r.ANNUAL, 3); } },
+            { k: 'FROM', label: T('من شهر', 'From month') },
+            { k: 'MONTHS', label: T('عدد الشهور', 'Months'), num: true, html: function (r) { return r.MONTHS + (r.CATCHUP ? ' <span class="badge b-warn" title="' + T('استدراك فترات سابقة', 'Catch-up of earlier periods') + '">' + T('استدراك', 'catch-up') + '</span>' : ''); } },
+            { k: 'AMOUNT', label: T('مبلغ الإهلاك', 'Depreciation amount'), num: true, total: true, text: function (r) { return fmtNum(r.AMOUNT, 3); } },
+            { k: 'ACCUMAFTER', label: T('مجمع الإهلاك بعد', 'Accum. after'), num: true, text: function (r) { return fmtNum(r.ACCUMAFTER, 3); } },
+            { k: 'NBVAFTER', label: T('صافي القيمة بعد', 'NBV after'), num: true, text: function (r) { return fmtNum(r.NBVAFTER, 3); } },
+            { k: 'OU', label: T('الوحدة التشغيلية', 'Operating unit') }
+          ]
+        }) + '</div>' +
+        (res.skipped.length ? '<details class="card" style="padding:10px 14px"><summary style="cursor:pointer;font-weight:600">' + T('الأصول المستبعدة وأسبابها', 'Skipped assets and reasons') + ' (' + res.skipped.length + ')</summary><table class="grid" style="margin-top:8px"><tbody>' +
+          res.skipped.map(function (x) { return '<tr><td><bdi>' + esc(x.asset) + '</bdi></td><td>' + esc(x.name) + '</td><td>' + esc(x.book) + '</td><td>' + esc(x.reason) + '</td></tr>'; }).join('') + '</tbody></table></details>' : '');
+    }
+    $('#main').innerHTML = apane([
+      { icon: 'refresh', ar: 'حساب مقترح الإهلاك', en: 'Calculate proposal', on: 'FA.depCalc()' },
+      canCreate && { icon: 'journal', ar: 'إنشاء يومية الإهلاك', en: 'Create depreciation journal', on: 'FA.depCreate()', dis: !(res && res.lines.length) },
+      '|',
+      { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: 'FA.depExport()', dis: !(res && res.lines.length) }
+    ]) + phead(T('الأصول الثابتة', 'Fixed assets'), T('الإهلاك التلقائي (ربع سنوي)', 'Automatic depreciation (quarterly)')) +
+      '<div class="content">' + params + out + '</div>';
+    $$('[data-p]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        S.depParams[el.getAttribute('data-p')] = el.value;
+        S.depResult = null;
+        if (el.getAttribute('data-p') === 'year' || el.getAttribute('data-p') === 'quarter') render();
+        if (el.getAttribute('data-p') === 'offsetAccount') el.parentNode.querySelector('.name').value = lookupName('@accounts', el.value);
+      });
+    });
+    if (res) {
+      if (!S.grids.dep.init) { S.grids.dep.sel = {}; res.lines.forEach(function (l) { S.grids.dep.sel[low(l.FIXEDASSETNUMBER)] = 1; }); S.grids.dep.init = 1; }
+      gridRender('dep');
+    }
+  }
+
+  function kpiStatic(t, v, d) { return '<div class="tile" style="cursor:default"><div class="t">' + esc(t) + '</div><div class="v" dir="ltr">' + esc(v) + '</div><div class="d">' + esc(d) + '</div></div>'; }
+
+  function depPayload() {
+    var p = S.depParams;
+    return { periodEnd: quarterEnd(Number(p.year), Number(p.quarter)), months: p.months, group: p.group, ou: p.ou, book: p.book,
+      journalName: p.journalName, offsetAccount: p.offsetAccount };
+  }
+
+  async function depCalc() {
+    try {
+      S.depResult = await api('depreciationProposal', S.token, depPayload());
+      if (S.grids.dep) S.grids.dep.init = 0;
+      render();
+    } catch (e) { fail(e); }
+  }
+
+  async function depCreate() {
+    var sel = selected('dep');
+    if (!sel.length) return toast(T('حدد أصلاً واحداً على الأقل', 'Select at least one asset'));
+    var total = sel.reduce(function (a, l) { return a + l.AMOUNT; }, 0);
+    if (!S.depParams.offsetAccount && !(await confirmBox(T('لم تحدد حساب مصروف الإهلاك، هل تريد المتابعة بدون حساب مقابل؟', 'No expense account selected. Continue without an offset account?')))) return;
+    if (!(await confirmBox(T('إنشاء يومية إهلاك لـ ', 'Create a depreciation journal for ') + sel.length + T(' أصل بإجمالي ', ' assets totalling ') + fmtNum(total, 3) + '؟'))) return;
+    try {
+      var p = depPayload();
+      p.only = sel.map(function (l) { return l.FIXEDASSETNUMBER; });
+      var r = await api('createDepreciationJournal', S.token, p);
+      toast(T('تم إنشاء اليومية ', 'Journal created ') + r.batch + ' — ' + r.count + T(' سطر', ' lines'), 'ok');
+      S.depResult = null;
+      S.data.journal = null;
+      go('journal', { batch: r.batch });
+    } catch (e) { fail(e); }
+  }
+
+  function depExport() {
+    var g = S.grids.dep;
+    exportPlain(g.cols, g.visible || g.rows(), 'Depreciation_' + S.depResult.periodEnd);
+  }
+
+  /** تصدير جدول عام (للتقارير) إلى Excel بعناوين الأعمدة الظاهرة. */
+  function exportPlain(cols, rows, name) {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    var aoa = [cols.map(function (c) { return c.label; })].concat(rows.map(function (r) {
+      return cols.map(function (c) { var v = r[c.k]; return c.num && v !== '' && !isNaN(Number(v)) ? Number(v) : (c.text ? c.text(r) : (v === undefined ? '' : v)); });
+    }));
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Report');
+    XLSX.writeFile(wb, name + '_' + today() + '.xlsx');
+  }
+
+  /* ======================= Reports ======================= */
+  var REPORTS = [
+    ['register', 'سجل الأصول الثابتة', 'Fixed asset register'],
+    ['ou', 'ملخص حسب الوحدة التشغيلية', 'Summary by operating unit'],
+    ['dim', 'ملخص حسب الموقع / الإدارة / المجموعة', 'Summary by location / department / group'],
+    ['dep', 'حركات الإهلاك', 'Depreciation transactions']
+  ];
+
+  async function pageReports(force) {
+    crumbs([S.b.settings.ORGNAME, T('التقارير', 'Reports')]);
+    if (!S.rep || force) S.rep = await api('reportData', S.token);
+    var tab = S.view.tab || 'register';
+    var f = S.repF = S.repF || { group: '', ou: '', location: '', status: '', dim: 'LOCATION', from: '', to: '' };
+    var head = apane([]).replace('<div class="bar"></div>', '<div class="bar">' + REPORTS.map(function (r) {
+      return '<button class="abtn tab ' + (r[0] === tab ? 'on' : '') + '" onclick="FA.go(\'reports\',{tab:\'' + r[0] + '\'})">' + esc(T(r[1], r[2])) + '</button>';
+    }).join('') + '<span class="sep"></span><button class="abtn" onclick="FA.repRefresh()">' + icon('refresh') + T('تحديث', 'Refresh') + '</button>' +
+      '<button class="abtn" onclick="FA.repExport()">' + icon('download') + T('تصدير إلى Excel', 'Export to Excel') + '</button>' +
+      '<button class="abtn" onclick="window.print()">' + icon('list') + T('طباعة', 'Print') + '</button></div>');
+    var title = REPORTS.filter(function (r) { return r[0] === tab; })[0];
+    var sel = function (k, list) {
+      return '<select class="inp" style="width:auto" onchange="FA.repFilter(\'' + k + '\', this.value)">' + list.map(function (x) {
+        return '<option value="' + esc(x[0]) + '"' + (x[0] === f[k] ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join('') + '</select>';
+    };
+    var lk = function (type, all) { return [['', all]].concat((S.b.lookups[type] || []).map(function (x) { return [x.c, x.c + ' - ' + x.n]; })); };
+    var filters = sel('group', lk('AssetGroup', T('كل المجموعات', 'All groups'))) + sel('ou', lk('OperatingUnit', T('كل الوحدات', 'All units'))) +
+      sel('location', lk('Location', T('كل المواقع', 'All locations'))) +
+      sel('status', [['', T('كل الحالات', 'All statuses')]].concat(fld('books', 'STATUS').opts.map(function (o) { return [o.v, L(o)]; })));
+    var cfg;
+    var money = function (k, label) { return { k: k, label: label, num: true, total: true, text: function (r) { return fmtNum(r[k], 3); } }; };
+    if (tab === 'register') {
+      cfg = { rows: repRegister, key: function (r) { return r.FIXEDASSETNUMBER + '|' + r.BOOKID; }, tools: filters, cols: [
+        { k: 'FIXEDASSETNUMBER', label: T('رقم الأصل', 'Fixed asset') }, { k: 'NAME', label: T('اسم الأصل', 'Name') },
+        { k: 'FIXEDASSETGROUPID', label: T('المجموعة', 'Group') }, { k: 'LOCATION', label: T('الموقع', 'Location') },
+        { k: 'DEPARTMENT', label: T('الإدارة', 'Department') }, { k: 'OPERATINGUNIT', label: T('الوحدة التشغيلية', 'Operating unit') },
+        { k: 'ACQUISITIONDATE', label: T('تاريخ الاقتناء', 'Acquisition date') }, { k: 'SERVICELIFE', label: T('العمر', 'Life'), num: true },
+        { k: 'STATUS', label: T('الحالة', 'Status'), html: function (r) { return badge('book', r.STATUS); }, text: function (r) { return r.STATUS; } },
+        money('ACQUISITIONPRICE', T('سعر الاقتناء', 'Acquisition price')), money('ACCUMULATEDDEPRECIATION', T('مجمع الإهلاك', 'Accum. depreciation')),
+        money('NETBOOKVALUE', T('صافي القيمة', 'Net book value')) ] };
+    } else if (tab === 'ou' || tab === 'dim') {
+      var dimK = tab === 'ou' ? 'OPERATINGUNIT' : f.dim;
+      var dimLk = { OPERATINGUNIT: 'OperatingUnit', LOCATION: 'Location', DEPARTMENT: 'Department', FIXEDASSETGROUPID: 'AssetGroup', BUILDING: 'Building', RESPONSIBLE: 'Employee' }[dimK];
+      cfg = { rows: function () { return repSummary(dimK); }, key: function (r) { return r.CODE; },
+        tools: tab === 'dim' ? sel('dim', [['LOCATION', T('حسب الموقع', 'By location')], ['DEPARTMENT', T('حسب الإدارة', 'By department')], ['BUILDING', T('حسب المبنى', 'By building')],
+          ['FIXEDASSETGROUPID', T('حسب المجموعة', 'By group')], ['RESPONSIBLE', T('حسب الموظف المسؤول', 'By employee')]]) + sel('status', [['', T('كل الحالات', 'All statuses')]].concat(fld('books', 'STATUS').opts.map(function (o) { return [o.v, L(o)]; })))
+          : sel('status', [['', T('كل الحالات', 'All statuses')]].concat(fld('books', 'STATUS').opts.map(function (o) { return [o.v, L(o)]; }))),
+        cols: [
+          { k: 'CODE', label: T('الكود', 'Code') }, { k: 'NAMEX', label: T('الاسم', 'Name'), text: function (r) { return r.CODE === '-' ? T('غير محدد', 'Not set') : lookupName(dimLk, r.CODE); } },
+          { k: 'COUNT', label: T('عدد الأصول', 'Assets'), num: true, total: true, dec: 0, text: function (r) { return fmtNum(r.COUNT, 0); } },
+          money('ACQUISITIONPRICE', T('قيمة الأصول', 'Assets value')), money('ACCUMULATEDDEPRECIATION', T('مجمع الإهلاك', 'Accum. depreciation')),
+          money('NETBOOKVALUE', T('صافي القيمة', 'Net book value')),
+          { k: 'PCT', label: T('% من القيمة', '% of value'), num: true, text: function (r) { return r.PCT.toFixed(1) + '%'; } } ] };
+    } else {
+      cfg = { rows: repDep, key: function (r, i) { return r.JOURNALBATCHNUMBER + r.FIXEDASSETNUMBER + r.TRANSDATE + r.AMOUNT; },
+        tools: '<label>' + T('من', 'From') + ' <input class="inp" style="width:auto" type="date" value="' + esc(f.from) + '" onchange="FA.repFilter(\'from\', this.value)"></label>' +
+          '<label>' + T('إلى', 'To') + ' <input class="inp" style="width:auto" type="date" value="' + esc(f.to) + '" onchange="FA.repFilter(\'to\', this.value)"></label>' + sel('ou', lk('OperatingUnit', T('كل الوحدات', 'All units'))),
+        cols: [
+          { k: 'TRANSDATE', label: T('التاريخ', 'Date') }, { k: 'JOURNALBATCHNUMBER', label: T('اليومية', 'Journal') },
+          { k: 'FIXEDASSETNUMBER', label: T('رقم الأصل', 'Fixed asset') }, { k: 'ASSETNAME', label: T('اسم الأصل', 'Name') },
+          { k: 'TRANSACTIONTYPE', label: T('النوع', 'Type'), text: function (r) { return displayVal(fld('journal', 'TRANSACTIONTYPE'), r.TRANSACTIONTYPE); } },
+          { k: 'MONTHS', label: T('الشهور', 'Months'), num: true }, { k: 'OPERATINGUNIT', label: T('الوحدة التشغيلية', 'Operating unit') },
+          money('AMOUNT', T('المبلغ', 'Amount')) ] };
+    }
+    $('#main').innerHTML = head + '<div class="print-head"><b>' + esc(S.b.settings.ORGNAME) + '</b> — ' + esc(T(title[1], title[2])) + ' — ' + today() + '</div>' +
+      phead(T('التقارير', 'Reports'), esc(T(title[1], title[2]))) + '<div class="content"><div class="card">' + grid('rep_' + tab, cfg) + '</div></div>';
+    gridRender('rep_' + tab);
+  }
+
+  function repRegister() {
+    var f = S.repF;
+    return S.rep.register.filter(function (r) {
+      return (!f.group || r.FIXEDASSETGROUPID === f.group) && (!f.ou || r.OPERATINGUNIT === f.ou) && (!f.location || r.LOCATION === f.location) && (!f.status || r.STATUS === f.status);
+    });
+  }
+
+  function repSummary(dimK) {
+    var f = S.repF, m = {}, total = 0;
+    var seen = {};
+    S.rep.register.forEach(function (r) {
+      if (f.status && r.STATUS !== f.status) return;
+      var k = low(r.FIXEDASSETNUMBER);
+      if (seen[k] && low(r.BOOKID) !== 'general') return; // دفتر واحد لكل أصل
+      seen[k] = 1;
+      var c = r[dimK] || '-';
+      var g = m[c] = m[c] || { CODE: c, COUNT: 0, ACQUISITIONPRICE: 0, ACCUMULATEDDEPRECIATION: 0, NETBOOKVALUE: 0 };
+      g.COUNT++; g.ACQUISITIONPRICE += r.ACQUISITIONPRICE; g.ACCUMULATEDDEPRECIATION += r.ACCUMULATEDDEPRECIATION; g.NETBOOKVALUE += r.NETBOOKVALUE;
+      total += r.ACQUISITIONPRICE;
+    });
+    return Object.keys(m).map(function (k) { var g = m[k]; g.PCT = total ? g.ACQUISITIONPRICE / total * 100 : 0; return g; })
+      .sort(function (a, b) { return b.ACQUISITIONPRICE - a.ACQUISITIONPRICE; });
+  }
+
+  function repDep() {
+    var f = S.repF;
+    return S.rep.depreciation.filter(function (r) {
+      return (!f.from || String(r.TRANSDATE) >= f.from) && (!f.to || String(r.TRANSDATE) <= f.to) && (!f.ou || r.OPERATINGUNIT === f.ou);
+    });
+  }
+
+  function repFilter(k, v) { S.repF[k] = v; render(); }
+  function repRefresh() { pageReports(true); }
+  function repExport() {
+    var g = S.grids['rep_' + (S.view.tab || 'register')];
+    var t = REPORTS.filter(function (r) { return r[0] === (S.view.tab || 'register'); })[0];
+    exportPlain(g.cols, g.visible || g.rows(), t[2].replace(/[^A-Za-z]+/g, '_'));
+  }
+
   /* ======================= Users ======================= */
   function roleTemplate(role) {
     var p = {};
     S.b.permPages.forEach(function (pg) { p[pg] = {}; S.b.permActions.forEach(function (a) { p[pg][a] = false; }); });
     var set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
-    var data = ['assets', 'books', 'journal', 'vendors'];
+    var data = ['assets', 'books', 'journal', 'vendors', 'masterdata'];
     if (role === 'SuperAdmin' || role === 'Admin') set(S.b.permPages, S.b.permActions);
-    else if (role === 'Accountant') set(data, ['view', 'add', 'edit']);
-    else set(data, ['view']);
+    else if (role === 'Accountant') { set(data, ['view', 'add', 'edit']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
+    else set(data.concat(['reports']), ['view']);
     return p;
   }
   var PAGE_NAMES = { assets: ['الأصول الثابتة', 'Fixed assets'], books: ['دفاتر الأصول', 'Books'], journal: ['يومية الأصول', 'FA journal'],
-    vendors: ['الموردون', 'Vendors'], users: ['المستخدمون', 'Users'], settings: ['الإعدادات', 'Settings'] };
+    vendors: ['الموردون', 'Vendors'], users: ['المستخدمون', 'Users'], settings: ['الإعدادات', 'Settings'],
+    depreciation: ['الإهلاك التلقائي', 'Depreciation'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'] };
   var ACT_NAMES = { view: ['دخول للصفحة', 'View'], add: ['إضافة', 'Add'], edit: ['تعديل', 'Edit'], delete: ['حذف', 'Delete'], approve: ['اعتماد', 'Approve'], post: ['ترحيل', 'Post'] };
 
   async function pageUsers() {
@@ -1233,11 +1621,12 @@
   async function pageSettings() {
     crumbs([S.b.settings.ORGNAME, T('الإعدادات', 'Settings')]);
     var tab = S.view.tab || 'general';
-    var tabs = [['general', 'عام', 'General'], ['sessions', 'الجلسات', 'Sessions'], ['lookups', 'القوائم المرجعية', 'Lookups']];
+    var tabs = [['general', 'عام', 'General'], ['sessions', 'الجلسات', 'Sessions']];
+    if (can('masterdata')) tabs.push(['lookups', 'مجموعات الأصول وأسماء اليوميات', 'Asset groups & journal names']);
     var head = apane([]) .replace('<div class="bar"></div>', '<div class="bar">' + tabs.map(function (t) {
       return '<button class="abtn tab ' + (t[0] === tab ? 'on' : '') + '" onclick="FA.go(\'settings\',{tab:\'' + t[0] + '\'})">' + esc(T(t[1], t[2])) + '</button>';
     }).join('') + '</div>');
-    var body = tab === 'sessions' ? await settingsSessions() : tab === 'lookups' ? await settingsLookups() : settingsGeneral();
+    var body = tab === 'sessions' ? await settingsSessions() : tab === 'lookups' ? await lookupsPanel(['AssetGroup', 'JournalName']) : settingsGeneral();
     $('#main').innerHTML = head + phead(T('الإدارة', 'Administration'), T('الإعدادات', 'Settings')) + '<div class="content">' + body + '</div>';
     if (tab === 'lookups') gridRender('lookups');
   }
@@ -1259,6 +1648,11 @@
       '<div class="fld"><label>' + T('صيغة التاريخ في ملفات CSV المستوردة', 'Date format in imported CSV files') + '</label><select class="inp" data-s="DATEFORMAT" ' + (ro ? 'disabled' : '') + '>' +
       '<option value="MDY" ' + (st.DATEFORMAT === 'MDY' ? 'selected' : '') + '>MM/DD/YYYY (D365 en-us)</option><option value="DMY" ' + (st.DATEFORMAT === 'DMY' ? 'selected' : '') + '>DD/MM/YYYY</option></select></div>' +
       sf('JOURNALPREFIX', T('بادئة رقم اليومية', 'Journal number prefix'), st.JOURNALPREFIX, ro) + '</div>' +
+      '<div class="fgroup"><h5>' + T('الإهلاك', 'Depreciation') + '</h5>' +
+      sf('DEPMONTHS', T('دورة الإهلاك (شهور)', 'Depreciation cycle (months)'), st.DEPMONTHS, ro) +
+      sf('DEPJOURNALNAME', T('اسم يومية الإهلاك الافتراضي', 'Default depreciation journal name'), st.DEPJOURNALNAME, ro) +
+      '<div class="fld"><label>' + T('حساب مصروف الإهلاك الافتراضي', 'Default depreciation expense account') + '</label><input class="inp" data-s="DEPOFFSETACCOUNT" list="dl_setacc" dir="ltr" value="' + esc(st.DEPOFFSETACCOUNT) + '" ' + (ro ? 'readonly' : '') + '>' +
+      '<datalist id="dl_setacc">' + datalistOpts('@accounts', null, {}) + '</datalist></div></div>' +
       '</div>' + (ro ? '' : '<div style="padding:0 14px 14px"><button class="btn pri" onclick="FA.saveSettings()">' + icon('save') + T('حفظ الإعدادات', 'Save settings') + '</button></div>') + '</div>';
   }
   function sf(k, label, v, ro, type) {
@@ -1327,30 +1721,11 @@
     try { await api('endSessionById', S.token, id); toast(T('تم إنهاء الجلسة', 'Session ended'), 'ok'); render(); } catch (e) { fail(e); }
   }
 
-  async function settingsLookups() {
-    await load('lookups');
-    var type = S.view.ltype || 'AssetGroup';
-    var types = S.b.lookupTypes;
-    var cols = schemaCols('lookups').filter(function (c) { return c.k !== 'TYPE'; });
-    return '<div class="tabs">' + types.map(function (t) {
-      var n = (S.data.lookups || []).filter(function (r) { return r.TYPE === t.v; }).length;
-      return '<button class="' + (t.v === type ? 'on' : '') + '" onclick="FA.go(\'settings\',{tab:\'lookups\',ltype:\'' + t.v + '\'})">' + esc(L(t)) + ' (' + n + ')</button>';
-    }).join('') + '</div><div class="card">' + grid('lookups', {
-      rows: function () { return (S.data.lookups || []).filter(function (r) { return r.TYPE === type; }); },
-      key: function (r) { return keyStr('lookups', r); }, select: can('settings', 'delete'), cols: cols,
-      open: function (r) { lookupDlg(r); },
-      tools: (can('settings', 'add') ? '<button class="btn" onclick="FA.lookupDlg(null)">' + icon('plus') + T('جديد', 'New') + '</button>' : '') +
-        (can('settings', 'delete') ? '<button class="btn" onclick="FA.deleteSelected(\'lookups\',\'lookups\')">' + icon('trash') + T('حذف', 'Delete') + '</button>' : '') +
-        (can('settings', 'add') ? '<button class="btn" onclick="FA.importStart(\'lookups\',{TYPE:\'' + type + '\'})">' + icon('upload') + T('استيراد', 'Import') + '</button>' : '') +
-        '<button class="btn" onclick="FA.exportGrid(\'lookups\',\'lookups\')">' + icon('download') + T('تصدير', 'Export') + '</button>'
-    }) + '</div>';
-  }
-
   function lookupDlg(rec) {
     var isNew = !rec;
     var type = S.view.ltype || 'AssetGroup';
     rec = rec || { TYPE: type };
-    var ro = !can('settings', isNew ? 'add' : 'edit');
+    var ro = !can('masterdata', isNew ? 'add' : 'edit');
     modal(L(S.b.lookupTypes.filter(function (t) { return t.v === type; })[0]), formHtml('lookups', rec, isNew, ro, { flat: true }),
       (ro ? '' : '<button class="btn pri" onclick="FA.saveLookup()">' + icon('save') + T('حفظ', 'Save') + '</button>') + '<button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>');
     var t = $('#modal [data-k="TYPE"]');
@@ -1393,7 +1768,8 @@
     userDlg: userDlg, userExpand: userExpand, roleChanged: roleChanged, saveUser: saveUser, userStatus: userStatus, userDelete: userDelete,
     resetPwDlg: resetPwDlg, resetPw: resetPw, changePasswordDlg: changePasswordDlg, changePw: changePw, logout: logout,
     saveSettings: saveSettings, logoPicked: logoPicked, removeLogo: removeLogo, endSession: endSession,
-    lookupDlg: lookupDlg, saveLookup: saveLookup
+    lookupDlg: lookupDlg, saveLookup: saveLookup, ltab: ltab, tip: tip,
+    depCalc: depCalc, depCreate: depCreate, depExport: depExport, repFilter: repFilter, repRefresh: repRefresh, repExport: repExport
   };
 
   start();

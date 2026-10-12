@@ -236,6 +236,29 @@
   .logo-prev { width: 160px; height: 90px; border: 1px dashed var(--input-border); display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 2px; margin-bottom: 8px; }
   .logo-prev img { max-width: 150px; max-height: 80px; }
 
+  /* ---------- Phase 2: KPIs, chart, tree, print ---------- */
+  .kpis .tile .v { font-size: 26px; }
+  .chartwrap { position: relative; overflow-x: auto; }
+  .chartwrap svg { display: block; margin: 0 auto; }
+  .chartwrap g.bar:hover path { fill: #0c5aa0; }
+  .tooltip { position: absolute; background: #fff; color: var(--text); box-shadow: 0 6.4px 14.4px rgba(0,0,0,.13), 0 1.2px 3.6px rgba(0,0,0,.11);
+    padding: 8px 10px; border-radius: 2px; font-size: 12px; pointer-events: none; white-space: nowrap; z-index: 5; direction: rtl; text-align: start; }
+  [dir="ltr"] .tooltip { direction: ltr; }
+  .tooltip b { display: block; margin-bottom: 4px; }
+  ul.tree { list-style: none; margin: 0; padding: 8px 12px; }
+  ul.tree ul { list-style: none; padding-inline-start: 16px; margin: 4px 0; border-inline-start: 1px dashed var(--input-border); }
+  ul.tree li { padding: 3px 0; }
+  ul.tree li span { color: var(--muted); }
+  .print-head { display: none; }
+  @media print {
+    .topbar, .navpane, .apane, .gridtools, .phead, .toasts, .busy, #modal, .grid .ck { display: none !important; }
+    .print-head { display: block; font-size: 14px; margin: 0 0 10px; }
+    .gridwrap { max-height: none !important; overflow: visible !important; }
+    .card { box-shadow: none; }
+    body, main { background: #fff; }
+    table.grid td, table.grid th { white-space: normal; position: static; }
+  }
+
   @media (max-width: 900px) {
     .factbox { display: none; }
     .lpane { width: 200px; }

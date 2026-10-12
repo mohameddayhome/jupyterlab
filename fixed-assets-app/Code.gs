@@ -10,8 +10,8 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '5.0.0';
-const SETUP_VERSION = '5';
+const APP_VERSION = '6.0.0';
+const SETUP_VERSION = '6';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
@@ -22,7 +22,7 @@ const USER_COLS = ['USERNAME', 'FULLNAME', 'EMAIL', 'PASSWORDHASH', 'SALT', 'ROL
   'MUSTCHANGE', 'LASTLOGIN', 'CREATEDBY', 'CREATEDON', 'MODIFIEDBY', 'MODIFIEDON'];
 const SESSION_COLS = ['SESSIONID', 'USERNAME', 'CREATEDON', 'LASTSEEN', 'ACTIVE', 'CLIENT'];
 const SETTING_DEFAULTS = {
-  ORGNAME: 'إدارة الأصول الثابتة', ORGEMAIL: '', CURRENCY: 'DJF', SESSIONTIMEOUT: '60',
+  ORGNAME: 'الإدارة المالية', ORGEMAIL: '', CURRENCY: 'DJF', SESSIONTIMEOUT: '60',
   MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ',
   DEPJOURNALNAME: 'FADEP', DEPOFFSETACCOUNT: '', DEPMONTHS: '3'
 };
@@ -63,6 +63,8 @@ const ACCOUNT_TYPES = [o('ProfitAndLoss', 'أرباح وخسائر', 'Profit and
   o('Expense', 'مصروفات', 'Expense'), o('BalanceSheet', 'الميزانية العمومية', 'Balance sheet'), o('Asset', 'أصول', 'Asset'),
   o('Liability', 'خصوم', 'Liability'), o('Equity', 'حقوق ملكية', 'Equity'), o('Total', 'إجمالي', 'Total'),
   o('Reporting', 'تقارير', 'Reporting')];
+const CASHFLOW_CATS = [o('Cash', 'نقدية وما في حكمها', 'Cash and cash equivalents'), o('Operating', 'أنشطة تشغيلية', 'Operating activities'),
+  o('Investing', 'أنشطة استثمارية', 'Investing activities'), o('Financing', 'أنشطة تمويلية', 'Financing activities')];
 const ACCOUNT_LEVELS = [o('Header', 'رئيسي', 'Header'), o('Posting', 'فرعي', 'Posting')];
 
 /**
@@ -370,6 +372,8 @@ const SCHEMAS = {
         aliases: ['Parent account', 'Parent'] }),
       F('MAINACCOUNTCATEGORY', 'مجموعة الحساب الرئيسي', 'Main account group', 'text', { sec: 'general', grp: 'cls', list: 1,
         aliases: ['Main account category', 'MainAccountGroup', 'Account category', 'MAINACCOUNTCATEGORYID'] }),
+      F('CASHFLOWCATEGORY', 'تصنيف التدفق النقدي', 'Cash flow category', 'select', { opts: CASHFLOW_CATS, sec: 'general', grp: 'cls',
+        aliases: ['Cash flow'] }),
       F('MAINACCOUNTTYPE', 'نوع الحساب', 'Account type', 'select', { opts: ACCOUNT_TYPES, req: 1, sec: 'general', grp: 'cls', list: 1,
         aliases: ['Main account type', 'Type', 'AccountType'] })
     ]
@@ -400,7 +404,7 @@ function doGet() {
   ensureSetup_();
   const t = HtmlService.createTemplateFromFile('Index');
   return t.evaluate()
-    .setTitle(getSettings_().ORGNAME || 'Fixed Assets')
+    .setTitle(getSettings_().ORGNAME || 'الإدارة المالية')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -457,6 +461,7 @@ function setup() {
     }
 
     migrateV3_(ss);
+    migrateV6_();
 
     const def = ss.getSheetByName('Sheet1') || ss.getSheetByName('ورقة1');
     if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
@@ -479,6 +484,8 @@ const DEFAULT_ACCOUNTS = [
   ['129300', 'مجمع إهلاك الأجهزة الطبية', 'Posting', '1290', 'Asset', 'FA'], ['129400', 'مجمع إهلاك الأثاث', 'Posting', '1290', 'Asset', 'FA'],
   ['129500', 'مجمع إهلاك أجهزة الحاسب', 'Posting', '1290', 'Asset', 'FA'],
   ['2100', 'الموردون', 'Header', '', 'Liability', 'AP'], ['210100', 'ذمم الموردين', 'Posting', '2100', 'Liability', 'AP'],
+  ['3100', 'حقوق الملكية', 'Header', '', 'Equity', 'EQ'], ['310100', 'رأس المال', 'Posting', '3100', 'Equity', 'EQ'],
+  ['4100', 'الإيرادات', 'Header', '', 'Revenue', 'REV'], ['410100', 'إيرادات الخدمات', 'Posting', '4100', 'Revenue', 'REV'],
   ['6100', 'مصروفات الإهلاك', 'Header', '', 'Expense', 'DEP'],
   ['610100', 'مصروف إهلاك المباني', 'Posting', '6100', 'Expense', 'DEP'], ['610200', 'مصروف إهلاك السيارات', 'Posting', '6100', 'Expense', 'DEP'],
   ['610300', 'مصروف إهلاك الأجهزة الطبية', 'Posting', '6100', 'Expense', 'DEP'], ['610400', 'مصروف إهلاك الأثاث', 'Posting', '6100', 'Expense', 'DEP'],
@@ -561,6 +568,20 @@ function migrateV3_(ss) {
     const g = groups[low_(a.FIXEDASSETGROUPID)];
     if (!a.ASSETACCOUNT && g && g.ASSETACCOUNT) { a.ASSETACCOUNT = g.ASSETACCOUNT; changed = true; }
     if (changed) writeRow_(ast, i, a);
+  });
+}
+
+/** الإصدار 6: اسم التطبيق الجديد + تصنيف حسابات النقدية للتدفقات النقدية. */
+function migrateV6_() {
+  const st = readTable_('Settings');
+  st.rows.forEach(function (r, i) {
+    if (r.KEY === 'ORGNAME' && r.VALUE === 'إدارة الأصول الثابتة') { r.VALUE = 'الإدارة المالية'; writeRow_(st, i, r); }
+  });
+  const at = readTable_('MainAccounts');
+  at.rows.forEach(function (r, i) {
+    if (r.MAINACCOUNTID && !r.CASHFLOWCATEGORY && r.ACCOUNTLEVEL !== 'Header' && String(r.MAINACCOUNTCATEGORY).toUpperCase() === 'CASH') {
+      r.CASHFLOWCATEGORY = 'Cash'; writeRow_(at, i, r);
+    }
   });
 }
 
@@ -2113,6 +2134,30 @@ function createDepreciationJournal(token, p) {
 /* ============================== Reports ============================== */
 
 /** بيانات التقارير: الأصول مع دفاترها + حركات الإهلاك المُرحّلة. */
+/** بيانات التقارير المالية: سطور القيود المُرحّلة + دليل الحسابات. */
+function ledgerData(token) {
+  const s = auth_(token);
+  need_(s, 'reports', 'view');
+  const heads = {};
+  readTable_('GLJournals').rows.forEach(function (h) { if (h.VOUCHER && h.STATUS === 'Posted') heads[low_(h.VOUCHER)] = h; });
+  const lines = [];
+  readTable_('GLJournalLines').rows.forEach(function (l) {
+    const h = heads[low_(l.VOUCHER)];
+    if (!h || !l.MAINACCOUNTID) return;
+    // [تاريخ، قيد، يومية، بيان، حساب، وحدة رئيسية، فرعية1، فرعية2، مدين، دائن، ملاحظة، مرجع، مصدر، سطر]
+    lines.push([String(h.TRANSDATE), String(h.VOUCHER), String(h.JOURNALNAME || ''), String(h.DESCRIPTION || ''), String(l.MAINACCOUNTID),
+      String(l.OPERATINGUNIT || ''), String(l.SUB1_OPERATINGUNIT || ''), String(l.SUB2_OPERATINGUNIT || ''), num_(l.DEBITAMOUNT), num_(l.CREDITAMOUNT),
+      String(l.NOTE || ''), String(l.REFERENCE || h.REFERENCE || ''), String(h.SOURCE || ''), num_(l.LINENUM)]);
+  });
+  const accounts = readTable_('MainAccounts').rows.filter(function (a) { return a.MAINACCOUNTID; }).map(function (a) {
+    return { c: String(a.MAINACCOUNTID), n: String(a.NAME || ''), h: a.ACCOUNTLEVEL === 'Header' ? 1 : 0, p: String(a.PARENTACCOUNT || ''),
+      t: a.MAINACCOUNTTYPE || '', cat: String(a.MAINACCOUNTCATEGORY || ''), cf: a.CASHFLOWCATEGORY || '' };
+  });
+  const fa = {};
+  readTable_('AssetGroups').rows.forEach(function (g) { if (g.ASSETACCOUNT) fa[low_(g.ASSETACCOUNT)] = 1; });
+  return { lines: lines, accounts: accounts, faAccounts: Object.keys(fa) };
+}
+
 function reportData(token) {
   const s = auth_(token);
   need_(s, 'reports', 'view');

@@ -601,8 +601,8 @@
 
   function paintLogin() {
     var i = S.info || {};
-    $('#loginOrg').textContent = i.orgName || T('إدارة الأصول الثابتة', 'Fixed assets management');
-    $('#loginBar').textContent = i.orgName || 'Fixed Assets';
+    $('#loginOrg').textContent = i.orgName || T('الإدارة المالية', 'Financial management');
+    $('#loginBar').textContent = i.orgName || T('الإدارة المالية', 'Financial management');
     var img = $('#loginLogo');
     if (i.logo) { img.src = i.logo; img.classList.remove('hidden'); } else img.classList.add('hidden');
   }
@@ -663,9 +663,10 @@
     { id: 'transfers', icon: 'transfer', ar: 'نقل الأصول', en: 'Asset transfers', perm: 'transfers' },
     { id: 'barcodes', icon: 'barcode', ar: 'طباعة الباركود', en: 'Barcode labels', perm: 'assets' },
     { id: 'depreciation', icon: 'clock', ar: 'الإهلاك التلقائي', en: 'Depreciation', perm: 'depreciation' },
-    { id: 'reports', icon: 'chart', ar: 'التقارير', en: 'Reports', perm: 'reports' },
+    { id: 'reports', icon: 'chart', ar: 'تقارير الأصول', en: 'Asset reports', perm: 'reports' },
     { h: 1, ar: 'المحاسبة', en: 'Accounting' },
     { id: 'gl', icon: 'book', ar: 'القيود المحاسبية', en: 'Journal entries', perm: 'gl' },
+    { id: 'finreports', icon: 'chart', ar: 'التقارير المالية', en: 'Financial reports', perm: 'reports' },
     { h: 1, ar: 'البيانات الأساسية', en: 'Master data' },
     { id: 'units', icon: 'tree', ar: 'الوحدات التشغيلية', en: 'Operating units', perm: 'masterdata' },
     { id: 'locations', icon: 'pin', ar: 'المواقع والمسؤولون', en: 'Locations & responsibility', perm: 'masterdata' },
@@ -679,7 +680,7 @@
 
   function chrome() {
     var st = S.b.settings;
-    $('#brandName').textContent = st.ORGNAME || 'Fixed Assets';
+    $('#brandName').textContent = st.ORGNAME || T('الإدارة المالية', 'Financial management');
     var img = $('#brandLogo');
     if (st.LOGO) { img.src = st.LOGO; img.classList.remove('hidden'); } else img.classList.add('hidden');
     $('#navToggle').innerHTML = icon('menu');
@@ -728,6 +729,7 @@
         case 'transfers': return await (S.view.doc ? pageTransferDoc() : pageTransfers());
         case 'barcodes': return await pageBarcodes();
         case 'transactions': return await pageTransactions();
+        case 'finreports': return await pageFin();
         case 'gl': return await (S.view.voucher ? pageGLVoucher() : pageGL());
         case 'reports': return await pageReports();
         default: return await pageDashboard();
@@ -2310,6 +2312,555 @@
     printVoucher(T('قيد يومية', 'Journal voucher'), { number: v, date: h.TRANSDATE, journal: h.JOURNALNAME, status: h.STATUS, desc: h.DESCRIPTION, ref: h.REFERENCE }, legs);
   }
 
+  /* ======================= Searchable dropdowns (all lists) ======================= */
+  var CB = { el: null, panel: null, search: null, items: [], shown: [], idx: -1 };
+
+  /** تطبيع للبحث العربي: تجاهل التشكيل والهمزات والتاء المربوطة والألف المقصورة. */
+  function normAr(s) {
+    return String(s || '').toLowerCase().replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').trim();
+  }
+
+  function enhanceCombos(root) {
+    $$('input[list]', root).forEach(function (el) {
+      el.setAttribute('data-dl', el.getAttribute('list'));
+      el.removeAttribute('list');
+      el.classList.add('combo');
+      el.setAttribute('autocomplete', 'off');
+    });
+  }
+
+  function comboItems(el) {
+    if (el.tagName === 'SELECT') {
+      return Array.prototype.map.call(el.options, function (o) { return { v: o.value, c: '', n: o.textContent || (o.value ? o.value : '—') }; });
+    }
+    var dl = document.getElementById(el.getAttribute('data-dl'));
+    return dl ? Array.prototype.map.call(dl.options, function (o) { return { v: o.value, c: o.value, n: o.textContent || o.label || '' }; }) : [];
+  }
+
+  function comboOpen(el) {
+    comboClose();
+    CB.el = el;
+    CB.items = comboItems(el);
+    var isSel = el.tagName === 'SELECT';
+    var p = document.createElement('div');
+    p.className = 'cb-panel';
+    p.setAttribute('dir', document.documentElement.dir);
+    p.innerHTML = (isSel || CB.items.length > 8 ? '<div class="cb-search">' + icon('search') + '<input placeholder="' + T('بحث...', 'Search...') + '"></div>' : '') + '<div class="cb-list" role="listbox"></div>';
+    document.body.appendChild(p);
+    CB.panel = p;
+    CB.search = isSel || CB.items.length > 8 ? p.querySelector('.cb-search input') : null;
+    if (CB.search && !isSel) CB.search.parentNode.style.display = 'none'; // في الحقول النصية الكتابة في الحقل نفسه
+    if (CB.search && isSel) {
+      CB.search.addEventListener('input', function () { comboFilter(CB.search.value); });
+      setTimeout(function () { if (CB.search) CB.search.focus(); }, 0);
+    }
+    p.addEventListener('mousedown', function (ev) {
+      var it = ev.target.closest('.cb-it');
+      if (it) { ev.preventDefault(); comboChoose(Number(it.getAttribute('data-i'))); }
+      else if (ev.target.tagName !== 'INPUT') ev.preventDefault();
+    });
+    comboFilter(isSel ? '' : '', true);
+    comboPlace();
+  }
+
+  function comboPlace() {
+    if (!CB.el || !CB.panel) return;
+    var r = CB.el.getBoundingClientRect();
+    var w = Math.min(Math.max(r.width, 280), window.innerWidth - 16);
+    var below = window.innerHeight - r.bottom;
+    var h = Math.min(320, CB.panel.scrollHeight || 320);
+    CB.panel.style.width = w + 'px';
+    CB.panel.style.top = (below < h + 8 && r.top > below ? Math.max(8, r.top - h - 2) : r.bottom + 2) + 'px';
+    var left = document.documentElement.dir === 'rtl' ? r.right - w : r.left;
+    CB.panel.style.left = Math.max(8, Math.min(left, window.innerWidth - w - 8)) + 'px';
+  }
+
+  function hl(text, q) {
+    if (!q) return esc(text);
+    var t = String(text), n = normAr(t), i = n.indexOf(q);
+    if (i < 0 || n.length !== t.toLowerCase().length) return esc(t);
+    return esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length));
+  }
+
+  function comboFilter(q, initial) {
+    if (!CB.panel) return;
+    var nq = normAr(q);
+    var cur = CB.el.value;
+    // عند الفتح يُعرض كل شيء مع تمييز القيمة الحالية
+    var list = CB.items.map(function (x, i) { return { x: x, i: i }; }).filter(function (o) {
+      return initial || !nq || normAr(o.x.c).indexOf(nq) >= 0 || normAr(o.x.n).indexOf(nq) >= 0;
+    });
+    if (nq && !initial) {
+      list.sort(function (a, b) {
+        var as = normAr(a.x.c).indexOf(nq) === 0 || normAr(a.x.n).indexOf(nq) === 0 ? 0 : 1;
+        var bs = normAr(b.x.c).indexOf(nq) === 0 || normAr(b.x.n).indexOf(nq) === 0 ? 0 : 1;
+        return as - bs;
+      });
+    }
+    CB.shown = list.slice(0, 300);
+    CB.idx = -1;
+    CB.shown.forEach(function (o, k) { if (cur !== '' && low(o.x.v) === low(cur) && CB.idx < 0) CB.idx = k; });
+    var box = CB.panel.querySelector('.cb-list');
+    var hq = initial ? '' : nq;
+    box.innerHTML = CB.shown.length ? CB.shown.map(function (o, k) {
+      var x = o.x;
+      return '<div class="cb-it' + (k === CB.idx ? ' on' : '') + (low(x.v) === low(cur) && cur !== '' ? ' cur' : '') + '" data-i="' + o.i + '" role="option">' +
+        (x.c ? '<b dir="ltr">' + hl(x.c, hq) + '</b>' : '') + '<span>' + (x.n ? hl(x.n, hq) : (x.c ? '' : '<i>' + T('— فارغ —', '— none —') + '</i>')) + '</span></div>';
+    }).join('') + (list.length > CB.shown.length ? '<div class="cb-more">' + T('اكتب للبحث في ', 'Type to search ') + list.length + T(' عنصراً', ' items') + '</div>' : '')
+      : '<div class="cb-empty">' + T('لا توجد نتائج', 'No results') + '</div>';
+    var on = box.querySelector('.cb-it.on');
+    if (on) on.scrollIntoView({ block: 'nearest' });
+    comboPlace();
+  }
+
+  function comboMove(d) {
+    if (!CB.shown.length) return;
+    CB.idx = (CB.idx + d + CB.shown.length) % CB.shown.length;
+    $$('.cb-it', CB.panel).forEach(function (n, k) { n.classList.toggle('on', k === CB.idx); });
+    var on = CB.panel.querySelector('.cb-it.on');
+    if (on) on.scrollIntoView({ block: 'nearest' });
+  }
+
+  function comboChoose(i) {
+    var el = CB.el, x = CB.items[i];
+    if (!el || !x) return;
+    comboClose();
+    el.value = x.v;
+    if (el.tagName !== 'SELECT') el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.focus();
+    CB.justChose = el;
+    setTimeout(function () { CB.justChose = null; }, 50);
+  }
+
+  function comboClose() {
+    if (CB.panel) CB.panel.remove();
+    CB.panel = null; CB.el = null; CB.search = null; CB.shown = []; CB.idx = -1;
+  }
+
+  function initCombos() {
+    enhanceCombos(document);
+    new MutationObserver(function (muts) {
+      muts.forEach(function (m) {
+        Array.prototype.forEach.call(m.addedNodes, function (n) { if (n.nodeType === 1 && n !== CB.panel) enhanceCombos(n.matches && n.matches('input[list]') ? n.parentNode : n); });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+
+    document.addEventListener('focusin', function (e) {
+      var el = e.target;
+      if (CB.panel && (el === CB.el || CB.panel.contains(el))) return;
+      if (el.classList && el.classList.contains('combo') && !el.readOnly && !el.disabled && CB.justChose !== el) comboOpen(el);
+      else if (CB.panel) comboClose();
+    });
+    document.addEventListener('mousedown', function (e) {
+      if (CB.panel && CB.panel.contains(e.target)) return;
+      var sel = e.target.closest && e.target.closest('select.inp');
+      if (sel && !sel.disabled && !sel.multiple) {
+        e.preventDefault();
+        if (CB.el === sel) { comboClose(); return; }
+        sel.focus();
+        comboOpen(sel);
+        return;
+      }
+      var inp = e.target.closest && e.target.closest('input.combo');
+      if (inp && inp === CB.el) return;
+      if (inp && !inp.readOnly && !inp.disabled) { comboOpen(inp); return; }
+      if (CB.panel) comboClose();
+    }, true);
+    document.addEventListener('input', function (e) { if (CB.el && e.target === CB.el && CB.el.tagName !== 'SELECT') comboFilter(CB.el.value); });
+    document.addEventListener('change', function (e) { if (CB.el && e.target === CB.el) comboClose(); });
+    document.addEventListener('keydown', function (e) {
+      if (!CB.panel) {
+        if (e.key === 'ArrowDown' && e.target.classList && e.target.classList.contains('combo')) { comboOpen(e.target); e.preventDefault(); }
+        return;
+      }
+      if (e.target !== CB.el && e.target !== CB.search) return;
+      if (e.key === 'ArrowDown') { comboMove(1); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { comboMove(-1); e.preventDefault(); }
+      else if (e.key === 'Enter') {
+        if (CB.idx >= 0) { e.preventDefault(); comboChoose(CB.shown[CB.idx].i); }
+        else if (CB.shown.length === 1) { e.preventDefault(); comboChoose(CB.shown[0].i); }
+        else comboClose();
+      } else if (e.key === 'Escape') { comboClose(); e.stopPropagation(); }
+      else if (e.key === 'Tab') comboClose();
+    }, true);
+    window.addEventListener('resize', comboClose);
+    document.addEventListener('scroll', function (e) { if (CB.panel && !CB.panel.contains(e.target)) comboPlace(); }, true);
+  }
+
+  /* ======================= Financial reports ======================= */
+  var FIN_TABS = [
+    ['tb', 'ميزان المراجعة', 'Trial balance'], ['ledger', 'دفتر الأستاذ', 'General ledger'],
+    ['bs', 'الميزانية العمومية', 'Balance sheet'], ['is', 'قائمة الدخل', 'Income statement'], ['cf', 'التدفقات النقدية', 'Cash flow statement']
+  ];
+  // مؤشرات أعمدة سطور القيود القادمة من الخادم
+  var LD = { date: 0, voucher: 1, journal: 2, desc: 3, acc: 4, ou: 5, s1: 6, s2: 7, dr: 8, cr: 9, note: 10, ref: 11, src: 12, line: 13 };
+
+  function fmtAcc(n, dec) {
+    n = Math.round((Number(n) || 0) * 1000) / 1000;
+    if (!n) return '-';
+    return n < 0 ? '(' + fmtNum(-n, dec === undefined ? 2 : dec) + ')' : fmtNum(n, dec === undefined ? 2 : dec);
+  }
+
+  function finDefaults() {
+    var d = new Date();
+    return { from: d.getFullYear() + '-01-01', to: today(), unit: '', account: '', zero: false, headersOnly: false };
+  }
+
+  function finAcc() {
+    var m = {};
+    S.fin.accounts.forEach(function (a) { m[low(a.c)] = a; });
+    return m;
+  }
+
+  function unitMatch(l, u) {
+    if (!u) return true;
+    var p = u.split(':'), k = p[0], v = low(p.slice(1).join(':'));
+    return low(l[k === 'OU' ? LD.ou : k === 'S1' ? LD.s1 : LD.s2]) === v;
+  }
+
+  function finLines(to, from) {
+    var f = S.finF;
+    return S.fin.lines.filter(function (l) {
+      return unitMatch(l, f.unit) && (!to || l[LD.date] <= to) && (!from || l[LD.date] >= from);
+    });
+  }
+
+  /** أرصدة الحسابات: {code: {dr, cr}} */
+  function sumBy(lines) {
+    var m = {};
+    lines.forEach(function (l) {
+      var k = low(l[LD.acc]);
+      var x = m[k] = m[k] || { dr: 0, cr: 0 };
+      x.dr += l[LD.dr]; x.cr += l[LD.cr];
+    });
+    return m;
+  }
+
+  function dayBefore(d) {
+    var t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() - 1);
+    return t.toISOString().slice(0, 10);
+  }
+
+  /** نوع الحساب لأغراض القوائم: أصول/خصوم/حقوق ملكية/إيرادات/مصروفات/أخرى. */
+  function accClass(a, bal) {
+    var t = a ? a.t : '';
+    if (t === 'Asset') return 'A';
+    if (t === 'Liability') return 'L';
+    if (t === 'Equity') return 'E';
+    if (t === 'Revenue') return 'R';
+    if (t === 'Expense') return 'X';
+    if (t === 'ProfitAndLoss') return 'P';
+    if (t === 'BalanceSheet') return bal >= 0 ? 'A' : 'L';
+    return '';
+  }
+  function isPL(cls) { return cls === 'R' || cls === 'X' || cls === 'P'; }
+
+  /** تصنيف التدفق النقدي للحساب (المحدد في الدليل أو الافتراضي). */
+  function cfClass(a, am) {
+    if (!a) return 'Operating';
+    if (a.cf) return a.cf;
+    if (String(a.cat).toUpperCase() === 'CASH') return 'Cash';
+    if (S.fin.faAccounts.indexOf(low(a.c)) >= 0) return 'Investing';
+    var parent = am[low(a.p)];
+    if (parent && String(parent.cat).toUpperCase() === 'FA' && a.t === 'Asset' && !/مجمع/.test(a.n)) return 'Investing';
+    if (a.t === 'Equity') return 'Financing';
+    return 'Operating';
+  }
+
+  /* ---------- statement rows → HTML / Excel ---------- */
+  // row: { k: 'sec'|'grp'|'acc'|'sub'|'tot'|'grand'|'note', label, code, v: [numbers], link, indent }
+  function stmtHtml(heads, rows) {
+    return '<table class="stmt"><thead><tr>' + heads.map(function (h, i) { return '<th class="' + (i > 1 ? 'n' : '') + '">' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r) {
+        if (r.k === 'sec') return '<tr class="r-sec"><td colspan="' + heads.length + '">' + esc(r.label) + '</td></tr>';
+        if (r.k === 'note') return '<tr class="r-note"><td colspan="' + heads.length + '">' + r.label + '</td></tr>';
+        var code = r.code ? (r.link ? '<a onclick="FA.finLedger(' + jsArg(r.code) + ')"><bdi>' + esc(r.code) + '</bdi></a>' : '<bdi>' + esc(r.code) + '</bdi>') : '';
+        return '<tr class="r-' + r.k + '"><td>' + code + '</td><td style="padding-inline-start:' + (8 + (r.indent || 0) * 18) + 'px">' + esc(r.label) + '</td>' +
+          (r.v || []).map(function (x) { return typeof x === 'string' ? '<td>' + esc(x) + '</td>' : '<td class="n">' + fmtAcc(x) + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function stmtAoa(heads, rows) {
+    return [heads].concat(rows.map(function (r) {
+      if (r.k === 'sec' || r.k === 'note') return [String(r.label).replace(/<[^>]+>/g, '')];
+      return [r.code || '', r.label].concat((r.v || []).map(function (x) { return typeof x === 'string' ? x : Math.round(x * 1000) / 1000; }));
+    }));
+  }
+
+  /* ---------- Trial balance ---------- */
+  function buildTB() {
+    var f = S.finF, am = finAcc();
+    var open = sumBy(finLines(dayBefore(f.from))), per = sumBy(finLines(f.to, f.from));
+    var codes = {};
+    Object.keys(open).concat(Object.keys(per)).forEach(function (k) { codes[k] = 1; });
+    S.fin.accounts.forEach(function (a) { if (!a.h) codes[low(a.c)] = 1; });
+    var rowOf = function (k) {
+      var o = open[k] || { dr: 0, cr: 0 }, p = per[k] || { dr: 0, cr: 0 };
+      var ob = o.dr - o.cr, cb = ob + p.dr - p.cr;
+      return { ob: ob, pd: p.dr, pc: p.cr, cb: cb };
+    };
+    var vals = function (x) { return [x.ob > 0 ? x.ob : 0, x.ob < 0 ? -x.ob : 0, x.pd, x.pc, x.cb > 0 ? x.cb : 0, x.cb < 0 ? -x.cb : 0]; };
+    var groups = {}, order = [];
+    Object.keys(codes).forEach(function (k) {
+      var a = am[k] || { c: k, n: T('حساب غير موجود في الدليل', 'Account not in chart'), p: '' };
+      var x = rowOf(k);
+      if (!f.zero && !x.ob && !x.pd && !x.pc && !x.cb) return;
+      var g = low(a.p) && am[low(a.p)] ? low(a.p) : '_';
+      if (!groups[g]) { groups[g] = []; order.push(g); }
+      groups[g].push({ a: a, x: x });
+    });
+    order.sort(function (a, b) { return a === '_' ? 1 : b === '_' ? -1 : a.localeCompare(b, undefined, { numeric: true }); });
+    var rows = [], tot = { ob: 0, pd: 0, pc: 0, cb: 0 }, totV = [0, 0, 0, 0, 0, 0];
+    order.forEach(function (g) {
+      var h = am[g];
+      var items = groups[g].sort(function (a, b) { return String(a.a.c).localeCompare(String(b.a.c), undefined, { numeric: true }); });
+      var gs = [0, 0, 0, 0, 0, 0];
+      items.forEach(function (it) { vals(it.x).forEach(function (v, i) { gs[i] += v; }); });
+      if (!f.headersOnly) {
+        rows.push({ k: 'grp', code: h ? h.c : '', label: h ? h.n : T('حسابات بدون حساب رئيسي', 'Accounts without header') });
+        items.forEach(function (it) { rows.push({ k: 'acc', code: it.a.c, label: it.a.n, v: vals(it.x), link: 1, indent: 1 }); });
+        rows.push({ k: 'sub', label: T('إجمالي ', 'Total ') + (h ? h.n : ''), v: gs });
+      } else {
+        rows.push({ k: 'acc', code: h ? h.c : '', label: h ? h.n : T('حسابات بدون حساب رئيسي', 'Accounts without header'), v: gs });
+      }
+      gs.forEach(function (v, i) { totV[i] += v; });
+    });
+    rows.push({ k: 'grand', label: T('الإجمالي', 'Total'), v: totV });
+    var ok = Math.abs(totV[0] - totV[1]) < 0.01 && Math.abs(totV[2] - totV[3]) < 0.01 && Math.abs(totV[4] - totV[5]) < 0.01;
+    rows.push({ k: 'note', label: ok ? '<span class="badge b-ok">' + T('الميزان متوازن', 'Trial balance is balanced') + '</span>' : '<span class="badge b-err">' + T('الميزان غير متوازن!', 'Trial balance is NOT balanced!') + '</span>' });
+    return {
+      heads: [T('رقم الحساب', 'Account'), T('اسم الحساب', 'Name'), T('افتتاحي مدين', 'Opening Dr'), T('افتتاحي دائن', 'Opening Cr'), T('حركة مدين', 'Period Dr'),
+        T('حركة دائن', 'Period Cr'), T('ختامي مدين', 'Closing Dr'), T('ختامي دائن', 'Closing Cr')], rows: rows
+    };
+  }
+
+  /* ---------- General ledger ---------- */
+  function buildLedger() {
+    var f = S.finF, am = finAcc();
+    var target = low(f.account);
+    var accs;
+    if (target) {
+      var a = am[target];
+      accs = a && a.h ? S.fin.accounts.filter(function (x) { return low(x.p) === target && !x.h; }).map(function (x) { return low(x.c); }) : [target];
+    } else {
+      var used = {};
+      finLines(f.to).forEach(function (l) { used[low(l[LD.acc])] = 1; });
+      accs = Object.keys(used);
+    }
+    accs.sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true }); });
+    var rows = [];
+    accs.forEach(function (k) {
+      var a = am[k] || { c: k, n: '' };
+      var all = finLines(f.to).filter(function (l) { return low(l[LD.acc]) === k; });
+      var ob = 0;
+      all.forEach(function (l) { if (l[LD.date] < f.from) ob += l[LD.dr] - l[LD.cr]; });
+      var mv = all.filter(function (l) { return l[LD.date] >= f.from; })
+        .sort(function (x, y) { return x[LD.date].localeCompare(y[LD.date]) || x[LD.voucher].localeCompare(y[LD.voucher], undefined, { numeric: true }) || x[LD.line] - y[LD.line]; });
+      if (!ob && !mv.length) return;
+      rows.push({ k: 'sec', label: a.c + ' — ' + a.n });
+      var bal = ob, td = 0, tc = 0;
+      rows.push({ k: 'sub', label: T('رصيد أول المدة', 'Opening balance'), v: ['', '', '', '', '', bal] });
+      mv.forEach(function (l) {
+        bal += l[LD.dr] - l[LD.cr]; td += l[LD.dr]; tc += l[LD.cr];
+        rows.push({ k: 'acc', code: l[LD.voucher], label: (l[LD.desc] || '') + (l[LD.note] && l[LD.note] !== l[LD.desc] ? ' — ' + l[LD.note] : ''), vlink: l[LD.voucher],
+          v: [l[LD.date], l[LD.journal], unitText(l[LD.ou], l[LD.s1], l[LD.s2]), l[LD.dr], l[LD.cr], bal] });
+      });
+      rows.push({ k: 'tot', label: T('الحركة والرصيد الختامي', 'Movement & closing balance'), v: ['', '', '', td, tc, bal] });
+    });
+    if (!rows.length) rows.push({ k: 'note', label: T('لا توجد حركات للفترة والحساب المحددين', 'No transactions for the selected period/account') });
+    return { heads: [T('رقم القيد', 'Voucher'), T('البيان', 'Description'), T('التاريخ', 'Date'), T('اليومية', 'Journal'), T('الوحدة', 'Unit'), T('مدين', 'Debit'), T('دائن', 'Credit'), T('الرصيد (بين قوسين = دائن)', 'Balance (brackets = credit)')], rows: rows };
+  }
+
+  /* ---------- Income statement ---------- */
+  function plSections(lines, am) {
+    var b = sumBy(lines), sec = { R: [], X: [], P: [] };
+    Object.keys(b).forEach(function (k) {
+      var a = am[k], bal = b[k].dr - b[k].cr, c = accClass(a, bal);
+      if (!isPL(c)) return;
+      var amt = c === 'X' ? bal : -bal; // الإيرادات والأخرى بطبيعة دائنة، المصروفات مدينة
+      if (Math.abs(amt) < 0.0005) return;
+      sec[c].push({ a: a, amt: amt });
+    });
+    return sec;
+  }
+
+  function groupedRows(items, am, sign) {
+    var rows = [], groups = {}, order = [], total = 0;
+    items.forEach(function (it) {
+      var g = it.a && low(it.a.p) && am[low(it.a.p)] ? low(it.a.p) : '_';
+      if (!groups[g]) { groups[g] = []; order.push(g); }
+      groups[g].push(it);
+    });
+    order.sort(function (a, b) { return a === '_' ? 1 : b === '_' ? -1 : a.localeCompare(b, undefined, { numeric: true }); });
+    order.forEach(function (g) {
+      var h = am[g], sub = 0;
+      if (h) rows.push({ k: 'grp', code: h.c, label: h.n });
+      groups[g].sort(function (a, b) { return String(a.a.c).localeCompare(String(b.a.c), undefined, { numeric: true }); }).forEach(function (it) {
+        rows.push({ k: 'acc', code: it.a ? it.a.c : '', label: it.a ? it.a.n : '', v: [it.amt * (sign || 1)], link: 1, indent: h ? 1 : 0 });
+        sub += it.amt;
+      });
+      if (h && groups[g].length > 1) rows.push({ k: 'sub', label: T('إجمالي ', 'Total ') + h.n, v: [sub * (sign || 1)] });
+      total += sub;
+    });
+    return { rows: rows, total: total };
+  }
+
+  function buildIS() {
+    var f = S.finF, am = finAcc();
+    var sec = plSections(finLines(f.to, f.from), am);
+    var rows = [], r = groupedRows(sec.R, am), x = groupedRows(sec.X, am), p = groupedRows(sec.P, am);
+    rows.push({ k: 'sec', label: T('الإيرادات', 'Revenue') });
+    rows = rows.concat(r.rows);
+    rows.push({ k: 'tot', label: T('إجمالي الإيرادات', 'Total revenue'), v: [r.total] });
+    rows.push({ k: 'sec', label: T('المصروفات', 'Expenses') });
+    rows = rows.concat(x.rows);
+    rows.push({ k: 'tot', label: T('إجمالي المصروفات', 'Total expenses'), v: [x.total] });
+    if (sec.P.length) {
+      rows.push({ k: 'sec', label: T('أرباح وخسائر أخرى', 'Other gains and losses') });
+      rows = rows.concat(p.rows);
+      rows.push({ k: 'tot', label: T('صافي الأرباح والخسائر الأخرى', 'Net other gains/losses'), v: [p.total] });
+    }
+    var net = r.total - x.total + p.total;
+    rows.push({ k: 'grand', label: net >= 0 ? T('صافي الربح', 'Net profit') : T('صافي الخسارة', 'Net loss'), v: [net] });
+    return { heads: [T('رقم الحساب', 'Account'), T('البيان', 'Item'), T('المبلغ', 'Amount')], rows: rows, net: net };
+  }
+
+  /* ---------- Balance sheet ---------- */
+  function buildBS() {
+    var f = S.finF, am = finAcc();
+    var lines = finLines(f.to);
+    var b = sumBy(lines), items = { A: [], L: [], E: [] }, earnings = 0;
+    Object.keys(b).forEach(function (k) {
+      var a = am[k], bal = b[k].dr - b[k].cr, c = accClass(a, bal);
+      if (isPL(c)) { earnings -= bal; return; }
+      if (!c || Math.abs(bal) < 0.0005) return;
+      items[c].push({ a: a, amt: c === 'A' ? bal : -bal });
+    });
+    var rows = [];
+    var A = groupedRows(items.A, am), Lb = groupedRows(items.L, am), E = groupedRows(items.E, am);
+    rows.push({ k: 'sec', label: T('الأصول', 'Assets') });
+    rows = rows.concat(A.rows);
+    rows.push({ k: 'grand', label: T('إجمالي الأصول', 'Total assets'), v: [A.total] });
+    rows.push({ k: 'sec', label: T('الخصوم', 'Liabilities') });
+    rows = rows.concat(Lb.rows);
+    rows.push({ k: 'tot', label: T('إجمالي الخصوم', 'Total liabilities'), v: [Lb.total] });
+    rows.push({ k: 'sec', label: T('حقوق الملكية', 'Equity') });
+    rows = rows.concat(E.rows);
+    rows.push({ k: 'acc', label: T('صافي ربح (خسارة) الفترات غير المُقفلة', 'Unclosed net profit (loss)'), v: [earnings], indent: 1 });
+    rows.push({ k: 'tot', label: T('إجمالي حقوق الملكية', 'Total equity'), v: [E.total + earnings] });
+    var le = Lb.total + E.total + earnings;
+    rows.push({ k: 'grand', label: T('إجمالي الخصوم وحقوق الملكية', 'Total liabilities & equity'), v: [le] });
+    var ok = Math.abs(A.total - le) < 0.01;
+    rows.push({ k: 'note', label: ok ? '<span class="badge b-ok">' + T('الميزانية متوازنة', 'Balance sheet balances') + '</span>'
+      : '<span class="badge b-err">' + T('الفرق: ', 'Difference: ') + fmtAcc(A.total - le) + ' — ' + T('راجع أنواع الحسابات في الدليل', 'check account types in the chart') + '</span>' });
+    return { heads: [T('رقم الحساب', 'Account'), T('البيان', 'Item'), T('كما في ', 'As of ') + f.to], rows: rows };
+  }
+
+  /* ---------- Cash flow (direct method) ---------- */
+  function buildCF() {
+    var f = S.finF, am = finAcc();
+    var isCash = function (code) { return cfClass(am[low(code)], am) === 'Cash'; };
+    var cashBal = function (lines) { var s = 0; lines.forEach(function (l) { if (isCash(l[LD.acc])) s += l[LD.dr] - l[LD.cr]; }); return s; };
+    var opening = cashBal(finLines(dayBefore(f.from))), closing = cashBal(finLines(f.to));
+    var byV = {};
+    finLines(f.to, f.from).forEach(function (l) { (byV[l[LD.voucher]] = byV[l[LD.voucher]] || []).push(l); });
+    var cats = { Operating: {}, Investing: {}, Financing: {} };
+    Object.keys(byV).forEach(function (v) {
+      var ls = byV[v];
+      var cash = 0, others = [], w = 0;
+      ls.forEach(function (l) {
+        if (isCash(l[LD.acc])) cash += l[LD.dr] - l[LD.cr];
+        else { var x = l[LD.cr] - l[LD.dr]; others.push({ l: l, x: x }); w += x; }
+      });
+      if (Math.abs(cash) < 0.0005 || !others.length || Math.abs(w) < 0.0005) return;
+      others.forEach(function (o) {
+        var part = cash * o.x / w;
+        var a = am[low(o.l[LD.acc])] || { c: o.l[LD.acc], n: o.l[LD.acc] };
+        var c = cfClass(a, am);
+        if (c === 'Cash') return;
+        var m = cats[c] || cats.Operating;
+        m[low(a.c)] = m[low(a.c)] || { a: a, amt: 0 };
+        m[low(a.c)].amt += part;
+      });
+    });
+    var rows = [], net = 0;
+    [['Operating', 'التدفقات النقدية من الأنشطة التشغيلية', 'Cash flows from operating activities'],
+      ['Investing', 'التدفقات النقدية من الأنشطة الاستثمارية', 'Cash flows from investing activities'],
+      ['Financing', 'التدفقات النقدية من الأنشطة التمويلية', 'Cash flows from financing activities']].forEach(function (c) {
+      rows.push({ k: 'sec', label: T(c[1], c[2]) });
+      var list = Object.keys(cats[c[0]]).map(function (k) { return cats[c[0]][k]; }).filter(function (x) { return Math.abs(x.amt) >= 0.0005; })
+        .sort(function (a, b) { return String(a.a.c).localeCompare(String(b.a.c), undefined, { numeric: true }); });
+      var sub = 0;
+      list.forEach(function (x) {
+        rows.push({ k: 'acc', code: x.a.c, label: (x.amt >= 0 ? T('مقبوضات — ', 'Receipts — ') : T('مدفوعات — ', 'Payments — ')) + x.a.n, v: [x.amt], link: 1, indent: 1 });
+        sub += x.amt;
+      });
+      if (!list.length) rows.push({ k: 'acc', label: T('لا توجد حركات', 'No movements'), v: [0], indent: 1 });
+      rows.push({ k: 'tot', label: T('صافي ', 'Net ') + T(c[1], c[2]).replace(/^التدفقات النقدية /, 'التدفق النقدي '), v: [sub] });
+      net += sub;
+    });
+    rows.push({ k: 'grand', label: T('صافي التغير في النقدية', 'Net change in cash'), v: [net] });
+    rows.push({ k: 'acc', label: T('النقدية أول الفترة', 'Cash at beginning of period'), v: [opening] });
+    rows.push({ k: 'grand', label: T('النقدية آخر الفترة', 'Cash at end of period'), v: [opening + net] });
+    var ok = Math.abs(opening + net - closing) < 0.01;
+    rows.push({ k: 'note', label: ok ? '<span class="badge b-ok">' + T('مطابق لرصيد حسابات النقدية', 'Matches cash account balances') + '</span>'
+      : '<span class="badge b-warn">' + T('رصيد حسابات النقدية: ', 'Cash accounts balance: ') + fmtAcc(closing) + T(' — حدد تصنيف "نقدية" لحسابات البنوك والصندوق في دليل الحسابات', ' — tag bank/cash accounts as "Cash" in the chart of accounts') + '</span>' });
+    return { heads: [T('رقم الحساب', 'Account'), T('البيان', 'Item'), T('المبلغ', 'Amount')], rows: rows };
+  }
+
+  /* ---------- page ---------- */
+  async function pageFin(force) {
+    crumbs([S.b.settings.ORGNAME, T('التقارير المالية', 'Financial reports')]);
+    if (!S.fin || force) S.fin = await api('ledgerData', S.token);
+    var tab = S.view.tab || 'tb';
+    var f = S.finF = S.finF || finDefaults();
+    var title = FIN_TABS.filter(function (t) { return t[0] === tab; })[0];
+    var head = apane([]).replace('<div class="bar"></div>', '<div class="bar">' + FIN_TABS.map(function (t) {
+      return '<button class="abtn tab ' + (t[0] === tab ? 'on' : '') + '" onclick="FA.go(\'finreports\',{tab:\'' + t[0] + '\'})">' + esc(T(t[1], t[2])) + '</button>';
+    }).join('') + '<span class="sep"></span><button class="abtn" onclick="FA.finRefresh()">' + icon('refresh') + T('تحديث', 'Refresh') + '</button>' +
+      '<button class="abtn" onclick="FA.finExport()">' + icon('download') + T('Excel', 'Excel') + '</button>' +
+      '<button class="abtn" onclick="FA.finPrint()">' + icon('list') + T('طباعة', 'Print') + '</button></div>');
+    var unitOpts = [['', T('كل الوحدات', 'All units')]]
+      .concat((S.b.lookups.OperatingUnit || []).map(function (x) { return ['OU:' + x.c, x.c + ' — ' + x.n]; }))
+      .concat((S.b.lookups.Sub1_OperatingUnit || []).map(function (x) { return ['S1:' + x.c, x.c + ' — ' + x.n]; }))
+      .concat((S.b.lookups.Sub2_OperatingUnit || []).map(function (x) { return ['S2:' + x.c, x.c + ' — ' + x.n]; }));
+    var opt = function (list, v) { return list.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === v ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
+    var filters = '<div class="fin-filters">' +
+      (tab !== 'bs' ? '<label>' + T('من', 'From') + '<input class="inp" type="date" value="' + esc(f.from) + '" onchange="FA.finSet(\'from\', this.value)"></label>' : '') +
+      '<label>' + (tab === 'bs' ? T('كما في', 'As of') : T('إلى', 'To')) + '<input class="inp" type="date" value="' + esc(f.to) + '" onchange="FA.finSet(\'to\', this.value)"></label>' +
+      '<label>' + T('الوحدة', 'Unit') + '<select class="inp" onchange="FA.finSet(\'unit\', this.value)">' + opt(unitOpts, f.unit) + '</select></label>' +
+      (tab === 'ledger' ? '<label>' + T('الحساب', 'Account') + '<input class="inp" list="dl_finacc" dir="ltr" value="' + esc(f.account) + '" placeholder="' + T('كل الحسابات', 'All accounts') +
+        '" onchange="FA.finSet(\'account\', this.value)"><datalist id="dl_finacc">' + datalistOpts('@allAccounts', null, {}) + '</datalist></label>' : '') +
+      (tab === 'tb' ? '<label class="ck"><input type="checkbox" ' + (f.zero ? 'checked' : '') + ' onchange="FA.finSet(\'zero\', this.checked)"> ' + T('إظهار الحسابات الصفرية', 'Show zero balances') + '</label>' +
+        '<label class="ck"><input type="checkbox" ' + (f.headersOnly ? 'checked' : '') + ' onchange="FA.finSet(\'headersOnly\', this.checked)"> ' + T('الحسابات الرئيسية فقط', 'Header accounts only') + '</label>' : '') +
+      '</div>';
+    var rep = tab === 'ledger' ? buildLedger() : tab === 'bs' ? buildBS() : tab === 'is' ? buildIS() : tab === 'cf' ? buildCF() : buildTB();
+    S.finRep = rep;
+    var period = tab === 'bs' ? T('كما في ', 'As of ') + f.to : T('من ', 'From ') + f.from + T(' إلى ', ' to ') + f.to;
+    S.finTitle = T(title[1], title[2]) + ' — ' + period + (f.unit ? ' — ' + f.unit.split(':').slice(1).join(':') : '');
+    $('#main').innerHTML = head + phead(T('المحاسبة', 'Accounting'), esc(T(title[1], title[2])) + ' <small style="font-size:13px;color:#605e5c;font-weight:400">' + esc(period) + '</small>') +
+      '<div class="content"><div class="card">' + filters + '<div class="gridwrap" style="max-height:none">' + stmtHtml(rep.heads, rep.rows) + '</div></div>' +
+      (S.fin.lines.length ? '' : '<div class="note">' + T('لا توجد قيود مُرحّلة بعد — التقارير المالية تعتمد على القيود المحاسبية المُرحّلة فقط.', 'No posted vouchers yet — financial reports use posted journal entries only.') + '</div>') + '</div>';
+    // روابط أرقام القيود في دفتر الأستاذ
+    if (tab === 'ledger') $$('.stmt tr.r-acc td:first-child bdi').forEach(function (b) { b.outerHTML = '<a onclick="FA.go(\'gl\',{voucher:' + jsArg(b.textContent) + '})">' + esc(b.textContent) + '</a>'; });
+  }
+
+  function finSet(k, v) { S.finF[k] = v; render(); }
+  function finRefresh() { pageFin(true); }
+  function finLedger(code) { S.finF.account = code; go('finreports', { tab: 'ledger' }); }
+  function finExport() {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    var wb = XLSX.utils.book_new();
+    var aoa = [[S.b.settings.ORGNAME], [S.finTitle], []].concat(stmtAoa(S.finRep.heads, S.finRep.rows));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Report');
+    XLSX.writeFile(wb, (S.view.tab || 'tb') + '_' + today() + '.xlsx');
+  }
+  function finPrint() {
+    printHtml('<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(S.finTitle) + stmtHtml(S.finRep.heads, S.finRep.rows) + '</div>',
+      'size: A4 ' + ((S.view.tab || 'tb') === 'tb' || S.view.tab === 'ledger' ? 'landscape' : 'portrait') + '; margin: 10mm;');
+  }
+
   /* ======================= Users ======================= */
   function roleTemplate(role) {
     var p = {};
@@ -2566,6 +3117,7 @@
   async function start() {
     S.lang = ls('fa_lang') || 'ar';
     applyLang();
+    initCombos();
     $('#loginForm').addEventListener('submit', doLogin);
     $('#loginLang').addEventListener('click', function () { setLang(S.lang === 'ar' ? 'en' : 'ar'); });
     $('#langBtn').addEventListener('click', function () { setLang(S.lang === 'ar' ? 'en' : 'ar'); });
@@ -2607,6 +3159,7 @@
     bcSelectedAssets: function () { go('barcodes', { only: selected('list_assets').map(function (r) { return r.FIXEDASSETNUMBER; }) }); },
     trxFilter: trxFilter, trxExport: trxExport, faPrintEntry: faPrintEntry, glReload: glReload, glDeleteSelected: glDeleteSelected,
     glExport: glExport, glCell: glCell, glAddLine: glAddLine, glDelLine: glDelLine, glSave: glSave, glAct: glAct, glPrint: glPrint,
+    finSet: finSet, finRefresh: finRefresh, finLedger: finLedger, finExport: finExport, finPrint: finPrint,
     accSearch: accSearch, accToggle: accToggle, accAll: accAll, exportRowsAcc: exportRowsAcc,
     depCalc: depCalc, depCreate: depCreate, depExport: depExport, repFilter: repFilter, repRefresh: repRefresh, repExport: repExport
   };

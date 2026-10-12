@@ -295,6 +295,50 @@
     body.print-mode #printArea { display: block !important; }
     body.print-mode { background: #fff; }
   }
+  /* ---------- Phase 6: searchable dropdowns ---------- */
+  select.inp, input.combo { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23605e5c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-size: 14px 14px;
+    background-position: left 6px center; padding-inline-end: 24px; cursor: pointer; }
+  [dir="ltr"] select.inp, [dir="ltr"] input.combo { background-position: right 6px center; }
+  input.combo[dir="ltr"] { background-position: right 6px center; }
+  [dir="ltr"] input.combo[dir="rtl"] { background-position: left 6px center; }
+  select.inp { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+  input.combo { cursor: text; }
+  select.inp:disabled, input.combo[readonly] { background-image: none; padding-inline-end: 6px; }
+  .cb-panel { position: fixed; z-index: 80; background: #fff; border: 1px solid #c8c6c4; border-radius: 4px;
+    box-shadow: 0 6.4px 14.4px rgba(0,0,0,.18), 0 1.2px 3.6px rgba(0,0,0,.12); display: flex; flex-direction: column; max-height: 320px; overflow: hidden; }
+  .cb-search { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .cb-search svg.i { color: var(--muted); }
+  .cb-search input { border: 0; outline: none; flex: 1; height: 26px; background: transparent; }
+  .cb-list { overflow: auto; padding: 4px 0; }
+  .cb-it { display: flex; align-items: baseline; gap: 10px; padding: 7px 12px; cursor: pointer; border-inline-start: 3px solid transparent; }
+  .cb-it b { font-weight: 600; color: var(--text); flex: none; min-width: 64px; }
+  .cb-it span { color: #3b3a39; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cb-it:hover { background: #f3f2f1; }
+  .cb-it.on { background: var(--primary-soft); border-inline-start-color: var(--primary); }
+  .cb-it.cur b::after { content: " ✓"; color: var(--primary); }
+  .cb-it mark { background: #fff4ce; color: inherit; padding: 0; border-radius: 2px; }
+  .cb-empty, .cb-more { padding: 10px 12px; color: var(--muted); font-size: 12px; text-align: center; }
+
+  /* ---------- Phase 6: financial statements ---------- */
+  .fin-filters { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; padding: 12px; border-bottom: 1px solid var(--border); }
+  .fin-filters label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: #323130; }
+  .fin-filters label.ck { flex-direction: row; align-items: center; gap: 6px; padding-bottom: 5px; }
+  .fin-filters .inp { width: 200px; }
+  table.stmt { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.stmt th { position: sticky; top: 0; background: #fff; text-align: start; padding: 8px 10px; border-bottom: 2px solid var(--navy); white-space: nowrap; }
+  table.stmt th.n, table.stmt td.n { text-align: end; direction: ltr; white-space: nowrap; }
+  table.stmt td { padding: 6px 10px; border-bottom: 1px solid #f3f2f1; }
+  table.stmt tr.r-sec td { background: var(--navy); color: #fff; font-weight: 700; padding: 8px 10px; }
+  table.stmt tr.r-grp td { font-weight: 700; color: var(--primary-dark); padding-top: 10px; }
+  table.stmt tr.r-sub td { font-weight: 600; background: #faf9f8; border-top: 1px solid var(--border); }
+  table.stmt tr.r-tot td { font-weight: 700; background: #f3f6fb; border-top: 1px solid #a19f9d; }
+  table.stmt tr.r-grand td { font-weight: 800; background: #e8eef8; border-top: 2px solid var(--navy); border-bottom: 3px double var(--navy); }
+  table.stmt tr.r-note td { padding: 10px; }
+  table.stmt tr.r-acc:hover td { background: #faf9f8; }
+  .doc table.stmt th { position: static; }
+  .doc table.stmt { font-size: 11px; }
+  .doc table.stmt tr.r-sec td { background: #e1e5ee; color: #000; }
+
   .print-head { display: none; }
   @media print {
     .topbar, .navpane, .apane, .gridtools, .phead, .toasts, .busy, #modal, .grid .ck { display: none !important; }

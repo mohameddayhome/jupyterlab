@@ -168,6 +168,8 @@
     var r = S.b.refs, l;
     if (key === '@assets') l = r.assets;
     else if (key === '@vendors') l = r.vendors;
+    else if (key === '@customers') l = r.customers || [];
+    else if (key === '@banks') l = r.banks || [];
     else if (key === '@accounts') l = r.accounts.filter(function (x) { return !x.h; });
     else if (key === '@accountHeaders') l = r.accounts.filter(function (x) { return x.h; });
     else if (key === '@allAccounts') l = r.accounts;
@@ -668,14 +670,24 @@
     { h: 1, ar: 'المحاسبة', en: 'Accounting' },
     { id: 'gl', icon: 'book', ar: 'القيود المحاسبية', en: 'Journal entries', perm: 'gl' },
     { id: 'finreports', icon: 'chart', ar: 'التقارير المالية', en: 'Financial reports', perm: 'reports' },
+    { id: 'budgets', icon: 'list', ar: 'إدخال الموازنة التقديرية', en: 'Budget entry', perm: 'budget' },
+    { id: 'budgetctl', icon: 'chart', ar: 'مراقبة الموازنة', en: 'Budget control', perm: 'budget' },
     { id: 'currency', icon: 'globe', ar: 'العملات وأسعار الصرف', en: 'Currencies & rates', perm: 'masterdata' },
     { id: 'fiscal', icon: 'lock', ar: 'السنوات المالية والإقفال', en: 'Fiscal years & closing', perm: 'fiscal' },
+    { h: 1, ar: 'العملاء', en: 'Customers' },
+    { id: 'customers', icon: 'users', ar: 'العملاء', en: 'Customers', perm: 'customers' },
+    { id: 'custreports', icon: 'chart', ar: 'تقارير العملاء', en: 'Customer reports', perm: 'customers' },
+    { h: 1, ar: 'الموردون', en: 'Vendors' },
+    { id: 'vendors', icon: 'truck', ar: 'الموردون', en: 'Vendors', perm: 'vendors' },
+    { id: 'vendreports', icon: 'chart', ar: 'تقارير الموردين', en: 'Vendor reports', perm: 'vendors' },
+    { h: 1, ar: 'الصناديق والبنوك', en: 'Cash & banks' },
+    { id: 'banks', icon: 'book', ar: 'الصناديق والبنوك', en: 'Cash & bank accounts', perm: 'banks' },
+    { id: 'bankreports', icon: 'chart', ar: 'تقارير الصناديق والبنوك', en: 'Cash & bank reports', perm: 'banks' },
     { h: 1, ar: 'البيانات الأساسية', en: 'Master data' },
     { id: 'units', icon: 'tree', ar: 'الوحدات التشغيلية', en: 'Operating units', perm: 'masterdata' },
     { id: 'locations', icon: 'pin', ar: 'المواقع والمسؤولون', en: 'Locations & responsibility', perm: 'masterdata' },
     { id: 'groups', icon: 'folder', ar: 'مجموعات الأصول', en: 'Fixed asset groups', perm: 'masterdata' },
     { id: 'accounts', icon: 'list', ar: 'دليل الحسابات', en: 'Chart of accounts', perm: 'masterdata' },
-    { id: 'vendors', icon: 'truck', ar: 'الموردون', en: 'Vendors', perm: 'vendors' },
     { h: 1, ar: 'الإدارة', en: 'Administration' },
     { id: 'users', icon: 'users', ar: 'المستخدمون والصلاحيات', en: 'Users & permissions', perm: 'users' },
     { id: 'settings', icon: 'gear', ar: 'الإعدادات', en: 'Settings', perm: 'settings' }
@@ -737,6 +749,12 @@
         case 'currency': return await pageCurrency();
         case 'gl': return await (S.view.voucher ? pageGLVoucher() : pageGL());
         case 'reports': return await pageReports();
+        case 'customers': case 'banks': case 'budgets':
+          return await (S.view.key !== undefined || S.view.isNew ? pageRecord(S.page) : pageList(S.page));
+        case 'custreports': return await pageParty('Customer');
+        case 'vendreports': return await pageParty('Vendor');
+        case 'bankreports': return await pageParty('Bank');
+        case 'budgetctl': return await pageBudgetCtl();
         default: return await pageDashboard();
       }
     } catch (e) {
@@ -861,7 +879,12 @@
       { icon: 'excel', ar: 'قالب الاستيراد', en: 'Import template', on: "FA.exportTemplate('" + e + "')" },
       e === 'assets' && '|',
       e === 'assets' && can('transfers', 'add') && { icon: 'transfer', ar: 'نقل المحدد', en: 'Transfer selected', on: "FA.trfSelected()" },
-      e === 'assets' && { icon: 'barcode', ar: 'باركود المحدد', en: 'Barcodes for selected', on: "FA.bcSelectedAssets()" }
+      e === 'assets' && { icon: 'barcode', ar: 'باركود المحدد', en: 'Barcodes for selected', on: "FA.bcSelectedAssets()" },
+      typeOfEntity(e) && '|',
+      typeOfEntity(e) && can(s.perm, 'edit') && can('gl', 'add') && { icon: 'send', ar: 'ترحيل الأرصدة الافتتاحية', en: 'Post opening balances', on: "FA.openingDlg('" + typeOfEntity(e) + "')" },
+      typeOfEntity(e) && { icon: 'chart', ar: 'التقارير وكشف الحساب', en: 'Reports & statement', on: "FA.go('" + PT[typeOfEntity(e)].page + "')" },
+      e === 'budgets' && '|',
+      e === 'budgets' && { icon: 'chart', ar: 'مراقبة الموازنة', en: 'Budget control', on: "FA.go('budgetctl')" }
     ]) + phead('<a onclick="FA.go(\'' + e + '\')">' + esc(L(s.title)) + '</a> | ' + T('العرض القياسي', 'Standard view'), esc(L(s.title))) +
       '<div class="content"><div class="card">' + grid(gid, {
         rows: function () { return S.data[e] || []; }, cols: schemaCols(e), key: function (r) { return keyStr(e, r); },
@@ -2234,11 +2257,24 @@
       (editable ? '<div class="sum"><button class="btn sm" onclick="FA.glAddLine()">' + icon('plus') + T('سطر', 'Line') + '</button></div>' : '') + '</div><div class="gl-wrap">' +
       '<table class="gl-grid"><thead id="glHead"></thead><tbody id="glBody"></tbody><tfoot id="glFoot"></tfoot></table></div></div>' +
       '<datalist id="dl_glacc">' + datalistOpts('@accounts', null, {}) + '</datalist><datalist id="dl_glsub2">' + datalistOpts('Sub2_OperatingUnit', null, {}) + '</datalist>' +
-      '<datalist id="dl_glcur">' + datalistOpts('@currencies', null, {}) + '</datalist></div>';
+      '<datalist id="dl_glcur">' + datalistOpts('@currencies', null, {}) + '</datalist>' +
+      '<datalist id="dl_glcust">' + datalistOpts('@customers', null, {}) + '</datalist><datalist id="dl_glvend">' + datalistOpts('@vendors', null, {}) + '</datalist>' +
+      '<datalist id="dl_glbank">' + datalistOpts('@banks', null, {}) + '</datalist></div>';
     S.glEditable = editable;
     drawGLLines();
   }
 
+  var GL_TYPES = ['Ledger', 'Customer', 'Vendor', 'Bank'];
+  var GL_DL = { Ledger: 'dl_glacc', Customer: 'dl_glcust', Vendor: 'dl_glvend', Bank: 'dl_glbank' };
+  var GL_REF = { Customer: 'customers', Vendor: 'vendors', Bank: 'banks' };
+  function glType(l) { return l.ACCOUNTTYPE || 'Ledger'; }
+  function glTypeName(t) { var o = fld('gllines', 'ACCOUNTTYPE').opts.filter(function (x) { return x.v === t; })[0]; return o ? L(o) : t; }
+  function glParty(l) { return (S.b.refs[GL_REF[glType(l)]] || []).filter(function (x) { return low(x.c) === low(l.PARTYID); })[0]; }
+  function glAccName(l) {
+    if (glType(l) === 'Ledger') return lookupName('@accounts', l.MAINACCOUNTID);
+    var p = glParty(l);
+    return p ? p.n : '';
+  }
   function localCur() { return String(S.b.settings.CURRENCY || '').toUpperCase(); }
   /** سعر الصرف الساري للعملة في تاريخ معيّن (آخر سعر لا يتجاوز التاريخ). */
   function rateFor(cur, date) {
@@ -2259,7 +2295,7 @@
 
   function drawGLLines() {
     var ed = S.glEditable, fx = glHasForeign();
-    var head = '<tr><th class="c-no">#</th><th class="c-acc">' + T('الحساب', 'Account') + '</th><th class="c-name">' + T('اسم الحساب', 'Account name') + '</th>' +
+    var head = '<tr><th class="c-no">#</th><th class="c-type">' + T('نوع الحساب', 'Account type') + '</th><th class="c-acc">' + T('الحساب', 'Account') + '</th><th class="c-name">' + T('اسم الحساب', 'Account name') + '</th>' +
       '<th class="c-cur">' + T('العملة', 'Currency') + '</th><th class="c-rate">' + T('سعر الصرف', 'Exch. rate') + '</th><th class="c-amt">' + T('مدين', 'Debit') + '</th><th class="c-amt">' + T('دائن', 'Credit') + '</th>' +
       (fx ? '<th class="c-amt">' + T('المحلي', 'Local') + '</th>' : '') + '<th class="c-unit">' + T('الوحدة (الفرعية 2)', 'Unit (sub 2)') + '</th><th class="c-note">' + T('ملاحظة', 'Note') + '</th>' +
       '<th class="c-ref">' + T('المرجع', 'Reference') + '</th>' + (ed ? '<th class="c-x"></th>' : '') + '</tr>';
@@ -2268,7 +2304,9 @@
       var loc = lineLocal(l), locTxt = loc.dr ? fmtNum(loc.dr, 3) : loc.cr ? fmtNum(loc.cr, 3) : '';
       var unitName = lookupName('Sub2_OperatingUnit', l.SUB2_OPERATINGUNIT);
       if (!ed) {
-        return '<tr><td class="c-no">' + (l.LINENUM || i + 1) + '</td><td dir="ltr">' + esc(l.MAINACCOUNTID) + '</td><td class="c-name">' + esc(l.ACCOUNTNAME || lookupName('@allAccounts', l.MAINACCOUNTID)) + '</td>' +
+        var pty = glType(l) !== 'Ledger';
+        return '<tr><td class="c-no">' + (l.LINENUM || i + 1) + '</td><td>' + esc(glTypeName(glType(l))) + '</td><td dir="ltr">' + esc(pty ? l.PARTYID : l.MAINACCOUNTID) + '</td>' +
+          '<td class="c-name" title="' + esc(l.MAINACCOUNTID + ' ' + (l.ACCOUNTNAME || '')) + '">' + esc(pty ? glAccName(l) + ' (' + l.MAINACCOUNTID + ')' : (l.ACCOUNTNAME || lookupName('@allAccounts', l.MAINACCOUNTID))) + '</td>' +
           '<td>' + esc(l.CURRENCYCODE || localCur()) + '</td><td class="n">' + fmtNum(Number(l.EXCHANGERATE) || 1, 4) + '</td>' +
           '<td class="n">' + (Number(l.AMOUNTCURDEBIT) ? fmtNum(l.AMOUNTCURDEBIT, 3) : '') + '</td><td class="n">' + (Number(l.AMOUNTCURCREDIT) ? fmtNum(l.AMOUNTCURCREDIT, 3) : '') + '</td>' +
           (fx ? '<td class="n">' + locTxt + '</td>' : '') +
@@ -2281,8 +2319,10 @@
         return '<input class="cell ' + (cls || '') + '" data-gl="' + k + '" data-i="' + i + '" value="' + esc(v === undefined ? '' : v) + '" ' + (attrs || '') + ' onchange="FA.glCell(this)">';
       };
       return '<tr><td class="c-no">' + (i + 1) + '</td>' +
-        '<td class="c-acc">' + inp('MAINACCOUNTID', 'list="dl_glacc" dir="ltr"') + '</td>' +
-        '<td class="c-name gl-name">' + esc(lookupName('@accounts', l.MAINACCOUNTID)) + '</td>' +
+        '<td class="c-type"><select class="cell" data-gl="ACCOUNTTYPE" data-i="' + i + '" onchange="FA.glCell(this)">' + GL_TYPES.map(function (t) {
+          return '<option value="' + t + '"' + (glType(l) === t ? ' selected' : '') + '>' + esc(glTypeName(t)) + '</option>'; }).join('') + '</select></td>' +
+        '<td class="c-acc"><input class="cell" data-gl="ACC" data-i="' + i + '" value="' + esc(glType(l) === 'Ledger' ? l.MAINACCOUNTID || '' : l.PARTYID || '') + '" list="' + GL_DL[glType(l)] + '" dir="ltr" onchange="FA.glCell(this)"></td>' +
+        '<td class="c-name gl-name">' + esc(glAccName(l)) + '</td>' +
         '<td class="c-cur">' + inp('CURRENCYCODE', 'list="dl_glcur" dir="ltr"') + '</td>' +
         '<td class="c-rate">' + inp('EXCHANGERATE', 'inputmode="decimal"' + ((l.CURRENCYCODE || localCur()).toUpperCase() === localCur() ? ' readonly tabindex="-1"' : ''), 'num') + '</td>' +
         '<td class="c-amt">' + inp('AMOUNTCURDEBIT', 'inputmode="decimal"', 'num') + '</td><td class="c-amt">' + inp('AMOUNTCURCREDIT', 'inputmode="decimal"', 'num') + '</td>' +
@@ -2298,7 +2338,7 @@
     var dr = 0, cr = 0, fx = glHasForeign();
     S.glLines.forEach(function (l) { var x = lineLocal(l); dr += x.dr; cr += x.cr; });
     var diff = Math.round((dr - cr) * 1000) / 1000;
-    $('#glFoot').innerHTML = '<tr><td colspan="5">' + T('الإجمالي بالعملة المحلية', 'Total in local currency') + ' (' + esc(localCur()) + ') ' +
+    $('#glFoot').innerHTML = '<tr><td colspan="6">' + T('الإجمالي بالعملة المحلية', 'Total in local currency') + ' (' + esc(localCur()) + ') ' +
       (diff ? '<span class="badge b-err">' + T('الفرق: ', 'Difference: ') + fmtNum(diff, 3) + '</span>' : (dr ? '<span class="badge b-ok">' + T('متوازن', 'Balanced') + '</span>' : '')) +
       '</td><td class="n">' + fmtNum(dr, 3) + '</td><td class="n">' + fmtNum(cr, 3) + '</td><td colspan="' + ((fx ? 1 : 0) + 3 + (S.glEditable ? 1 : 0)) + '"></td></tr>';
   }
@@ -2314,7 +2354,25 @@
       l[other] = '';
       var o = $('[data-gl="' + other + '"]', tr); if (o) o.value = '';
     }
-    if (k === 'MAINACCOUNTID') $('.c-name', tr).textContent = lookupName('@accounts', v);
+    if (k === 'ACCOUNTTYPE') {
+      l.MAINACCOUNTID = ''; l.PARTYID = '';
+      var ai = $('[data-gl="ACC"]', tr); ai.value = ''; ai.setAttribute(ai.hasAttribute('list') ? 'list' : 'data-dl', GL_DL[v]);
+      $('.c-name', tr).textContent = '';
+      setTimeout(function () { ai.focus(); }, 0);
+    }
+    if (k === 'ACC') {
+      delete l.ACC;
+      if (glType(l) === 'Ledger') l.MAINACCOUNTID = v;
+      else {
+        l.PARTYID = v;
+        var pr = glParty(l);
+        l.MAINACCOUNTID = pr ? pr.acc : '';
+        if (pr && pr.cur && low(pr.cur) !== low(l.CURRENCYCODE || localCur())) {
+          var ce = $('[data-gl="CURRENCYCODE"]', tr); ce.value = pr.cur; glCell(ce);
+        }
+      }
+      $('.c-name', tr).textContent = glAccName(l);
+    }
     if (k === 'SUB2_OPERATINGUNIT') $('.unitcell .gl-name', tr).textContent = lookupName('Sub2_OperatingUnit', v);
     if (k === 'CURRENCYCODE') {
       l.CURRENCYCODE = v = v.toUpperCase(); el.value = v;
@@ -2326,7 +2384,7 @@
     if (glHasForeign() !== fxBefore) {
       // ظهور/اختفاء عمود المبلغ المحلي: إعادة رسم مع إعادة التركيز للخلية التالية
       drawGLLines();
-      var order = ['MAINACCOUNTID', 'CURRENCYCODE', 'EXCHANGERATE', 'AMOUNTCURDEBIT', 'AMOUNTCURCREDIT', 'SUB2_OPERATINGUNIT', 'NOTE', 'REFERENCE'];
+      var order = ['ACC', 'CURRENCYCODE', 'EXCHANGERATE', 'AMOUNTCURDEBIT', 'AMOUNTCURCREDIT', 'SUB2_OPERATINGUNIT', 'NOTE', 'REFERENCE'];
       var nx = $('[data-gl="' + order[Math.min(order.indexOf(k) + 1, order.length - 1)] + '"][data-i="' + i + '"]');
       if (nx) setTimeout(function () { nx.focus(); }, 0);
       return;
@@ -2340,7 +2398,7 @@
     S.glLines.push({ SUB2_OPERATINGUNIT: last.SUB2_OPERATINGUNIT || '', NOTE: last.NOTE || '', REFERENCE: last.REFERENCE || '',
       CURRENCYCODE: last.CURRENCYCODE || localCur(), EXCHANGERATE: last.EXCHANGERATE || 1 });
     drawGLLines();
-    var el = $('[data-gl="MAINACCOUNTID"][data-i="' + (S.glLines.length - 1) + '"]');
+    var el = $('[data-gl="ACC"][data-i="' + (S.glLines.length - 1) + '"]');
     if (el) el.focus();
   }
   function glDelLine(i) { S.glLines.splice(i, 1); drawGLLines(); }
@@ -2351,7 +2409,7 @@
     var head = readForm(form);
     if (!isNew) head.VOUCHER = S.view.voucher;
     var lines = S.glLines.map(function (l) {
-      return { MAINACCOUNTID: l.MAINACCOUNTID || '', SUB2_OPERATINGUNIT: l.SUB2_OPERATINGUNIT || '', CURRENCYCODE: l.CURRENCYCODE || localCur(),
+      return { ACCOUNTTYPE: glType(l), PARTYID: glType(l) === 'Ledger' ? '' : l.PARTYID || '', MAINACCOUNTID: l.MAINACCOUNTID || '', SUB2_OPERATINGUNIT: l.SUB2_OPERATINGUNIT || '', CURRENCYCODE: l.CURRENCYCODE || localCur(),
         EXCHANGERATE: parseNum(l.EXCHANGERATE), AMOUNTCURDEBIT: parseNum(l.AMOUNTCURDEBIT), AMOUNTCURCREDIT: parseNum(l.AMOUNTCURCREDIT),
         NOTE: l.NOTE || '', REFERENCE: l.REFERENCE || '' };
     });
@@ -2384,7 +2442,7 @@
         var fx = l.CURRENCYCODE && String(l.CURRENCYCODE).toUpperCase() !== localCur();
         var curAmt = Number(l.AMOUNTCURDEBIT) || Number(l.AMOUNTCURCREDIT) || 0;
         return { acc: l.MAINACCOUNTID, units: unitText(l.OPERATINGUNIT, l.SUB1_OPERATINGUNIT, l.SUB2_OPERATINGUNIT),
-          note: (l.NOTE || '') + (fx ? ' [' + l.CURRENCYCODE + ' ' + fmtNum(curAmt, 2) + ' × ' + fmtNum(l.EXCHANGERATE, 4) + ']' : ''),
+          note: (glType(l) !== 'Ledger' ? glTypeName(glType(l)) + ' ' + l.PARTYID + ' — ' + glAccName(l) + (l.NOTE ? ' / ' : '') : '') + (l.NOTE || '') + (fx ? ' [' + l.CURRENCYCODE + ' ' + fmtNum(curAmt, 2) + ' × ' + fmtNum(l.EXCHANGERATE, 4) + ']' : ''),
           debit: Number(l.DEBITAMOUNT) || 0, credit: Number(l.CREDITAMOUNT) || 0 };
       });
     printVoucher(T('قيد يومية', 'Journal voucher'), { number: v, date: h.TRANSDATE, journal: h.JOURNALNAME, status: h.STATUS, desc: h.DESCRIPTION, ref: h.REFERENCE }, legs);
@@ -2946,6 +3004,276 @@
       (S.view.tab || 'tb') === 'tb' || S.view.tab === 'ledger' ? 'landscape' : 'portrait');
   }
 
+  /* ======================= Parties: customers / vendors / cash & banks ======================= */
+  var PT = {
+    Customer: { page: 'custreports', entity: 'customers', perm: 'customers', ref: 'customers', sign: 1,
+      ar: 'العملاء', en: 'Customers', one: ['العميل', 'Customer'], no: ['رقم العميل', 'Customer account'], nm: ['اسم العميل', 'Customer name'] },
+    Vendor: { page: 'vendreports', entity: 'vendors', perm: 'vendors', ref: 'vendors', sign: -1,
+      ar: 'الموردون', en: 'Vendors', one: ['المورد', 'Vendor'], no: ['رقم المورد', 'Vendor account'], nm: ['اسم المورد', 'Vendor name'] },
+    Bank: { page: 'bankreports', entity: 'banks', perm: 'banks', ref: 'banks', sign: 1,
+      ar: 'الصناديق والبنوك', en: 'Cash & banks', one: ['الصندوق / البنك', 'Cash/bank'], no: ['رقم الصندوق / البنك', 'Cash/bank account'], nm: ['اسم الصندوق / البنك', 'Cash/bank name'] }
+  };
+  var PL = { date: 0, voucher: 1, journal: 2, desc: 3, note: 4, party: 5, cur: 6, cdr: 7, ccr: 8, dr: 9, cr: 10, ref: 11, rate: 12 };
+  function typeOfEntity(e) { return e === 'customers' ? 'Customer' : e === 'banks' ? 'Bank' : e === 'vendors' ? 'Vendor' : ''; }
+
+  /** نافذة إنشاء قيد الأرصدة الافتتاحية من صفحة القائمة. */
+  function openingDlg(type) {
+    var P = PT[type];
+    modal(T('ترحيل الأرصدة الافتتاحية — ', 'Post opening balances — ') + T(P.ar, P.en),
+      '<p style="margin-top:0">' + T('يُنشئ قيداً (مسودة) بأرصدة كل من لم يُرحَّل رصيده الافتتاحي بعد، مقابل حساب الأرصدة الافتتاحية. راجِع القيد ثم اعتمده ورحّله ليظهر في التقارير.',
+        'Creates a draft voucher with every unposted opening balance against the opening balance account. Review, approve and post it to include it in reports.') + '</p>' +
+      '<div class="fld"><label>' + T('تاريخ القيد', 'Voucher date') + '</label><input class="inp" type="date" id="obDate" value="' + new Date().getFullYear() + '-01-01"></div>' +
+      '<div class="fld"><label>' + T('حساب الأرصدة الافتتاحية (المقابل)', 'Opening balance offset account') + '</label><input class="inp" id="obAcc" list="dl_obacc" dir="ltr" value="' + esc(S.b.settings.OPENINGBALANCEACCOUNT || '') + '">' +
+      '<datalist id="dl_obacc">' + datalistOpts('@accounts', null, {}) + '</datalist></div>',
+      '<button class="btn pri" onclick="FA.openingGo(' + jsArg(type) + ')">' + icon('save') + T('إنشاء القيد', 'Create voucher') + '</button><button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>');
+  }
+  async function openingGo(type) {
+    try {
+      var r = await api('createOpeningVoucher', S.token, type, $('#obDate').value, $('#obAcc').value.trim());
+      closeModal();
+      toast(T('تم إنشاء القيد ', 'Created voucher ') + r.voucher + ' (' + r.count + ')', 'ok');
+      await Promise.all([load(PT[type].entity, true), load('glheaders', true), load('gllines', true)]);
+      S.party = {};
+      if (can('gl', 'view')) go('gl', { voucher: r.voucher }); else render();
+    } catch (e) { fail(e); }
+  }
+
+  /** صفحة تقارير الأطراف: الملخص + كشف الحساب. */
+  async function pageParty(type, force) {
+    var P = PT[type];
+    S.party = S.party || {};
+    if (!S.party[type] || force) S.party[type] = await api('partyData', S.token, type);
+    var d = S.party[type];
+    var f = S.partyF = S.partyF || {};
+    f[type] = f[type] || { from: new Date().getFullYear() + '-01-01', to: today(), party: '', grp: '', zero: false };
+    var F = f[type];
+    var tab = S.view.tab || 'sum';
+    if (tab === 'stmt' && !F.party && d.parties.length) F.party = d.parties[0].c;
+    var tabs = [['sum', T('التقرير الإجمالي', 'Summary report')], ['stmt', T('كشف حساب', 'Account statement')]];
+    var head = apane([]).replace('<div class="bar"></div>', '<div class="bar">' + tabs.map(function (t) {
+      return '<button class="abtn tab ' + (t[0] === tab ? 'on' : '') + '" onclick="FA.go(\'' + P.page + '\',{tab:\'' + t[0] + '\'})">' + esc(t[1]) + '</button>';
+    }).join('') + '<span class="sep"></span><button class="abtn" onclick="FA.partyRefresh(' + jsArg(type) + ')">' + icon('refresh') + T('تحديث', 'Refresh') + '</button>' +
+      '<button class="abtn" onclick="FA.partyExport()">' + icon('download') + 'Excel</button>' +
+      '<button class="abtn" onclick="FA.partyPrint()">' + icon('list') + T('طباعة', 'Print') + '</button>' +
+      (can(P.perm, 'view') ? '<button class="abtn" onclick="FA.go(\'' + P.entity + '\')">' + icon('users') + T(P.ar, P.en) + '</button>' : '') + '</div>');
+    var setter = function (k) { return 'FA.partySet(' + jsArg(type) + ',\'' + k + '\', this.' + (k === 'zero' ? 'checked' : 'value') + ')'; };
+    var filters = '<div class="fin-filters">' +
+      '<label>' + T('من', 'From') + '<input class="inp" type="date" value="' + esc(F.from) + '" onchange="' + setter('from') + '"></label>' +
+      '<label>' + T('إلى', 'To') + '<input class="inp" type="date" value="' + esc(F.to) + '" onchange="' + setter('to') + '"></label>' +
+      (tab === 'stmt' ? '<label>' + esc(T(P.one[0], P.one[1])) + '<input class="inp" list="dl_party" dir="ltr" value="' + esc(F.party) + '" onchange="' + setter('party') + '">' +
+        '<datalist id="dl_party">' + d.parties.map(function (x) { return '<option value="' + esc(x.c) + '">' + esc(x.n) + '</option>'; }).join('') + '</datalist></label>' : '') +
+      (tab === 'sum' && type === 'Bank' ? '<label>' + T('المجموعة', 'Group') + '<select class="inp" onchange="' + setter('grp') + '"><option value="">' + T('كل المجموعات', 'All groups') + '</option>' +
+        (S.b.lookups.BankGroup || []).map(function (x) { return '<option value="' + esc(x.c) + '"' + (x.c === F.grp ? ' selected' : '') + '>' + esc(x.c + ' — ' + x.n) + '</option>'; }).join('') + '</select></label>' : '') +
+      (tab === 'sum' ? '<label class="ck"><input type="checkbox" ' + (F.zero ? 'checked' : '') + ' onchange="' + setter('zero') + '"> ' + T('إظهار الأرصدة الصفرية', 'Show zero balances') + '</label>' : '') +
+      '</div>';
+    var rep = tab === 'stmt' ? partyStatement(type, d, F) : partySummary(type, d, F);
+    S.partyRep = rep;
+    var period = T('من ', 'From ') + F.from + T(' إلى ', ' to ') + F.to;
+    crumbs([S.b.settings.ORGNAME, T(P.ar, P.en), tabs.filter(function (t) { return t[0] === tab; })[0][1]]);
+    $('#main').innerHTML = head + phead(T(P.ar, P.en), esc(rep.title) + ' <small style="font-size:13px;color:#605e5c;font-weight:400">' + esc(period) + '</small>') +
+      '<div class="content"><div class="card">' + filters + (rep.info || '') + '<div class="gridwrap" style="max-height:none">' + rep.html + '</div></div>' +
+      (rep.unposted ? '<div class="note">' + T('* رصيد افتتاحي مسجّل في بطاقة الطرف ولم يُرحَّل بعد في القيود — أنشئ قيد الأرصدة الافتتاحية من صفحة ', '* Opening balance on the card not yet posted to the ledger — create the opening voucher from the ') +
+        '<a onclick="FA.go(\'' + P.entity + '\')">' + esc(T(P.ar, P.en)) + '</a>.</div>' : '') + '</div>';
+    $$('.stmt a[data-v]').forEach(function (a) { a.onclick = function () { go('gl', { voucher: a.getAttribute('data-v') }); }; });
+  }
+
+  /** مبلغ السطر بعملة الطرف. */
+  function partyAmt(l, cur) {
+    if (low(l[PL.cur] || localCur()) === low(cur)) return { dr: l[PL.cdr], cr: l[PL.ccr] };
+    var rate = rateFor(cur, l[PL.date]) || 1;
+    return { dr: l[PL.dr] / rate, cr: l[PL.cr] / rate };
+  }
+  /** تجميع حركة طرف: الافتتاحي (قبل الفترة + قيد الافتتاح) والحركة خلال الفترة. */
+  function partyCalc(type, d, p, F) {
+    var P = PT[type], ob = 0, dr = 0, cr = 0, obL = 0, drL = 0, crL = 0, postedOpen = false, rows = [];
+    d.lines.forEach(function (l) {
+      if (low(l[PL.party]) !== low(p.c) || l[PL.date] > F.to) return;
+      var a = partyAmt(l, p.cur);
+      var isOpen = l[PL.ref] === 'OPENING';
+      if (isOpen) postedOpen = true;
+      if (l[PL.date] < F.from || isOpen) { ob += (a.dr - a.cr) * P.sign; obL += (l[PL.dr] - l[PL.cr]) * P.sign; return; }
+      dr += a.dr; cr += a.cr; drL += l[PL.dr]; crL += l[PL.cr];
+      rows.push({ l: l, a: a });
+    });
+    var unposted = !postedOpen && p.ob ? 1 : 0;
+    if (unposted) { ob += p.ob; obL += p.ob * (rateFor(p.cur, F.from) || 1); }
+    var cb = ob + (dr - cr) * P.sign;
+    return { ob: ob, dr: dr, cr: cr, cb: cb, cbL: obL + (drL - crL) * P.sign, rows: rows, unposted: unposted };
+  }
+
+  function partySummary(type, d, F) {
+    var P = PT[type], unposted = 0, tot = { ob: 0, dr: 0, cr: 0, cb: 0, cbL: 0 }, curs = {};
+    var heads = [T(P.no[0], P.no[1]), T(P.nm[0], P.nm[1]), T('العملة', 'Currency'), T('الرصيد الافتتاحي', 'Opening balance'),
+      T('حركة العام — مدين', 'Period movement — debit'), T('حركة العام — دائن', 'Period movement — credit'), T('الرصيد الختامي', 'Closing balance'),
+      T('الرصيد الختامي بالعملة المحلية', 'Closing balance (local)') + ' ' + localCur()];
+    var rows = [];
+    var groups = type === 'Bank' && !F.grp ? (S.b.lookups.BankGroup || []).map(function (g) { return g.c; }).concat(['']) : [null];
+    groups.forEach(function (g) {
+      var list = d.parties.filter(function (p) { return g === null ? (!F.grp || p.grp === F.grp) : (g ? p.grp === g : !(S.b.lookups.BankGroup || []).some(function (x) { return x.c === p.grp; })); });
+      var sub = { ob: 0, dr: 0, cr: 0, cb: 0, cbL: 0 }, out = [];
+      list.forEach(function (p) {
+        var c = partyCalc(type, d, p, F);
+        if (!F.zero && !c.ob && !c.dr && !c.cr) return;
+        if (c.unposted) unposted = 1;
+        curs[p.cur] = 1;
+        out.push({ code: p.c, label: p.n + (c.unposted ? ' *' : ''), cur: p.cur, v: [p.cur, c.ob, c.dr, c.cr, c.cb, c.cbL] });
+        ['ob', 'dr', 'cr', 'cb', 'cbL'].forEach(function (k) { sub[k] += c[k]; tot[k] += c[k]; });
+      });
+      if (!out.length) return;
+      if (g !== null) rows.push({ k: 'sec', label: g ? g + ' — ' + lookupName('BankGroup', g) : T('بدون مجموعة', 'No group') });
+      rows = rows.concat(out.map(function (r) { r.k = 'acc'; return r; }));
+      if (g !== null) rows.push({ k: 'sub', label: T('إجمالي المجموعة', 'Group total'), v: Object.keys(curs).length === 1 ? ['', sub.ob, sub.dr, sub.cr, sub.cb, sub.cbL] : ['', '', '', '', '', sub.cbL] });
+    });
+    var one = Object.keys(curs).length <= 1;
+    rows.push({ k: 'tot', label: T('الإجمالي', 'Total'), v: one ? ['', tot.ob, tot.dr, tot.cr, tot.cb, tot.cbL] : ['', '', '', '', '', tot.cbL] });
+    if (!d.parties.length) rows = [{ k: 'note', label: esc(T('لا توجد بيانات — أضف ', 'No data — add ') + T(P.ar, P.en)) }];
+    return { title: T('التقرير الإجمالي — ', 'Summary — ') + T(P.ar, P.en), heads: heads, rows: rows, html: stmtHtml(heads, rows), unposted: unposted };
+  }
+
+  function partyStatement(type, d, F) {
+    var P = PT[type];
+    var p = d.parties.filter(function (x) { return low(x.c) === low(F.party); })[0];
+    var heads = [T('التاريخ', 'Date'), T('رقم القيد', 'Voucher'), T('البيان', 'Description'), T('مدين', 'Debit'), T('دائن', 'Credit'), T('الرصيد', 'Balance')];
+    if (!p) return { title: T('كشف حساب', 'Account statement'), heads: heads, rows: [], html: '<div class="empty">' + T('اختر ', 'Select ') + esc(T(P.one[0], P.one[1])) + '</div>' };
+    var c = partyCalc(type, d, p, F), bal = c.ob;
+    var body = [];
+    body.push('<tr class="r-sub"><td>' + esc(F.from) + '</td><td></td><td>' + T('رصيد افتتاحي', 'Opening balance') + (c.unposted ? ' *' : '') + '</td><td class="n"></td><td class="n"></td><td class="n">' + fmtAcc(bal) + '</td></tr>');
+    var aoa = [heads, [F.from, '', T('رصيد افتتاحي', 'Opening balance'), '', '', r3(bal)]];
+    c.rows.sort(function (a, b) { return a.l[PL.date] < b.l[PL.date] ? -1 : a.l[PL.date] > b.l[PL.date] ? 1 : String(a.l[PL.voucher]).localeCompare(String(b.l[PL.voucher]), undefined, { numeric: true }); })
+      .forEach(function (x) {
+        bal += (x.a.dr - x.a.cr) * P.sign;
+        var desc = [x.l[PL.desc], x.l[PL.note]].filter(String).join(' — ') + (low(x.l[PL.cur] || localCur()) !== low(p.cur) ? ' [' + x.l[PL.cur] + ']' : '');
+        body.push('<tr class="r-acc"><td>' + esc(x.l[PL.date]) + '</td><td><a data-v="' + esc(x.l[PL.voucher]) + '"><bdi>' + esc(x.l[PL.voucher]) + '</bdi></a></td><td>' + esc(desc) + '</td>' +
+          '<td class="n">' + (x.a.dr ? fmtNum(x.a.dr, 2) : '') + '</td><td class="n">' + (x.a.cr ? fmtNum(x.a.cr, 2) : '') + '</td><td class="n">' + fmtAcc(bal) + '</td></tr>');
+        aoa.push([x.l[PL.date], x.l[PL.voucher], desc, r3(x.a.dr), r3(x.a.cr), r3(bal)]);
+      });
+    body.push('<tr class="r-tot"><td></td><td></td><td>' + T('الإجمالي / الرصيد الختامي', 'Totals / closing balance') + '</td><td class="n">' + fmtNum(c.dr, 2) + '</td><td class="n">' + fmtNum(c.cr, 2) + '</td><td class="n">' + fmtAcc(c.cb) + '</td></tr>');
+    aoa.push(['', '', T('الإجمالي / الرصيد الختامي', 'Totals / closing balance'), r3(c.dr), r3(c.cr), r3(c.cb)]);
+    var info = '<div class="pinfo"><span><b>' + esc(T(P.one[0], P.one[1])) + ':</b> <bdi>' + esc(p.c) + '</bdi> — ' + esc(p.n) + '</span><span><b>' + T('العملة', 'Currency') + ':</b> ' + esc(p.cur) + '</span>' +
+      '<span><b>' + T('الحساب', 'Account') + ':</b> <bdi>' + esc(p.acc) + '</bdi> ' + esc(lookupName('@allAccounts', p.acc)) + '</span>' +
+      '<span><b>' + T('الرصيد الختامي', 'Closing balance') + ':</b> ' + fmtAcc(c.cb) + ' ' + esc(p.cur) + '</span></div>';
+    var html = '<table class="stmt pst"><thead><tr>' + heads.map(function (h, i) { return '<th class="' + (i > 2 ? 'n' : '') + '">' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' + body.join('') + '</tbody></table>';
+    return { title: T('كشف حساب ', 'Statement — ') + T(P.one[0], P.one[1]) + ' ' + p.c + ' — ' + p.n, heads: heads, aoa: aoa, html: html, info: info, unposted: c.unposted };
+  }
+  function r3(x) { return Math.round((Number(x) || 0) * 1000) / 1000; }
+
+  function partySet(type, k, v) { S.partyF[type][k] = v; render(); }
+  function partyRefresh(type) { pageParty(type, true); }
+  function partyExport() {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    var r = S.partyRep, wb = XLSX.utils.book_new();
+    var aoa = [[S.b.settings.ORGNAME], [r.title], []].concat(r.aoa || stmtAoa(r.heads, r.rows));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Report');
+    XLSX.writeFile(wb, S.page + '_' + (S.view.tab || 'sum') + '_' + today() + '.xlsx');
+  }
+  function partyPrint() {
+    var r = S.partyRep, type = Object.keys(PT).filter(function (k) { return PT[k].page === S.page; })[0], F = S.partyF[type];
+    printDoc('<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(r.title) +
+      '<p style="margin:0 0 8px;color:#444">' + esc(T('من ', 'From ') + F.from + T(' إلى ', ' to ') + F.to) + '</p>' + (r.info || '') + r.html + '</div>',
+      S.view.tab === 'stmt' ? 'portrait' : 'landscape');
+  }
+
+  /* ======================= Budget control ======================= */
+  async function pageBudgetCtl(force) {
+    crumbs([S.b.settings.ORGNAME, T('مراقبة الموازنة', 'Budget control')]);
+    var f = S.bcF = S.bcF || { year: String(new Date().getFullYear()), m1: 1, m2: 12, level: 'S2', unit: '', over: false };
+    if (!S.bud || S.bud.year !== f.year || force) S.bud = await api('budgetData', S.token, f.year);
+    var unitOpts = [['', T('كل الوحدات', 'All units')]]
+      .concat((S.b.lookups.OperatingUnit || []).map(function (x) { return ['OU:' + x.c, x.c + ' — ' + x.n]; }))
+      .concat((S.b.lookups.Sub1_OperatingUnit || []).map(function (x) { return ['S1:' + x.c, x.c + ' — ' + x.n]; }))
+      .concat((S.b.lookups.Sub2_OperatingUnit || []).map(function (x) { return ['S2:' + x.c, x.c + ' — ' + x.n]; }));
+    var opt = function (list, v) { return list.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (String(x[0]) === String(v) ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
+    var months = [];
+    for (var m = 1; m <= 12; m++) months.push([m, pad(m)]);
+    var y0 = new Date().getFullYear(), years = [];
+    for (var y = y0 - 3; y <= y0 + 2; y++) years.push([String(y), String(y)]);
+    var filters = '<div class="fin-filters">' +
+      '<label>' + T('السنة', 'Year') + '<select class="inp" onchange="FA.bcSet(\'year\', this.value)">' + opt(years, f.year) + '</select></label>' +
+      '<label>' + T('من شهر', 'From month') + '<select class="inp" onchange="FA.bcSet(\'m1\', +this.value)">' + opt(months, f.m1) + '</select></label>' +
+      '<label>' + T('إلى شهر', 'To month') + '<select class="inp" onchange="FA.bcSet(\'m2\', +this.value)">' + opt(months, f.m2) + '</select></label>' +
+      '<label>' + T('مستوى الوحدة', 'Unit level') + '<select class="inp" onchange="FA.bcSet(\'level\', this.value)">' +
+        opt([['OU', T('الوحدة الرئيسية', 'Operating unit')], ['S1', T('الوحدة الفرعية 1', 'Sub-unit 1')], ['S2', T('الوحدة الفرعية 2', 'Sub-unit 2')], ['', T('بدون (إجمالي الحساب)', 'None (account total)')]], f.level) + '</select></label>' +
+      '<label>' + T('الوحدة', 'Unit') + '<select class="inp" onchange="FA.bcSet(\'unit\', this.value)">' + opt(unitOpts, f.unit) + '</select></label>' +
+      '<label class="ck"><input type="checkbox" ' + (f.over ? 'checked' : '') + ' onchange="FA.bcSet(\'over\', this.checked)"> ' + T('التجاوزات فقط', 'Over budget only') + '</label></div>';
+    var rep = buildBudgetCtl();
+    S.bcRep = rep;
+    S.bcTitle = T('تقرير مراقبة الموازنة ', 'Budget control ') + f.year + ' (' + pad(f.m1) + '–' + pad(f.m2) + ')';
+    var head = apane([
+      can('budget', 'view') && { icon: 'list', ar: 'إدخال الموازنة', en: 'Budget entry', on: "FA.go('budgets')" },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.bcRefresh()' },
+      { icon: 'download', ar: 'Excel', en: 'Excel', on: 'FA.bcExport()' },
+      { icon: 'list', ar: 'طباعة', en: 'Print', on: 'FA.bcPrint()' }
+    ]);
+    $('#main').innerHTML = head + phead(T('المحاسبة', 'Accounting'), esc(S.bcTitle)) +
+      '<div class="content"><div class="card">' + filters + '<div class="gridwrap" style="max-height:none">' + rep.html + '</div></div>' +
+      '<div class="note">' + T('الفعلي = صافي القيود المُرحّلة خلال الفترة (بدون قيد الإقفال). الفارق = الفعلي − التقديري. الموازنة السنوية تُوزَّع بالتساوي على 12 شهراً، والشهرية تتكرر لكل شهر. الأحمر = تجاوز (مصروف أعلى أو إيراد أقل من التقديري).',
+        'Actual = net posted entries in the period (excluding closing). Variance = actual − budget. Annual budgets are spread evenly over 12 months; monthly budgets repeat each month. Red = unfavourable.') + '</div></div>';
+  }
+
+  function buildBudgetCtl() {
+    var f = S.bcF, d = S.bud, n = f.m2 - f.m1 + 1;
+    if (n < 1) n = 0;
+    var unitOk = function (ou, s1, s2) {
+      if (!f.unit) return true;
+      var p = f.unit.split(':'), c = low(p.slice(1).join(':'));
+      return low(p[0] === 'OU' ? ou : p[0] === 'S1' ? s1 : s2) === c;
+    };
+    var unitKey = function (ou, s1, s2) { return f.level === 'OU' ? ou : f.level === 'S1' ? s1 : f.level === 'S2' ? s2 : ''; };
+    var lk = f.level === 'OU' ? 'OperatingUnit' : f.level === 'S1' ? 'Sub1_OperatingUnit' : 'Sub2_OperatingUnit';
+    var m = {}, order = [];
+    var get = function (acc, u) {
+      var k = low(acc) + '|' + low(u);
+      if (!m[k]) { m[k] = { acc: acc, u: u, b: 0, a: 0 }; order.push(k); }
+      return m[k];
+    };
+    var budAcc = {};
+    d.budgets.forEach(function (b) {
+      if (!unitOk(b.ou, b.s1, b.s2)) return;
+      budAcc[low(b.acc)] = 1;
+      get(b.acc, unitKey(b.ou, b.s1, b.s2)).b += b.per === 'Monthly' ? b.amt * n : b.amt * n / 12;
+    });
+    d.actual.forEach(function (l) {
+      var mo = Number(String(l[0]).slice(5, 7));
+      if (mo < f.m1 || mo > f.m2 || !budAcc[low(l[1])] || !unitOk(l[2], l[3], l[4])) return;
+      var t = d.types[l[1]] || '';
+      get(l[1], unitKey(l[2], l[3], l[4])).a += (t === 'Revenue' || t === 'Liability' || t === 'Equity') ? -l[5] : l[5];
+    });
+    var heads = [T('رقم الحساب', 'Account'), T('اسم الحساب', 'Account name'), T('الوحدة', 'Unit'), T('التقديري', 'Budget'), T('الفعلي', 'Actual'), T('الفارق', 'Variance'), T('نسبة الفارق', 'Variance %')];
+    var rows = order.map(function (k) { return m[k]; }).sort(function (a, b) { return String(a.acc).localeCompare(String(b.acc), undefined, { numeric: true }) || String(a.u).localeCompare(String(b.u)); });
+    var tot = { e: { b: 0, a: 0, n: 0 }, r: { b: 0, a: 0, n: 0 } }, body = [], aoa = [heads];
+    rows.forEach(function (r) {
+      var t = d.types[r.acc] || '', rev = t === 'Revenue';
+      var v = r.a - r.b, pct = r.b ? v / r.b * 100 : (r.a ? 100 : 0);
+      var bad = rev ? v < -0.0005 : v > 0.0005;
+      if (f.over && !bad) return;
+      var tk = tot[rev ? 'r' : 'e']; tk.b += r.b; tk.a += r.a; tk.n++;
+      var unit = f.level ? (r.u ? r.u + ' — ' + lookupName(lk, r.u) : T('بدون وحدة', 'No unit')) : T('كل الوحدات', 'All units');
+      body.push('<tr class="r-acc' + (bad ? ' bad' : '') + '"><td><bdi>' + esc(r.acc) + '</bdi></td><td>' + esc(lookupName('@allAccounts', r.acc)) + '</td><td><bdi>' + esc(unit) + '</bdi></td>' +
+        '<td class="n">' + fmtAcc(r.b) + '</td><td class="n">' + fmtAcc(r.a) + '</td><td class="n v">' + fmtAcc(v) + '</td><td class="n v">' + (r.b || r.a ? fmtNum(pct, 1) + '%' : '-') + '</td></tr>');
+      aoa.push([r.acc, lookupName('@allAccounts', r.acc), unit, r3(r.b), r3(r.a), r3(v), Math.round(pct * 10) / 10]);
+    });
+    if (!body.length) body.push('<tr class="r-note"><td colspan="7">' + T('لا توجد سطور موازنة لهذه السنة / الفلتر — أضفها من صفحة إدخال الموازنة.', 'No budget lines for this year/filter — add them on the budget entry page.') + '</td></tr>');
+    [['r', T('إجمالي الإيرادات', 'Total revenue')], ['e', T('إجمالي المصروفات والحسابات الأخرى', 'Total expenses & other')]].forEach(function (x) {
+      var t = tot[x[0]];
+      if (!t.n) return;
+      var tv = t.a - t.b, bad = x[0] === 'r' ? tv < -0.0005 : tv > 0.0005;
+      body.push('<tr class="r-tot' + (bad ? ' bad' : '') + '"><td></td><td>' + esc(x[1]) + '</td><td></td><td class="n">' + fmtAcc(t.b) + '</td><td class="n">' + fmtAcc(t.a) + '</td><td class="n v">' + fmtAcc(tv) + '</td><td class="n v">' + (t.b ? fmtNum(tv / t.b * 100, 1) + '%' : '-') + '</td></tr>');
+      aoa.push(['', x[1], '', r3(t.b), r3(t.a), r3(tv), t.b ? Math.round(tv / t.b * 1000) / 10 : '']);
+    });
+    var html = '<table class="stmt bct"><thead><tr>' + heads.map(function (h, i) { return '<th class="' + (i > 2 ? 'n' : '') + '">' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' + body.join('') + '</tbody></table>';
+    return { html: html, aoa: aoa };
+  }
+  function bcSet(k, v) { S.bcF[k] = v; pageBudgetCtl(); }
+  function bcRefresh() { pageBudgetCtl(true); }
+  function bcExport() {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[S.b.settings.ORGNAME], [S.bcTitle], []].concat(S.bcRep.aoa)), 'Budget');
+    XLSX.writeFile(wb, 'budget_control_' + S.bcF.year + '.xlsx');
+  }
+  function bcPrint() { printDoc('<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(S.bcTitle) + S.bcRep.html + '</div>', 'landscape'); }
+
   /* ======================= Print options (orientation / paper / margins) ======================= */
   function printPrefs() {
     var d = { orient: 'portrait', paper: 'A4', margin: 'normal' };
@@ -3134,7 +3462,7 @@
     var p = {};
     S.b.permPages.forEach(function (pg) { p[pg] = {}; S.b.permActions.forEach(function (a) { p[pg][a] = false; }); });
     var set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
-    var data = ['assets', 'books', 'journal', 'vendors', 'masterdata'];
+    var data = ['assets', 'books', 'journal', 'vendors', 'masterdata', 'customers', 'banks', 'budget'];
     if (role === 'SuperAdmin' || role === 'Admin') set(S.b.permPages, S.b.permActions);
     else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
     else set(data.concat(['reports', 'transfers', 'gl']), ['view']);
@@ -3142,7 +3470,8 @@
   }
   var PAGE_NAMES = { assets: ['الأصول الثابتة', 'Fixed assets'], books: ['دفاتر الأصول', 'Books'], journal: ['يومية الأصول', 'FA journal'],
     vendors: ['الموردون', 'Vendors'], users: ['المستخدمون', 'Users'], settings: ['الإعدادات', 'Settings'],
-    depreciation: ['الإهلاك التلقائي', 'Depreciation'], transfers: ['نقل الأصول', 'Asset transfers'], gl: ['القيود المحاسبية', 'Journal entries'], fiscal: ['السنوات المالية والإقفال', 'Fiscal years & closing'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'] };
+    depreciation: ['الإهلاك التلقائي', 'Depreciation'], transfers: ['نقل الأصول', 'Asset transfers'], gl: ['القيود المحاسبية', 'Journal entries'], fiscal: ['السنوات المالية والإقفال', 'Fiscal years & closing'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'],
+    customers: ['العملاء وتقاريرهم', 'Customers & reports'], banks: ['الصناديق والبنوك وتقاريرها', 'Cash & banks & reports'], budget: ['الموازنة التقديرية', 'Budgets'] };
   var ACT_NAMES = { view: ['دخول للصفحة', 'View'], add: ['إضافة', 'Add'], edit: ['تعديل', 'Edit'], delete: ['حذف', 'Delete'], approve: ['اعتماد', 'Approve'], post: ['ترحيل', 'Post'] };
 
   async function pageUsers() {
@@ -3314,7 +3643,8 @@
       '<div class="fld"><label>' + T('حساب مصروف الإهلاك الافتراضي', 'Default depreciation expense account') + '</label><input class="inp" data-s="DEPOFFSETACCOUNT" list="dl_setacc" dir="ltr" value="' + esc(st.DEPOFFSETACCOUNT) + '" ' + (ro ? 'readonly' : '') + '>' +
       '<datalist id="dl_setacc">' + datalistOpts('@accounts', null, {}) + '</datalist></div>' +
       '<div class="fld"><label>' + T('حساب الأرباح المحتجزة الافتراضي (للإقفال)', 'Default retained earnings account') + '</label><input class="inp" data-s="RETAINEDEARNINGSACCOUNT" list="dl_setacc2" dir="ltr" value="' + esc(st.RETAINEDEARNINGSACCOUNT || '') + '" ' + (ro ? 'readonly' : '') + '>' +
-      '<datalist id="dl_setacc2">' + datalistOpts('@accounts', null, {}) + '</datalist></div></div>' +
+      '<datalist id="dl_setacc2">' + datalistOpts('@accounts', null, {}) + '</datalist></div>' +
+      '<div class="fld"><label>' + T('حساب الأرصدة الافتتاحية (العملاء / الموردين / البنوك)', 'Opening balance offset account') + '</label><input class="inp" data-s="OPENINGBALANCEACCOUNT" list="dl_setacc" dir="ltr" value="' + esc(st.OPENINGBALANCEACCOUNT || '') + '" ' + (ro ? 'readonly' : '') + '></div></div>' +
       '</div>' + (ro ? '' : '<div style="padding:0 14px 14px"><button class="btn pri" onclick="FA.saveSettings()">' + icon('save') + T('حفظ الإعدادات', 'Save settings') + '</button></div>') + '</div>';
   }
   function sf(k, label, v, ro, type) {
@@ -3433,6 +3763,8 @@
     curDlg: curDlg, curSave: curSave,
     finSet: finSet, finRefresh: finRefresh, finLedger: finLedger, finExport: finExport, finPrint: finPrint,
     accSearch: accSearch, accToggle: accToggle, accAll: accAll, exportRowsAcc: exportRowsAcc,
+    openingDlg: openingDlg, openingGo: openingGo, partySet: partySet, partyRefresh: partyRefresh, partyExport: partyExport, partyPrint: partyPrint,
+    bcSet: bcSet, bcRefresh: bcRefresh, bcExport: bcExport, bcPrint: bcPrint,
     depCalc: depCalc, depCreate: depCreate, depExport: depExport, repFilter: repFilter, repRefresh: repRefresh, repExport: repExport
   };
 

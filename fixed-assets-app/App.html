@@ -170,6 +170,9 @@
     else if (key === '@vendors') l = r.vendors;
     else if (key === '@customers') l = r.customers || [];
     else if (key === '@banks') l = r.banks || [];
+    else if (key === '@itemgroups') l = r.itemgroups || [];
+    else if (key === '@salesitems') l = r.salesitems || [];
+    else if (key === '@purchitems') l = r.purchitems || [];
     else if (key === '@openinvoices') {
       l = (r.invoices || []).filter(function (x) {
         return all || ((!rec.PARTYID || low(x.p) === low(rec.PARTYID)) && (!rec.VOUCHERTYPE || x.t === (rec.VOUCHERTYPE === 'Receipt' ? 'Sales' : 'Purchase')));
@@ -420,7 +423,7 @@
       var i = list.findIndex(function (r) { return keyStr(e, r) === k; });
       if (i >= 0) list[i] = saved; else list.push(saved);
       toast(T('تم الحفظ', 'Saved'), 'ok');
-      if (['assets', 'books', 'vendors', 'accounts', 'groups'].indexOf(e) >= 0 || sch(e).lkType) await refreshRefs();
+      if (['assets', 'books', 'vendors', 'accounts', 'groups', 'customers', 'banks', 'itemgroups', 'salesitems', 'purchitems'].indexOf(e) >= 0 || sch(e).lkType) await refreshRefs();
       return saved;
     } catch (err) { fail(err); return null; }
   }
@@ -702,6 +705,10 @@
     { id: 'banks', icon: 'book', ar: 'الصناديق والبنوك', en: 'Cash & bank accounts', perm: 'banks' },
     { id: 'cashvouchers', icon: 'send', ar: 'سندات القبض والصرف', en: 'Receipts & payments', perm: 'cashvouchers' },
     { id: 'bankreports', icon: 'chart', ar: 'تقارير الصناديق والبنوك', en: 'Cash & bank reports', perm: 'banks' },
+    { h: 1, ar: 'الأصناف', en: 'Items' },
+    { id: 'salesitems', icon: 'box', ar: 'أصناف البيع', en: 'Sales items', perm: 'items' },
+    { id: 'purchitems', icon: 'box', ar: 'أصناف الشراء', en: 'Purchase items', perm: 'items' },
+    { id: 'itemgroups', icon: 'folder', ar: 'مجموعات الأصناف', en: 'Item groups', perm: 'items' },
     { h: 1, ar: 'البيانات الأساسية', en: 'Master data' },
     { id: 'units', icon: 'tree', ar: 'الوحدات التشغيلية', en: 'Operating units', perm: 'masterdata' },
     { id: 'locations', icon: 'pin', ar: 'المواقع والمسؤولون', en: 'Locations & responsibility', perm: 'masterdata' },
@@ -771,7 +778,7 @@
         case 'budgets': return await (S.view.id ? pageBudgetDoc() : pageBudgetList());
         case 'salesinv': case 'purchinv': return await (S.view.id ? pageInvDoc() : pageInvList());
         case 'cashvouchers': return await (S.view.no ? pageCashDoc() : pageCashList());
-        case 'customers': case 'banks':
+        case 'customers': case 'banks': case 'salesitems': case 'purchitems': case 'itemgroups':
           return await (S.view.key !== undefined || S.view.isNew ? pageRecord(S.page) : pageList(S.page));
         case 'custreports': return await pageParty('Customer');
         case 'vendreports': return await pageParty('Vendor');
@@ -3071,6 +3078,10 @@
     var tab = S.view.tab || 'sum';
     if (tab === 'stmt' && !F.party && d.parties.length) F.party = d.parties[0].c;
     var tabs = [['sum', T('التقرير الإجمالي', 'Summary report')], ['stmt', T('كشف حساب', 'Account statement')]];
+    if (type !== 'Bank') tabs.push(['aging', T('أعمار الديون', 'Aging')]);
+    F.asOf = F.asOf || today();
+    S.aging = S.aging || {};
+    if (tab === 'aging' && (force || !S.aging[type] || S.aging[type].asOf !== F.asOf)) S.aging[type] = await api('agingData', S.token, type, F.asOf);
     var head = apane([]).replace('<div class="bar"></div>', '<div class="bar">' + tabs.map(function (t) {
       return '<button class="abtn tab ' + (t[0] === tab ? 'on' : '') + '" onclick="FA.go(\'' + P.page + '\',{tab:\'' + t[0] + '\'})">' + esc(t[1]) + '</button>';
     }).join('') + '<span class="sep"></span><button class="abtn" onclick="FA.partyRefresh(' + jsArg(type) + ')">' + icon('refresh') + T('تحديث', 'Refresh') + '</button>' +
@@ -3078,7 +3089,9 @@
       '<button class="abtn" onclick="FA.partyPrint()">' + icon('list') + T('طباعة', 'Print') + '</button>' +
       (can(P.perm, 'view') ? '<button class="abtn" onclick="FA.go(\'' + P.entity + '\')">' + icon('users') + T(P.ar, P.en) + '</button>' : '') + '</div>');
     var setter = function (k) { return 'FA.partySet(' + jsArg(type) + ',\'' + k + '\', this.' + (k === 'zero' ? 'checked' : 'value') + ')'; };
-    var filters = '<div class="fin-filters">' +
+    var chk = function (k, label) { return '<label class="ck"><input type="checkbox" ' + (F[k] ? 'checked' : '') + ' onchange="FA.partySet(' + jsArg(type) + ',\'' + k + '\', this.checked)"> ' + label + '</label>'; };
+    var filters = tab === 'aging' ? '<div class="fin-filters"><label>' + T('كما في تاريخ', 'As of') + '<input class="inp" type="date" value="' + esc(F.asOf) + '" onchange="' + setter('asOf') + '"></label>' +
+      chk('detail', T('عرض الفواتير', 'Show invoices')) + chk('overdue', T('المتأخرون فقط', 'Overdue only')) + '</div>' : '<div class="fin-filters">' +
       '<label>' + T('من', 'From') + '<input class="inp" type="date" value="' + esc(F.from) + '" onchange="' + setter('from') + '"></label>' +
       '<label>' + T('إلى', 'To') + '<input class="inp" type="date" value="' + esc(F.to) + '" onchange="' + setter('to') + '"></label>' +
       (tab === 'stmt' ? '<label>' + esc(T(P.one[0], P.one[1])) + '<input class="inp" list="dl_party" dir="ltr" value="' + esc(F.party) + '" onchange="' + setter('party') + '">' +
@@ -3087,15 +3100,16 @@
         (S.b.lookups.BankGroup || []).map(function (x) { return '<option value="' + esc(x.c) + '"' + (x.c === F.grp ? ' selected' : '') + '>' + esc(x.c + ' — ' + x.n) + '</option>'; }).join('') + '</select></label>' : '') +
       (tab === 'sum' ? '<label class="ck"><input type="checkbox" ' + (F.zero ? 'checked' : '') + ' onchange="' + setter('zero') + '"> ' + T('إظهار الأرصدة الصفرية', 'Show zero balances') + '</label>' : '') +
       '</div>';
-    var rep = tab === 'stmt' ? partyStatement(type, d, F) : partySummary(type, d, F);
+    var rep = tab === 'stmt' ? partyStatement(type, d, F) : tab === 'aging' ? partyAging(type, d, F) : partySummary(type, d, F);
     S.partyRep = rep;
-    var period = T('من ', 'From ') + F.from + T(' إلى ', ' to ') + F.to;
+    var period = tab === 'aging' ? T('كما في ', 'As of ') + F.asOf : T('من ', 'From ') + F.from + T(' إلى ', ' to ') + F.to;
     crumbs([S.b.settings.ORGNAME, T(P.ar, P.en), tabs.filter(function (t) { return t[0] === tab; })[0][1]]);
     $('#main').innerHTML = head + phead(T(P.ar, P.en), esc(rep.title) + ' <small style="font-size:13px;color:#605e5c;font-weight:400">' + esc(period) + '</small>') +
       '<div class="content"><div class="card">' + filters + (rep.info || '') + '<div class="gridwrap" style="max-height:none">' + rep.html + '</div></div>' +
       (rep.unposted ? '<div class="note">' + T('* رصيد افتتاحي مسجّل في بطاقة الطرف ولم يُرحَّل بعد في القيود — أنشئ قيد الأرصدة الافتتاحية من صفحة ', '* Opening balance on the card not yet posted to the ledger — create the opening voucher from the ') +
         '<a onclick="FA.go(\'' + P.entity + '\')">' + esc(T(P.ar, P.en)) + '</a>.</div>' : '') + '</div>';
     $$('.stmt a[data-v]').forEach(function (a) { a.onclick = function () { go('gl', { voucher: a.getAttribute('data-v') }); }; });
+    $$('.stmt a[data-inv]').forEach(function (a) { a.onclick = function () { go(type === 'Vendor' ? 'purchinv' : 'salesinv', { id: a.getAttribute('data-inv') }); }; });
   }
 
   /** مبلغ السطر بعملة الطرف. */
@@ -3190,7 +3204,7 @@
   function partyPrint() {
     var r = S.partyRep, type = Object.keys(PT).filter(function (k) { return PT[k].page === S.page; })[0], F = S.partyF[type];
     printDoc('<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(r.title) +
-      '<p style="margin:0 0 8px;color:#444">' + esc(T('من ', 'From ') + F.from + T(' إلى ', ' to ') + F.to) + '</p>' + (r.info || '') + r.html + '</div>',
+      '<p style="margin:0 0 8px;color:#444">' + esc(S.view.tab === 'aging' ? T('كما في ', 'As of ') + F.asOf : T('من ', 'From ') + F.from + T(' إلى ', ' to ') + F.to) + '</p>' + (r.info || '') + r.html + '</div>',
       S.view.tab === 'stmt' ? 'portrait' : 'landscape');
   }
 
@@ -3443,13 +3457,14 @@
       '|',
       !isNew && can('budget', 'approve') && { icon: 'check', ar: 'اعتماد', en: 'Approve', on: "FA.bgAct('approve')", dis: head.STATUS !== 'Draft' },
       !isNew && can('budget', 'approve') && { icon: 'undo', ar: 'إلغاء الاعتماد', en: 'Unapprove', on: "FA.bgAct('unapprove')", dis: head.STATUS !== 'Approved' },
+      !isNew && can('budget', 'post') && { icon: 'send', ar: 'ترحيل', en: 'Post', on: "FA.bgAct('post')", dis: head.STATUS !== 'Approved' },
       '|',
       { icon: 'download', ar: 'تصدير السطور', en: 'Export lines', on: 'FA.bgExport()' },
       !isNew && { icon: 'list', ar: 'طباعة', en: 'Print', on: 'FA.bgPrint()' },
       !isNew && head.STATUS === 'Draft' && can('budget', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: "FA.bgAct('delete')", cls: 'danger' }
     ]) + phead('<a onclick="FA.go(\'budgets\')">' + esc(L(s.title)) + '</a>', (isNew ? T('موازنة جديدة', 'New budget') : esc(id)) + ' ' + stBadge('budgetheads', head.STATUS)) +
       '<div class="content compact">' + formHtml('budgetheads', head, isNew, !ed, { flat: true,
-        hide: isNew ? ['BUDGETID', 'TOTALAMOUNT', 'STATUS', 'APPROVEDBY', 'APPROVEDON'] : ['TOTALAMOUNT'] }) +
+        hide: isNew ? ['BUDGETID', 'TOTALAMOUNT', 'STATUS', 'APPROVEDBY', 'APPROVEDON', 'POSTEDBY', 'POSTEDON'] : ['TOTALAMOUNT'] }) +
       '<div class="card"><div class="ftab-h" style="cursor:default;padding:6px 12px"><h3>' + T('تفاصيل الموازنة', 'Budget lines') + '</h3>' +
       (ed ? '<div class="sum"><button class="btn sm" onclick="FA.bgAddLine()">' + icon('plus') + T('سطر', 'Line') + '</button></div>' : '') + '</div><div class="gl-wrap">' +
       '<table class="gl-grid bg-grid"><thead id="bgHead"></thead><tbody id="bgBody"></tbody><tfoot id="bgFoot"></tfoot></table></div></div>' +
@@ -3544,7 +3559,7 @@
     } catch (e) { fail(e); }
   }
   async function bgAct(action) {
-    var msgs = { approve: T('اعتماد الموازنة؟ تدخل بعدها في تقرير مراقبة الموازنة.', 'Approve the budget? It will then be used in budget control.'),
+    var msgs = { approve: T('اعتماد الموازنة؟', 'Approve the budget?'), post: T('ترحيل الموازنة؟ تدخل بعدها في تقرير مراقبة الموازنة ولا يمكن تعديلها.', 'Post the budget? It will be used in budget control and can no longer be changed.'),
       unapprove: T('إلغاء اعتماد الموازنة؟', 'Unapprove the budget?'), delete: T('حذف الموازنة؟', 'Delete the budget?') };
     if (!(await confirmBox(msgs[action], null, action === 'delete'))) return;
     try {
@@ -3674,10 +3689,10 @@
       : (S.data.invoices || []).filter(function (h) { return h.INVOICEID === id; })[0];
     if (!head) { go(S.page); return; }
     var defAcc = sales ? st.SALESACCOUNT : st.PURCHASEACCOUNT, defTax = Number(st.DEFAULTTAXPERCENT) || 0;
-    var lines = isNew ? [{ QTY: 1, MAINACCOUNTID: defAcc, TAXPERCENT: defTax }] : (S.data.invlines || []).filter(function (l) { return l.INVOICEID === id; })
+    var lines = isNew ? [{ QTY: 1, MAINACCOUNTID: '', TAXPERCENT: defTax }] : (S.data.invlines || []).filter(function (l) { return l.INVOICEID === id; })
       .sort(function (a, b) { return (Number(a.LINENUM) || 0) - (Number(b.LINENUM) || 0); });
     var ed = head.STATUS === 'Draft' && can('invoices', isNew ? 'add' : 'edit');
-    S.invLines = lines.map(function (l) { return { ITEMDESCRIPTION: l.ITEMDESCRIPTION || '', MAINACCOUNTID: l.MAINACCOUNTID || '', SUB2_OPERATINGUNIT: l.SUB2_OPERATINGUNIT || '',
+    S.invLines = lines.map(function (l) { return { ITEMID: l.ITEMID || '', UNIT: l.UNIT || '', ITEMDESCRIPTION: l.ITEMDESCRIPTION || '', MAINACCOUNTID: l.MAINACCOUNTID || '',
       QTY: l.QTY === undefined ? 1 : l.QTY, UNITPRICE: l.UNITPRICE === undefined ? '' : l.UNITPRICE, TAXPERCENT: l.TAXPERCENT === undefined ? defTax : l.TAXPERCENT }; });
     S.invEd = ed; S.invHead = head;
     var title = sales ? T('فاتورة مبيعات', 'Sales invoice') : T('فاتورة مشتريات', 'Purchase invoice');
@@ -3708,7 +3723,8 @@
           return '<tr class="r-acc"><td><a onclick="FA.go(\'cashvouchers\',{no:\'' + String(c.VOUCHERNO).replace(/[^\w-]/g, '') + '\'})"><bdi>' + esc(c.VOUCHERNO) + '</bdi></a></td><td>' + esc(c.TRANSDATE) + '</td><td>' + esc(c.BANKACCOUNTID) +
             '</td><td class="n">' + fmtNum(c.AMOUNT, 3) + ' ' + esc(c.CURRENCYCODE) + '</td><td>' + stBadge('cashvouchers', c.STATUS) + '</td></tr>';
         }).join('') + '</tbody></table></div>' : '') +
-      '<datalist id="dl_invacc">' + datalistOpts('@accounts', null, {}) + '</datalist><datalist id="dl_invsub2">' + datalistOpts('Sub2_OperatingUnit', null, {}) + '</datalist></div>';
+      '<datalist id="dl_invacc">' + datalistOpts('@accounts', null, {}) + '</datalist><datalist id="dl_invitem">' + datalistOpts(sales ? '@salesitems' : '@purchitems', null, {}) + '</datalist>' +
+      '<datalist id="dl_invunit">' + datalistOpts('ItemUnit', null, {}) + '</datalist></div>';
     drawInvLines();
   }
   function invLineCalc(l) {
@@ -3717,8 +3733,8 @@
   }
   function drawInvLines() {
     var ed = S.invEd;
-    $('#invHead').innerHTML = '<tr><th class="c-no">#</th><th class="c-item">' + T('البيان / الصنف', 'Item / description') + '</th><th class="c-acc">' + T('الحساب', 'Account') + '</th><th class="c-name">' + T('اسم الحساب', 'Account name') + '</th>' +
-      '<th class="c-unit">' + T('الوحدة الفرعية 2', 'Sub-unit 2') + '</th><th class="c-qty">' + T('الكمية', 'Qty') + '</th><th class="c-amt">' + T('سعر الوحدة', 'Unit price') + '</th><th class="c-amt">' + T('الإجمالي', 'Amount') + '</th>' +
+    $('#invHead').innerHTML = '<tr><th class="c-no">#</th><th class="c-acc">' + T('رقم الصنف', 'Item') + '</th><th class="c-item">' + T('البيان / الصنف', 'Item / description') + '</th><th class="c-qty">' + T('الوحدة', 'Unit') + '</th>' +
+      '<th class="c-acc">' + T('الحساب', 'Account') + '</th><th class="c-name">' + T('اسم الحساب', 'Account name') + '</th><th class="c-qty">' + T('الكمية', 'Qty') + '</th><th class="c-amt">' + T('سعر الوحدة', 'Unit price') + '</th><th class="c-amt">' + T('الإجمالي', 'Amount') + '</th>' +
       '<th class="c-qty">' + T('الضريبة %', 'Tax %') + '</th><th class="c-amt">' + T('الضريبة', 'Tax') + '</th>' + (ed ? '<th class="c-x"></th>' : '') + '</tr>';
     $('#invBody').innerHTML = S.invLines.map(function (l, i) {
       var c = invLineCalc(l);
@@ -3727,13 +3743,13 @@
         return '<input class="cell ' + (cls || '') + '" data-iv="' + k + '" data-i="' + i + '" value="' + esc(v === undefined ? '' : v) + '" ' + (attrs || '') + ' onchange="FA.invCell(this)">';
       };
       if (!ed) {
-        return '<tr><td class="c-no">' + (i + 1) + '</td><td>' + esc(l.ITEMDESCRIPTION) + '</td><td dir="ltr">' + esc(l.MAINACCOUNTID) + '</td><td class="c-name">' + esc(lookupName('@allAccounts', l.MAINACCOUNTID)) + '</td>' +
-          '<td>' + bgUnitTxt('Sub2_OperatingUnit', l.SUB2_OPERATINGUNIT) + '</td><td class="n">' + fmtNum(l.QTY, 3) + '</td><td class="n">' + fmtNum(l.UNITPRICE, 3) + '</td><td class="n">' + fmtNum(c.amt, 3) + '</td>' +
+        return '<tr><td class="c-no">' + (i + 1) + '</td><td dir="ltr">' + esc(l.ITEMID) + '</td><td>' + esc(l.ITEMDESCRIPTION) + '</td><td>' + esc(l.UNIT) + '</td><td dir="ltr">' + esc(l.MAINACCOUNTID) + '</td><td class="c-name">' + esc(lookupName('@allAccounts', l.MAINACCOUNTID)) + '</td>' +
+          '<td class="n">' + fmtNum(l.QTY, 3) + '</td><td class="n">' + fmtNum(l.UNITPRICE, 3) + '</td><td class="n">' + fmtNum(c.amt, 3) + '</td>' +
           '<td class="n">' + fmtNum(l.TAXPERCENT, 2) + '</td><td class="n">' + fmtNum(c.tax, 3) + '</td></tr>';
       }
-      return '<tr><td class="c-no">' + (i + 1) + '</td><td class="c-item">' + inp('ITEMDESCRIPTION', 'dir="auto"') + '</td><td class="c-acc">' + inp('MAINACCOUNTID', 'list="dl_invacc" dir="ltr"') + '</td>' +
+      return '<tr><td class="c-no">' + (i + 1) + '</td><td class="c-acc">' + inp('ITEMID', 'list="dl_invitem" dir="ltr"') + '</td><td class="c-item">' + inp('ITEMDESCRIPTION', 'dir="auto"') + '</td>' +
+        '<td class="c-qty">' + inp('UNIT', 'list="dl_invunit" dir="ltr"') + '</td><td class="c-acc">' + inp('MAINACCOUNTID', 'list="dl_invacc" dir="ltr"') + '</td>' +
         '<td class="c-name gl-name">' + esc(lookupName('@accounts', l.MAINACCOUNTID)) + '</td>' +
-        '<td class="c-unit"><div class="unitcell">' + inp('SUB2_OPERATINGUNIT', 'list="dl_invsub2" dir="ltr"') + '<span class="gl-name">' + esc(lookupName('Sub2_OperatingUnit', l.SUB2_OPERATINGUNIT)) + '</span></div></td>' +
         '<td class="c-qty">' + inp('QTY', 'inputmode="decimal"', 'num') + '</td><td class="c-amt">' + inp('UNITPRICE', 'inputmode="decimal"', 'num') + '</td>' +
         '<td class="c-amt n la">' + fmtNum(c.amt, 3) + '</td><td class="c-qty">' + inp('TAXPERCENT', 'inputmode="decimal"', 'num') + '</td><td class="c-amt n lt">' + fmtNum(c.tax, 3) + '</td>' +
         '<td class="c-x"><button class="ib red" tabindex="-1" title="' + T('حذف السطر', 'Remove line') + '" onclick="FA.invDelLine(' + i + ')">' + icon('trash') + '</button></td></tr>';
@@ -3744,8 +3760,8 @@
     var sub = 0, tax = 0, h = S.invHead || {};
     S.invLines.forEach(function (l) { var c = invLineCalc(l); sub += c.amt; tax += c.tax; });
     var cur = (($('[data-form="invoices"] [data-k="CURRENCYCODE"]') || {}).value || h.CURRENCYCODE || localCur());
-    var tot = sub + tax, cols = S.invEd ? 11 : 10;
-    var row = function (label, v, cls) { return '<tr class="' + (cls || '') + '"><td colspan="7" class="ft-l">' + label + '</td><td class="n" colspan="3">' + fmtNum(v, 3) + ' ' + esc(cur) + '</td>' + (S.invEd ? '<td></td>' : '') + '</tr>'; };
+    var tot = sub + tax, cols = S.invEd ? 12 : 11;
+    var row = function (label, v, cls) { return '<tr class="' + (cls || '') + '"><td colspan="8" class="ft-l">' + label + '</td><td class="n" colspan="3">' + fmtNum(v, 3) + ' ' + esc(cur) + '</td>' + (S.invEd ? '<td></td>' : '') + '</tr>'; };
     $('#invFoot').innerHTML = row(T('الإجمالي قبل الضريبة', 'Subtotal'), sub) + row(T('الضريبة', 'Tax'), tax) + row('<b>' + T('إجمالي الفاتورة', 'Invoice total') + '</b>', tot, 'ft-tot') +
       (h.STATUS === 'Posted' || h.STATUS === 'Cancelled' ? row(T('المسدد', 'Paid'), Number(h.PAIDAMOUNT) || 0) + row('<b>' + T('المتبقي', 'Balance due') + '</b>', invRem(h), 'ft-tot') : '') +
       '<tr><td colspan="' + cols + '" class="ft-words">' + esc(tot ? tafqeet(tot, cur) : '') + '</td></tr>';
@@ -3756,17 +3772,30 @@
     if (k === 'QTY' || k === 'UNITPRICE' || k === 'TAXPERCENT') v = parseNum(v);
     l[k] = v;
     if (k === 'MAINACCOUNTID') $('.c-name', tr).textContent = lookupName('@accounts', v);
-    if (k === 'SUB2_OPERATINGUNIT') $('.unitcell .gl-name', tr).textContent = lookupName('Sub2_OperatingUnit', v);
+    if (k === 'ITEMID' && v) {
+      var it = refFind(invItems(), v);
+      if (it) {
+        var g = refFind(S.b.refs.itemgroups, it.g) || {};
+        l.ITEMID = it.c; l.ITEMDESCRIPTION = it.n; l.UNIT = it.u; l.UNITPRICE = it.pr;
+        l.MAINACCOUNTID = (invType() === 'Purchase' ? g.pa : g.sa) || l.MAINACCOUNTID;
+        // إعادة الرسم بعد انتهاء حدث الخروج من الخلية حتى لا يتعارض مع المتصفح
+        setTimeout(function () {
+          drawInvLines();
+          var q = $('[data-iv="QTY"][data-i="' + i + '"]'); if (q) { q.focus(); q.select(); }
+        }, 0);
+        return;
+      }
+      toast(T('الصنف غير موجود: ', 'Item not found: ') + v, 'err');
+    }
     var c = invLineCalc(l);
     $('.la', tr).textContent = fmtNum(c.amt, 3); $('.lt', tr).textContent = fmtNum(c.tax, 3);
     drawInvFoot();
   }
   function invAddLine() {
     var last = S.invLines[S.invLines.length - 1] || {}, st = S.b.settings;
-    S.invLines.push({ ITEMDESCRIPTION: '', MAINACCOUNTID: last.MAINACCOUNTID || (invType() === 'Sales' ? st.SALESACCOUNT : st.PURCHASEACCOUNT) || '',
-      SUB2_OPERATINGUNIT: last.SUB2_OPERATINGUNIT || '', QTY: 1, UNITPRICE: '', TAXPERCENT: last.TAXPERCENT !== undefined ? last.TAXPERCENT : Number(st.DEFAULTTAXPERCENT) || 0 });
+    S.invLines.push({ ITEMID: '', ITEMDESCRIPTION: '', UNIT: '', MAINACCOUNTID: '', QTY: 1, UNITPRICE: '', TAXPERCENT: last.TAXPERCENT !== undefined ? last.TAXPERCENT : Number(st.DEFAULTTAXPERCENT) || 0 });
     drawInvLines();
-    var el = $('[data-iv="ITEMDESCRIPTION"][data-i="' + (S.invLines.length - 1) + '"]');
+    var el = $('[data-iv="ITEMID"][data-i="' + (S.invLines.length - 1) + '"]');
     if (el) el.focus();
   }
   function invDelLine(i) { S.invLines.splice(i, 1); drawInvLines(); }
@@ -3776,8 +3805,9 @@
     var head = readForm(form);
     head.INVOICETYPE = invType();
     if (!isNew) head.INVOICEID = S.view.id;
-    var lines = S.invLines.filter(function (l) { return l.ITEMDESCRIPTION || Number(parseNum(l.UNITPRICE)); })
-      .map(function (l) { return { ITEMDESCRIPTION: l.ITEMDESCRIPTION, MAINACCOUNTID: l.MAINACCOUNTID, SUB2_OPERATINGUNIT: l.SUB2_OPERATINGUNIT,
+    var st = S.b.settings, defAcc = invType() === 'Sales' ? st.SALESACCOUNT : st.PURCHASEACCOUNT;
+    var lines = S.invLines.filter(function (l) { return l.ITEMID || l.ITEMDESCRIPTION || Number(parseNum(l.UNITPRICE)); })
+      .map(function (l) { return { ITEMID: l.ITEMID, ITEMDESCRIPTION: l.ITEMDESCRIPTION, UNIT: l.UNIT, MAINACCOUNTID: l.MAINACCOUNTID || (l.ITEMID ? '' : defAcc || ''),
         QTY: parseNum(l.QTY), UNITPRICE: parseNum(l.UNITPRICE), TAXPERCENT: parseNum(l.TAXPERCENT) }; });
     if (post && !(await confirmBox(T('حفظ الفاتورة وترحيل قيدها الآن؟', 'Save the invoice and post its journal entry now?')))) return;
     try {
@@ -3830,12 +3860,12 @@
       (p.ad ? '<div>' + esc(p.ad) + '</div>' : '') + (p.ph ? '<div dir="ltr">' + esc(p.ph) + '</div>' : '') + (p.em ? '<div dir="ltr">' + esc(p.em) + '</div>' : '') + '</div>' +
       '<table class="meta"><tr><td>' + T('رقم الفاتورة: ', 'Invoice no.: ') + '<b>' + esc(h.INVOICEID) + '</b></td></tr><tr><td>' + T('التاريخ: ', 'Date: ') + '<b>' + esc(h.INVOICEDATE) + '</b></td></tr>' +
       '<tr><td>' + T('تاريخ الاستحقاق: ', 'Due date: ') + esc(h.DUEDATE || '') + '</td></tr>' + (h.PARTYREF ? '<tr><td>' + T('مرجع: ', 'Reference: ') + esc(h.PARTYREF) + '</td></tr>' : '') +
-      '<tr><td>' + T('العملة: ', 'Currency: ') + esc(h.CURRENCYCODE) + '</td></tr></table></div>' +
+      '<tr><td>' + T('العملة: ', 'Currency: ') + esc(h.CURRENCYCODE) + '</td></tr><tr><td>' + T('الوحدة: ', 'Unit: ') + esc(unitText(h.OPERATINGUNIT, h.SUB1_OPERATINGUNIT, h.SUB2_OPERATINGUNIT)) + '</td></tr></table></div>' +
       (h.DESCRIPTION ? '<p style="margin:6px 0">' + esc(h.DESCRIPTION) + '</p>' : '') +
-      '<table class="lines"><thead><tr><th>#</th><th>' + T('البيان / الصنف', 'Description') + '</th><th>' + T('الكمية', 'Qty') + '</th><th>' + T('سعر الوحدة', 'Unit price') + '</th><th>' + T('الإجمالي', 'Amount') + '</th><th>' + T('الضريبة %', 'Tax %') + '</th><th>' + T('الضريبة', 'Tax') + '</th></tr></thead><tbody>' +
+      '<table class="lines"><thead><tr><th>#</th><th>' + T('رقم الصنف', 'Item') + '</th><th>' + T('البيان / الصنف', 'Description') + '</th><th>' + T('الوحدة', 'Unit') + '</th><th>' + T('الكمية', 'Qty') + '</th><th>' + T('سعر الوحدة', 'Unit price') + '</th><th>' + T('الإجمالي', 'Amount') + '</th><th>' + T('الضريبة %', 'Tax %') + '</th><th>' + T('الضريبة', 'Tax') + '</th></tr></thead><tbody>' +
       S.invLines.map(function (l, i) {
         var c = invLineCalc(l); sub += c.amt; tax += c.tax;
-        return '<tr><td>' + (i + 1) + '</td><td>' + esc(l.ITEMDESCRIPTION) + '</td><td class="n">' + fmtNum(l.QTY, 2) + '</td><td class="n">' + fmtNum(l.UNITPRICE, 2) + '</td><td class="n">' + fmtNum(c.amt, 2) +
+        return '<tr><td>' + (i + 1) + '</td><td dir="ltr">' + esc(l.ITEMID) + '</td><td>' + esc(l.ITEMDESCRIPTION) + '</td><td>' + esc(lookupName('ItemUnit', l.UNIT) || l.UNIT) + '</td><td class="n">' + fmtNum(l.QTY, 2) + '</td><td class="n">' + fmtNum(l.UNITPRICE, 2) + '</td><td class="n">' + fmtNum(c.amt, 2) +
           '</td><td class="n">' + fmtNum(l.TAXPERCENT, 2) + '</td><td class="n">' + fmtNum(c.tax, 2) + '</td></tr>';
       }).join('') + '</tbody></table>' +
       '<table class="inv-tot"><tr><th>' + T('الإجمالي قبل الضريبة', 'Subtotal') + '</th><td>' + fmtNum(sub, 2) + '</td></tr><tr><th>' + T('الضريبة', 'Tax') + '</th><td>' + fmtNum(tax, 2) + '</td></tr>' +
@@ -3847,6 +3877,60 @@
       }).join('') + '</div></div>';
     printDoc(html, 'portrait');
   }
+
+  /* ======================= Aging (أعمار الديون) ======================= */
+  var AGE_B = [['nd', 'لم يستحق', 'Not due'], ['b1', '0–30 يوماً', '0–30 days'], ['b2', '31–60 يوماً', '31–60 days'], ['b3', '61–90 يوماً', '61–90 days'], ['b4', 'أكثر من 90 يوماً', 'Over 90 days']];
+  function daysBetween(a, b) { return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000); }
+  function ageBucket(days) { return days < 0 ? 'nd' : days <= 30 ? 'b1' : days <= 60 ? 'b2' : days <= 90 ? 'b3' : 'b4'; }
+  function partyAging(type, d, F) {
+    var P = PT[type], A = S.aging[type];
+    var asOf = A.asOf;
+    var heads = [T(P.no[0], P.no[1]), T(P.nm[0], P.nm[1]), T('العملة', 'Currency')].concat(AGE_B.map(function (b) { return T(b[1], b[2]); })).concat([T('الإجمالي', 'Total')]);
+    var by = {}, order = [];
+    A.invoices.forEach(function (x) {
+      var k = low(x.party);
+      if (!by[k]) { by[k] = { c: x.party, n: x.name, cur: x.cur, rate: x.rate, inv: [], s: { nd: 0, b1: 0, b2: 0, b3: 0, b4: 0, t: 0 } }; order.push(k); }
+      x.days = daysBetween(x.due, asOf); x.b = ageBucket(x.days);
+      by[k].inv.push(x); by[k].s[x.b] += x.rem; by[k].s.t += x.rem;
+      by[k].loc = (by[k].loc || 0) + x.rem * x.rate;
+      by[k].locB = by[k].locB || { nd: 0, b1: 0, b2: 0, b3: 0, b4: 0, t: 0 };
+      by[k].locB[x.b] += x.rem * x.rate; by[k].locB.t += x.rem * x.rate;
+    });
+    var parties = order.map(function (k) { return by[k]; }).sort(function (a, b) { return b.s.b4 - a.s.b4 || b.s.t - a.s.t; });
+    if (F.overdue) parties = parties.filter(function (p) { return p.s.b1 + p.s.b2 + p.s.b3 + p.s.b4 > 0.0005; });
+    var tot = { nd: 0, b1: 0, b2: 0, b3: 0, b4: 0, t: 0 }, curs = {};
+    var cell = function (k, v) { return '<td class="n ' + (v > 0.0005 ? 'ag-' + k : '') + '">' + (v > 0.0005 ? fmtNum(v, 2) : '-') + '</td>'; };
+    var body = [], aoa = [heads];
+    parties.forEach(function (p) {
+      curs[p.cur] = 1;
+      Object.keys(tot).forEach(function (k) { tot[k] += p.locB[k]; });
+      body.push('<tr class="r-acc ag-p"><td><bdi>' + esc(p.c) + '</bdi></td><td>' + esc(p.n) + '</td><td>' + esc(p.cur) + '</td>' + AGE_B.map(function (b) { return cell(b[0], p.s[b[0]]); }).join('') + '<td class="n"><b>' + fmtNum(p.s.t, 2) + '</b></td></tr>');
+      aoa.push([p.c, p.n, p.cur].concat(AGE_B.map(function (b) { return r3(p.s[b[0]]); })).concat([r3(p.s.t)]));
+      if (F.detail) p.inv.sort(function (a, b) { return a.due < b.due ? -1 : 1; }).forEach(function (x) {
+        body.push('<tr class="ag-inv"><td><a data-inv="' + esc(x.id) + '"><bdi>' + esc(x.id) + '</bdi></a></td><td>' + T('تاريخ ', 'Date ') + esc(x.date) + T(' — استحقاق ', ' — due ') + esc(x.due) +
+          (x.days > 0 ? ' — <b>' + T('متأخرة ', 'overdue ') + x.days + T(' يوماً', ' days') + '</b>' : '') + '</td><td>' + esc(x.cur) + '</td>' +
+          AGE_B.map(function (b) { return b[0] === x.b ? cell(b[0], x.rem) : '<td class="n"></td>'; }).join('') + '<td class="n">' + fmtNum(x.rem, 2) + '</td></tr>');
+        aoa.push(['  ' + x.id, x.date + ' / ' + x.due + ' (' + x.days + ')', x.cur].concat(AGE_B.map(function (b) { return b[0] === x.b ? r3(x.rem) : ''; })).concat([r3(x.rem)]));
+      });
+    });
+    var mixed = Object.keys(curs).length > 1;
+    var totLabel = T('الإجمالي', 'Total') + (mixed || (Object.keys(curs)[0] || localCur()) !== localCur() ? ' (' + T('بالعملة المحلية', 'local currency') + ' ' + localCur() + ')' : '');
+    if (!parties.length) body.push('<tr class="r-note"><td colspan="' + heads.length + '">' + T('لا توجد فواتير غير مسددة حتى هذا التاريخ.', 'No unpaid invoices as of this date.') + '</td></tr>');
+    else {
+      body.push('<tr class="r-tot"><td></td><td>' + esc(totLabel) + '</td><td></td>' + AGE_B.map(function (b) { return '<td class="n">' + fmtNum(tot[b[0]], 2) + '</td>'; }).join('') + '<td class="n">' + fmtNum(tot.t, 2) + '</td></tr>');
+      body.push('<tr class="r-sub"><td></td><td>' + T('النسبة من الإجمالي', 'Share of total') + '</td><td></td>' + AGE_B.map(function (b) { return '<td class="n">' + (tot.t ? fmtNum(tot[b[0]] / tot.t * 100, 1) + '%' : '-') + '</td>'; }).join('') + '<td class="n">100%</td></tr>');
+      aoa.push(['', totLabel, ''].concat(AGE_B.map(function (b) { return r3(tot[b[0]]); })).concat([r3(tot.t)]));
+    }
+    var overdue = tot.b1 + tot.b2 + tot.b3 + tot.b4;
+    var info = parties.length ? '<div class="pinfo"><span><b>' + T('كما في', 'As of') + ':</b> ' + esc(asOf) + '</span><span><b>' + T('إجمالي المستحق', 'Total outstanding') + ':</b> ' + fmtNum(tot.t, 2) + ' ' + esc(localCur()) + '</span>' +
+      '<span><b>' + T('المتأخر', 'Overdue') + ':</b> ' + fmtNum(overdue, 2) + ' (' + (tot.t ? fmtNum(overdue / tot.t * 100, 1) : 0) + '%)</span>' +
+      '<span><b>' + T('أكثر من 90 يوماً', 'Over 90 days') + ':</b> <span class="ag-b4">' + fmtNum(tot.b4, 2) + '</span></span></div>' : '';
+    var html = '<table class="stmt aging"><thead><tr>' + heads.map(function (h, i) { return '<th class="' + (i > 2 ? 'n' : '') + '">' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' + body.join('') + '</tbody></table>';
+    return { title: T('أعمار الديون — ', 'Aging — ') + T(P.ar, P.en), heads: heads, aoa: aoa, html: html, info: info };
+  }
+
+  /* ======================= Items in invoices ======================= */
+  function invItems() { return (invType() === 'Purchase' ? S.b.refs.purchitems : S.b.refs.salesitems) || []; }
 
   /* ======================= Budget control ======================= */
   async function pageBudgetCtl(force) {
@@ -3882,7 +3966,7 @@
     ]);
     $('#main').innerHTML = head + phead(T('المحاسبة', 'Accounting'), esc(S.bcTitle)) +
       '<div class="content"><div class="card">' + filters + '<div class="gridwrap" style="max-height:none">' + rep.html + '</div></div>' +
-      '<div class="note">' + T('الفعلي = صافي القيود المُرحّلة خلال الفترة (بدون قيد الإقفال). الفارق = الفعلي − التقديري. الموازنة السنوية تُوزَّع بالتساوي على 12 شهراً، والشهرية تتكرر لكل شهر. الأحمر = تجاوز (مصروف أعلى أو إيراد أقل من التقديري).',
+      '<div class="note">' + T('التقديري = الموازنات المُرحّلة فقط. الفعلي = صافي القيود المُرحّلة خلال الفترة (بدون قيد الإقفال). الفارق = الفعلي − التقديري. الموازنة السنوية تُوزَّع بالتساوي على 12 شهراً، والشهرية تتكرر لكل شهر. الأحمر = تجاوز (مصروف أعلى أو إيراد أقل من التقديري).',
         'Actual = net posted entries in the period (excluding closing). Variance = actual − budget. Annual budgets are spread evenly over 12 months; monthly budgets repeat each month. Red = unfavourable.') + '</div></div>';
   }
 
@@ -4137,16 +4221,16 @@
     var p = {};
     S.b.permPages.forEach(function (pg) { p[pg] = {}; S.b.permActions.forEach(function (a) { p[pg][a] = false; }); });
     var set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
-    var data = ['assets', 'books', 'journal', 'vendors', 'masterdata', 'customers', 'banks', 'budget', 'cashvouchers', 'invoices'];
+    var data = ['assets', 'books', 'journal', 'vendors', 'masterdata', 'customers', 'banks', 'budget', 'cashvouchers', 'invoices', 'items'];
     if (role === 'SuperAdmin' || role === 'Admin') set(S.b.permPages, S.b.permActions);
-    else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); set(['cashvouchers', 'invoices'], ['post']); }
+    else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); set(['cashvouchers', 'invoices', 'budget'], ['post']); }
     else set(data.concat(['reports', 'transfers', 'gl']), ['view']);
     return p;
   }
   var PAGE_NAMES = { assets: ['الأصول الثابتة', 'Fixed assets'], books: ['دفاتر الأصول', 'Books'], journal: ['يومية الأصول', 'FA journal'],
     vendors: ['الموردون', 'Vendors'], users: ['المستخدمون', 'Users'], settings: ['الإعدادات', 'Settings'],
     depreciation: ['الإهلاك التلقائي', 'Depreciation'], transfers: ['نقل الأصول', 'Asset transfers'], gl: ['القيود المحاسبية', 'Journal entries'], fiscal: ['السنوات المالية والإقفال', 'Fiscal years & closing'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'],
-    customers: ['العملاء وتقاريرهم', 'Customers & reports'], banks: ['الصناديق والبنوك وتقاريرها', 'Cash & banks & reports'], budget: ['الموازنة التقديرية', 'Budgets'], cashvouchers: ['سندات القبض والصرف', 'Receipts & payments'], invoices: ['فواتير المبيعات والمشتريات', 'Sales & purchase invoices'] };
+    customers: ['العملاء وتقاريرهم', 'Customers & reports'], banks: ['الصناديق والبنوك وتقاريرها', 'Cash & banks & reports'], budget: ['الموازنة التقديرية', 'Budgets'], cashvouchers: ['سندات القبض والصرف', 'Receipts & payments'], invoices: ['فواتير المبيعات والمشتريات', 'Sales & purchase invoices'], items: ['الأصناف ومجموعاتها', 'Items & item groups'] };
   var ACT_NAMES = { view: ['دخول للصفحة', 'View'], add: ['إضافة', 'Add'], edit: ['تعديل', 'Edit'], delete: ['حذف', 'Delete'], approve: ['اعتماد', 'Approve'], post: ['ترحيل', 'Post'] };
 
   async function pageUsers() {

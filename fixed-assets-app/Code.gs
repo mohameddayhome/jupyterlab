@@ -10,24 +10,26 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '9.0.0';
-const SETUP_VERSION = '9';
+const APP_VERSION = '10.0.0';
+const SETUP_VERSION = '10';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
 const AUDIT = ['CREATEDBY', 'CREATEDON', 'MODIFIEDBY', 'MODIFIEDON'];
-const PERM_PAGES = ['assets', 'books', 'journal', 'transfers', 'gl', 'fiscal', 'budget', 'customers', 'banks', 'cashvouchers', 'depreciation', 'reports', 'masterdata', 'vendors', 'users', 'settings'];
+const PERM_PAGES = ['assets', 'books', 'journal', 'transfers', 'gl', 'fiscal', 'budget', 'customers', 'banks', 'cashvouchers', 'invoices', 'depreciation', 'reports', 'masterdata', 'vendors', 'users', 'settings'];
 const PERM_ACTIONS = ['view', 'add', 'edit', 'delete', 'approve', 'post'];
 const USER_COLS = ['USERNAME', 'FULLNAME', 'EMAIL', 'PASSWORDHASH', 'SALT', 'ROLE', 'PERMISSIONS', 'STATUS',
   'MUSTCHANGE', 'LASTLOGIN', 'CREATEDBY', 'CREATEDON', 'MODIFIEDBY', 'MODIFIEDON'];
 const SESSION_COLS = ['SESSIONID', 'USERNAME', 'CREATEDON', 'LASTSEEN', 'ACTIVE', 'CLIENT'];
 const SETTING_DEFAULTS = {
   ORGNAME: 'الإدارة المالية', ORGEMAIL: '', CURRENCY: 'DJF', SESSIONTIMEOUT: '60',
-  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ', RETAINEDEARNINGSACCOUNT: '', CLOSINGJOURNALNAME: 'YE', OPENINGBALANCEACCOUNT: '', BUDGETPREFIX: 'BG-', BUDGETSEQ: '0', RVPREFIX: 'RV-', RVSEQ: '0', PVPREFIX: 'PV-', PVSEQ: '0',
+  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ', RETAINEDEARNINGSACCOUNT: '', CLOSINGJOURNALNAME: 'YE', OPENINGBALANCEACCOUNT: '', BUDGETPREFIX: 'BG-', BUDGETSEQ: '0', RVPREFIX: 'RV-', RVSEQ: '0', PVPREFIX: 'PV-', PVSEQ: '0', SIPREFIX: 'SI-', SISEQ: '0', PIPREFIX: 'PI-', PISEQ: '0',
+  SALESACCOUNT: '', PURCHASEACCOUNT: '', SALESTAXACCOUNT: '', PURCHTAXACCOUNT: '', DEFAULTTAXPERCENT: '0',
   DEPJOURNALNAME: 'FADEP', DEPOFFSETACCOUNT: '', DEPMONTHS: '3'
 };
 const PUBLIC_SETTINGS = ['ORGNAME', 'ORGEMAIL', 'CURRENCY', 'SESSIONTIMEOUT', 'MAXSESSIONS', 'DATEFORMAT', 'LOGO', 'JOURNALPREFIX',
-  'DEPJOURNALNAME', 'DEPOFFSETACCOUNT', 'DEPMONTHS', 'TRANSFERPREFIX', 'GLPREFIX', 'TRFJOURNALNAME', 'RETAINEDEARNINGSACCOUNT', 'CLOSINGJOURNALNAME', 'OPENINGBALANCEACCOUNT'];
+  'DEPJOURNALNAME', 'DEPOFFSETACCOUNT', 'DEPMONTHS', 'TRANSFERPREFIX', 'GLPREFIX', 'TRFJOURNALNAME', 'RETAINEDEARNINGSACCOUNT', 'CLOSINGJOURNALNAME', 'OPENINGBALANCEACCOUNT',
+  'SALESACCOUNT', 'PURCHASEACCOUNT', 'SALESTAXACCOUNT', 'PURCHTAXACCOUNT', 'DEFAULTTAXPERCENT'];
 
 /* ============================== Schemas ============================== */
 
@@ -58,7 +60,8 @@ const TRANS_TYPES = [
 
 const JOURNAL_STATUS = [o('Draft', 'مسودة'), o('Approved', 'معتمد'), o('Posted', 'مُرحّل')];
 const GL_SOURCES = [o('Manual', 'يدوي', 'Manual'), o('FAJournal', 'يومية الأصول', 'Fixed asset journal'), o('Transfer', 'نقل أصول', 'Asset transfer'),
-  o('YearEnd', 'إقفال السنة', 'Year-end closing'), o('CashVoucher', 'سند قبض / صرف', 'Receipt / payment')];
+  o('YearEnd', 'إقفال السنة', 'Year-end closing'), o('CashVoucher', 'سند قبض / صرف', 'Receipt / payment'), o('Invoice', 'فاتورة', 'Invoice')];
+const INVOICE_TYPES = [o('Sales', 'فاتورة مبيعات', 'Sales invoice'), o('Purchase', 'فاتورة مشتريات', 'Purchase invoice')];
 const BUDGET_TYPES = [o('Expense', 'مصروفات', 'Expense'), o('Revenue', 'إيرادات', 'Revenue')];
 const BUDGET_STATUS = [o('Draft', 'مسودة', 'Draft'), o('Approved', 'معتمدة', 'Approved')];
 const CASH_TYPES = [o('Receipt', 'سند قبض', 'Receipt'), o('Payment', 'سند صرف', 'Payment')];
@@ -410,6 +413,52 @@ const SCHEMAS = {
     ]
   },
 
+  invoices: {
+    sheet: 'Invoices', perm: 'invoices', key: ['INVOICEID'], title: { ar: 'فواتير المبيعات والمشتريات', en: 'Sales & purchase invoices' },
+    sections: [{ id: 'h', ar: 'رأس الفاتورة', en: 'Invoice header', groups: [
+      { id: 'h1', ar: 'الفاتورة', en: 'Invoice' }, { id: 'h2', ar: 'الطرف', en: 'Party' }, { id: 'h3', ar: 'المبالغ', en: 'Amounts' }, { id: 'h4', ar: 'الترحيل', en: 'Posting' }] }],
+    fields: [
+      F('INVOICEID', 'رقم الفاتورة', 'Invoice', 'text', { key: 1, sys: 1, sec: 'h', grp: 'h1', list: 1 }),
+      F('INVOICETYPE', 'نوع الفاتورة', 'Invoice type', 'select', { opts: INVOICE_TYPES, req: 1, sec: 'h', grp: 'h1', list: 1 }),
+      F('INVOICEDATE', 'تاريخ الفاتورة', 'Invoice date', 'date', { req: 1, dflt: '@today', sec: 'h', grp: 'h1', list: 1 }),
+      F('DUEDATE', 'تاريخ الاستحقاق', 'Due date', 'date', { sec: 'h', grp: 'h1', list: 1 }),
+      F('PARTYID', 'العميل / المورد', 'Customer / vendor', 'lookup', { lkBy: 'INVOICETYPE', lkMap: { Sales: '@customers', Purchase: '@vendors', Ledger: '@customers' }, req: 1, sec: 'h', grp: 'h2', list: 1 }),
+      F('PARTYNAME', 'اسم العميل / المورد', 'Party name', 'text', { calc: 1, sec: 'h', grp: 'h2', list: 1 }),
+      F('PARTYREF', 'مرجع الطرف (رقم فاتورة المورد / أمر الشراء)', 'Party reference', 'text', { sec: 'h', grp: 'h2', list: 1 }),
+      F('DESCRIPTION', 'البيان', 'Description', 'text', { sec: 'h', grp: 'h2', list: 1 }),
+      F('CURRENCYCODE', 'العملة', 'Currency', 'text', { calc: 1, sec: 'h', grp: 'h3', list: 1 }),
+      F('EXCHANGERATE', 'سعر الصرف', 'Exchange rate', 'number', { dec: 6, sec: 'h', grp: 'h3' }),
+      F('SUBTOTAL', 'الإجمالي قبل الضريبة', 'Subtotal', 'number', { dec: 3, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
+      F('TAXAMOUNT', 'الضريبة', 'Tax', 'number', { dec: 3, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
+      F('TOTALAMOUNT', 'إجمالي الفاتورة', 'Invoice total', 'number', { dec: 3, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
+      F('PAIDAMOUNT', 'المسدد', 'Paid', 'number', { dec: 3, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
+      F('STATUS', 'الحالة', 'Status', 'select', { opts: CASH_STATUS, sys: 1, sec: 'h', grp: 'h4', list: 1 }),
+      F('GLVOUCHER', 'رقم القيد', 'Journal voucher', 'text', { sys: 1, sec: 'h', grp: 'h4', list: 1 }),
+      F('REVERSALVOUCHER', 'قيد الإلغاء', 'Reversal voucher', 'text', { sys: 1, sec: 'h', grp: 'h4' }),
+      F('POSTEDBY', 'رحّل بواسطة', 'Posted by', 'text', { sys: 1, sec: 'h', grp: 'h4' }),
+      F('POSTEDON', 'تاريخ الترحيل', 'Posted on', 'text', { sys: 1, sec: 'h', grp: 'h4' })
+    ]
+  },
+
+  invlines: {
+    sheet: 'InvoiceLines', perm: 'invoices', key: ['LINEID'], autoId: 'LINEID', title: { ar: 'سطور الفواتير', en: 'Invoice lines' },
+    sections: [{ id: 'l', ar: 'السطر', en: 'Line', groups: [{ id: 'l1', ar: 'الصنف', en: 'Item' }, { id: 'l2', ar: 'المبلغ', en: 'Amount' }] }],
+    fields: [
+      F('LINEID', 'معرّف السطر', 'Line ID', 'text', { key: 1, sys: 1, sec: 'l', grp: 'l1' }),
+      F('INVOICEID', 'رقم الفاتورة', 'Invoice', 'text', { req: 1, sec: 'l', grp: 'l1', list: 1 }),
+      F('LINENUM', 'رقم السطر', 'Line number', 'number', { dec: 0, sec: 'l', grp: 'l1', list: 1 }),
+      F('ITEMDESCRIPTION', 'البيان / الصنف', 'Item / description', 'text', { req: 1, sec: 'l', grp: 'l1', list: 1 }),
+      F('MAINACCOUNTID', 'رقم الحساب', 'Main account', 'lookup', { lk: '@accounts', req: 1, sec: 'l', grp: 'l1', list: 1 }),
+      F('ACCOUNTNAME', 'اسم الحساب', 'Account name', 'text', { calc: 1, sec: 'l', grp: 'l1', list: 1 })
+    ].concat(unitFields_('', 'l', 'l1')).concat([
+      F('QTY', 'الكمية', 'Quantity', 'number', { dec: 3, req: 1, sec: 'l', grp: 'l2', list: 1 }),
+      F('UNITPRICE', 'سعر الوحدة', 'Unit price', 'number', { dec: 3, req: 1, sec: 'l', grp: 'l2', list: 1 }),
+      F('LINEAMOUNT', 'الإجمالي', 'Line amount', 'number', { dec: 3, calc: 1, sec: 'l', grp: 'l2', list: 1 }),
+      F('TAXPERCENT', 'نسبة الضريبة %', 'Tax %', 'number', { dec: 2, sec: 'l', grp: 'l2', list: 1 }),
+      F('TAXAMOUNT', 'الضريبة', 'Tax', 'number', { dec: 3, calc: 1, sec: 'l', grp: 'l2', list: 1 })
+    ])
+  },
+
   budgetheads: {
     sheet: 'BudgetHeaders', perm: 'budget', key: ['BUDGETID'], title: { ar: 'الموازنات التقديرية', en: 'Budgets' },
     sections: [{ id: 'h', ar: 'رأس الموازنة', en: 'Budget header', groups: [
@@ -441,6 +490,7 @@ const SCHEMAS = {
       F('PARTYID', 'العميل / المورد / الحساب', 'Party', 'lookup', { lkBy: 'PARTYTYPE', lkMap: { Customer: '@customers', Vendor: '@vendors', Ledger: '@accounts' }, req: 1, sec: 'v', grp: 'v2', list: 1 }),
       F('PARTYNAME', 'اسم الطرف', 'Party name', 'text', { calc: 1, sec: 'v', grp: 'v2', list: 1 }),
       F('SUB2_OPERATINGUNIT', 'الوحدة الفرعية 2', 'A_Sub2_OperatingUnit', 'lookup', { lk: 'Sub2_OperatingUnit', sec: 'v', grp: 'v2' }),
+      F('INVOICEID', 'سداد الفاتورة', 'Settles invoice', 'lookup', { lk: '@openinvoices', sec: 'v', grp: 'v2', list: 1 }),
       F('AMOUNT', 'المبلغ', 'Amount', 'number', { dec: 3, req: 1, sec: 'v', grp: 'v3', list: 1 }),
       F('CURRENCYCODE', 'العملة', 'Currency', 'text', { calc: 1, sec: 'v', grp: 'v3', list: 1 }),
       F('EXCHANGERATE', 'سعر الصرف', 'Exchange rate', 'number', { dec: 6, sec: 'v', grp: 'v3' }),
@@ -620,6 +670,7 @@ function setup() {
     migrateV7_();
     migrateV8_();
     migrateV9_();
+    migrateV10_();
 
     const def = ss.getSheetByName('Sheet1') || ss.getSheetByName('ورقة1');
     if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
@@ -850,6 +901,39 @@ function migrateV9_() {
   });
 }
 
+/** الإصدار 10: يوميات الفواتير، وحسابات المبيعات والمشتريات والضريبة في الدليل الافتراضي. */
+function migrateV10_() {
+  const stamp = stamp_();
+  const jt = readTable_('JournalNames');
+  const have = {};
+  jt.rows.forEach(function (r) { have[low_(r.CODE)] = 1; });
+  [['SI', 'فواتير المبيعات - Sales invoices'], ['PI', 'فواتير المشتريات - Purchase invoices']].forEach(function (x) {
+    if (!have[low_(x[0])]) appendRow_(jt, { CODE: x[0], NAME: x[1], CREATEDBY: 'setup', CREATEDON: stamp });
+  });
+  const at = readTable_('MainAccounts');
+  const accs = {};
+  at.rows.forEach(function (r) { accs[low_(r.MAINACCOUNTID)] = 1; });
+  const add = function (id, name, lvl, parent, type, cat) {
+    if (accs[low_(id)]) return;
+    appendRow_(at, { MAINACCOUNTID: id, NAME: name, ACCOUNTLEVEL: lvl, PARENTACCOUNT: parent, MAINACCOUNTTYPE: type, MAINACCOUNTCATEGORY: cat, CREATEDBY: 'setup', CREATEDON: stamp });
+    accs[low_(id)] = 1;
+  };
+  if (!accs['4100'] || !accs['1100']) return;   // دليل حسابات مخصّص: لا نضيف شيئاً
+  add('1400', 'أرصدة مدينة أخرى', 'Header', '', 'Asset', 'OTH');
+  add('140100', 'ضريبة القيمة المضافة - مدخلات', 'Posting', '1400', 'Asset', 'TAX');
+  add('2200', 'الضرائب المستحقة', 'Header', '', 'Liability', 'TAX');
+  add('220100', 'ضريبة القيمة المضافة - مخرجات', 'Posting', '2200', 'Liability', 'TAX');
+  add('410200', 'إيرادات المبيعات', 'Posting', '4100', 'Revenue', 'REV');
+  add('6200', 'المصروفات التشغيلية', 'Header', '', 'Expense', 'OPEX');
+  add('620100', 'مشتريات ومصروفات عامة', 'Posting', '6200', 'Expense', 'OPEX');
+  const st = getSettings_(), o = {};
+  if (!st.SALESACCOUNT) o.SALESACCOUNT = '410200';
+  if (!st.PURCHASEACCOUNT) o.PURCHASEACCOUNT = '620100';
+  if (!st.SALESTAXACCOUNT) o.SALESTAXACCOUNT = '220100';
+  if (!st.PURCHTAXACCOUNT) o.PURCHTAXACCOUNT = '140100';
+  if (Object.keys(o).length) setSettings_(o);
+}
+
 /** بيانات تجريبية اختيارية مطابقة للصور (BLD_00001). */
 function seedDemoData() {
   ensureSetup_();
@@ -1034,9 +1118,9 @@ function roleTemplate_(role) {
   const p = {};
   PERM_PAGES.forEach(function (pg) { p[pg] = {}; PERM_ACTIONS.forEach(function (a) { p[pg][a] = false; }); });
   const set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
-  const data = ['assets', 'books', 'journal', 'vendors', 'masterdata', 'customers', 'banks', 'budget', 'cashvouchers'];
+  const data = ['assets', 'books', 'journal', 'vendors', 'masterdata', 'customers', 'banks', 'budget', 'cashvouchers', 'invoices'];
   if (role === 'SuperAdmin' || role === 'Admin') set(PERM_PAGES, PERM_ACTIONS);
-  else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); set(['cashvouchers'], ['post']); }
+  else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); set(['cashvouchers', 'invoices'], ['post']); }
   else if (role !== 'none') set(data.concat(['reports', 'transfers', 'gl']), ['view']);
   return p;
 }
@@ -1252,13 +1336,19 @@ function lookups_() {
 
 function refs_(s) {
   const out = { assets: [], vendors: [], books: [], accounts: [], groups: [], currencies: [], rates: [], customers: [], banks: [] };
-  if (['customers', 'gl', 'reports', 'cashvouchers'].some(function (pg) { return can_(s, pg, 'view'); })) {
+  if (['customers', 'gl', 'reports', 'cashvouchers', 'invoices'].some(function (pg) { return can_(s, pg, 'view'); })) {
     out.customers = readTable_('Customers').rows.filter(function (r) { return r.CUSTOMERACCOUNT; })
-      .map(function (r) { return { c: String(r.CUSTOMERACCOUNT), n: String(r.NAME || ''), acc: r.LEDGERACCOUNT || '', cur: r.CURRENCYCODE || '' }; });
+      .map(function (r) { return { c: String(r.CUSTOMERACCOUNT), n: String(r.NAME || ''), acc: r.LEDGERACCOUNT || '', cur: r.CURRENCYCODE || '',
+        ad: String(r.ADDRESS || ''), ph: String(r.PHONE || ''), em: String(r.EMAIL || '') }; });
   }
   if (['banks', 'gl', 'reports', 'cashvouchers'].some(function (pg) { return can_(s, pg, 'view'); })) {
     out.banks = readTable_('BankAccounts').rows.filter(function (r) { return r.BANKACCOUNTID; })
       .map(function (r) { return { c: String(r.BANKACCOUNTID), n: String(r.NAME || ''), acc: r.LEDGERACCOUNT || '', cur: r.CURRENCYCODE || '' }; });
+  }
+  if (['invoices', 'cashvouchers'].some(function (pg) { return can_(s, pg, 'view'); })) {
+    out.invoices = readTable_('Invoices').rows.filter(function (r) { return r.INVOICEID && r.STATUS === 'Posted' && num_(r.TOTALAMOUNT) - num_(r.PAIDAMOUNT) > 0.0005; })
+      .map(function (r) { return { c: String(r.INVOICEID), n: String(r.INVOICEDATE) + ' — ' + round_(num_(r.TOTALAMOUNT) - num_(r.PAIDAMOUNT), 3) + ' ' + r.CURRENCYCODE,
+        t: r.INVOICETYPE, p: String(r.PARTYID), rem: round_(num_(r.TOTALAMOUNT) - num_(r.PAIDAMOUNT), 3), cur: r.CURRENCYCODE, rate: num_(r.EXCHANGERATE) || 1 }; });
   }
   out.currencies = readTable_('Currencies').rows.filter(function (r) { return r.CURRENCYCODE; })
     .map(function (r) { return { c: String(r.CURRENCYCODE), n: String(r.NAME || '') }; });
@@ -1280,9 +1370,10 @@ function refs_(s) {
     out.books = readTable_('AssetBooks').rows.filter(function (r) { return r.FIXEDASSETNUMBER; })
       .map(function (r) { return { a: String(r.FIXEDASSETNUMBER), c: String(r.BOOKID), n: String(r.STATUS || '') }; });
   }
-  if (can_(s, 'vendors', 'view') || can_(s, 'journal', 'view') || can_(s, 'gl', 'view') || can_(s, 'cashvouchers', 'view')) {
+  if (['vendors', 'journal', 'gl', 'cashvouchers', 'invoices'].some(function (pg) { return can_(s, pg, 'view'); })) {
     out.vendors = readTable_('Vendors').rows.filter(function (r) { return r.VENDORACCOUNTNUMBER; })
-      .map(function (r) { return { c: String(r.VENDORACCOUNTNUMBER), n: String(r.VENDORORGANIZATIONNAME || ''), acc: r.VENDORLEDGERACCOUNT || '', cur: r.CURRENCYCODE || '' }; });
+      .map(function (r) { return { c: String(r.VENDORACCOUNTNUMBER), n: String(r.VENDORORGANIZATIONNAME || ''), acc: r.VENDORLEDGERACCOUNT || '', cur: r.CURRENCYCODE || '',
+        ad: String(r.ADDRESS || ''), em: String(r.PRIMARYEMAILADDRESS || '') }; });
   }
   return out;
 }
@@ -1661,6 +1752,37 @@ HOOKS.budgets = function (rec, ex, ctx) {
   if (dup) throw new Error('سطر ' + (rec.LINENUM || '') + ': الحساب ' + rec.MAINACCOUNTID + ' بنفس الوحدة موجود في الموازنة ' + dup.BUDGETID + ' لنفس السنة');
 };
 
+HOOKS.invoices = function (rec, ex, ctx) {
+  if (ex && ex.STATUS && ex.STATUS !== 'Draft') throw new Error('لا يمكن تعديل فاتورة مُرحّلة');
+  const P = invParty_(rec.INVOICETYPE);
+  const p = ctx.find(P.entity, rec.PARTYID);
+  if (!p) throw new Error(P.ar + ' غير موجود "' + (rec.PARTYID || '') + '"');
+  rec.PARTYID = p[P.id];
+  rec.PARTYNAME = p[P.name] || '';
+  const local = String(getSettings_().CURRENCY || '').toUpperCase();
+  rec.CURRENCYCODE = String(p.CURRENCYCODE || local).toUpperCase();
+  if (rec.CURRENCYCODE === local) rec.EXCHANGERATE = 1;
+  else if (!(num_(rec.EXCHANGERATE) > 0)) {
+    rec.EXCHANGERATE = ctx.rate(rec.CURRENCYCODE, rec.INVOICEDATE);
+    if (!(rec.EXCHANGERATE > 0)) throw new Error('لا يوجد سعر صرف للعملة ' + rec.CURRENCYCODE + ' بتاريخ ' + rec.INVOICEDATE);
+  }
+  if (!rec.DUEDATE) rec.DUEDATE = rec.INVOICEDATE;
+  if (String(rec.DUEDATE) < String(rec.INVOICEDATE)) throw new Error('تاريخ الاستحقاق قبل تاريخ الفاتورة');
+  checkOpenPeriod_(ctx, rec.INVOICEDATE, 'الفاتورة');
+};
+
+HOOKS.invlines = function (rec, ex, ctx) {
+  const lbl = 'سطر ' + (rec.LINENUM || '');
+  rec.MAINACCOUNTID = postingAccount_(ctx, rec.MAINACCOUNTID, lbl + ' — الحساب');
+  rec.ACCOUNTNAME = (ctx.find('accounts', rec.MAINACCOUNTID) || {}).NAME || '';
+  deriveChain_(ctx, rec, UNIT_CHAIN);
+  if (num_(rec.QTY) <= 0) throw new Error(lbl + ': الكمية يجب أن تكون أكبر من صفر');
+  if (num_(rec.UNITPRICE) < 0) throw new Error(lbl + ': السعر لا يمكن أن يكون سالباً');
+  if (num_(rec.TAXPERCENT) < 0 || num_(rec.TAXPERCENT) > 100) throw new Error(lbl + ': نسبة الضريبة بين 0 و100');
+  rec.LINEAMOUNT = round_(num_(rec.QTY) * num_(rec.UNITPRICE), 3);
+  rec.TAXAMOUNT = round_(rec.LINEAMOUNT * num_(rec.TAXPERCENT) / 100, 3);
+};
+
 HOOKS.budgetheads = function (rec, ex, ctx) {
   if (!/^\d{4}$/.test(rec.BUDGETYEAR)) throw new Error('سنة الموازنة يجب أن تكون 4 أرقام (مثل 2026)');
   if (!rec.ENTRYDATE) rec.ENTRYDATE = today_();
@@ -1693,6 +1815,7 @@ HOOKS.cashvouchers = function (rec, ex, ctx) {
   }
   if (rec.SUB2_OPERATINGUNIT) checkLk_(ctx, rec, 'SUB2_OPERATINGUNIT', 'Sub2_OperatingUnit');
   checkOpenPeriod_(ctx, rec.TRANSDATE, 'السند');
+  checkInvoiceLink_(ctx, rec);
 };
 
 HOOKS.currencies = function (rec) {
@@ -1937,6 +2060,9 @@ function deleteRecords(token, entity, keys) {
         const T = entity === 'customers' ? 'Customer' : entity === 'banks' ? 'Bank' : 'Vendor';
         const id = r[PARTY[T].id];
         if (partyUsed_(ctx, T, id)) throw new Error('لا يمكن حذف ' + PARTY[T].ar + ' ' + id + ' لوجود قيود مرتبطة به');
+        if (T !== 'Bank' && ctx.table('invoices').rows.some(function (v) { return invParty_(v.INVOICETYPE) === PARTY[T] && low_(v.PARTYID) === low_(id); })) {
+          throw new Error('لا يمكن حذف ' + PARTY[T].ar + ' ' + id + ' لوجود فواتير مرتبطة به');
+        }
         if (ctx.table('cashvouchers').rows.some(function (c) { return low_(T === 'Bank' ? c.BANKACCOUNTID : c.PARTYTYPE === T ? c.PARTYID : '') === low_(id); })) {
           throw new Error('لا يمكن حذف ' + PARTY[T].ar + ' ' + id + ' لوجود سندات قبض/صرف مرتبطة به');
         }
@@ -2528,6 +2654,167 @@ function fiscalReopen(token, year) {
   });
 }
 
+/* ============================== Sales & purchase invoices ============================== */
+
+function invParty_(type) { return PARTY[type === 'Purchase' ? 'Vendor' : 'Customer']; }
+
+/** قيد الفاتورة: المبيعات = من حـ/ العميل إلى حـ/ الإيرادات + الضريبة، والمشتريات عكسها. */
+function invoiceLegs_(ctx, h, lines, reverse) {
+  const st = getSettings_();
+  const sales = h.INVOICETYPE === 'Sales';
+  const cur = h.CURRENCYCODE, rate = num_(h.EXCHANGERATE) || 1;
+  const partyDr = sales !== !!reverse;     // المبيعات: العميل مدين
+  const note = (sales ? 'فاتورة مبيعات ' : 'فاتورة مشتريات ') + h.INVOICEID;
+  const legs = [{ pt: sales ? 'Customer' : 'Vendor', pid: h.PARTYID, cur: cur, rate: rate, curDebit: partyDr ? num_(h.TOTALAMOUNT) : 0,
+    curCredit: partyDr ? 0 : num_(h.TOTALAMOUNT), note: h.DESCRIPTION || note, ref: h.PARTYREF || h.INVOICEID }];
+  lines.forEach(function (l) {
+    const a = num_(l.LINEAMOUNT);
+    if (!a) return;
+    legs.push({ acc: l.MAINACCOUNTID, s2: l.SUB2_OPERATINGUNIT, s1: l.SUB1_OPERATINGUNIT, ou: l.OPERATINGUNIT, cur: cur, rate: rate,
+      curDebit: partyDr ? 0 : a, curCredit: partyDr ? a : 0, note: l.ITEMDESCRIPTION, ref: h.INVOICEID });
+  });
+  const tax = num_(h.TAXAMOUNT);
+  if (tax) {
+    const acc = sales ? st.SALESTAXACCOUNT : st.PURCHTAXACCOUNT;
+    if (!acc) throw new Error('حدد حساب ضريبة ' + (sales ? 'المبيعات' : 'المشتريات') + ' من الإعدادات');
+    legs.push({ acc: acc, cur: cur, rate: rate, curDebit: partyDr ? 0 : tax, curCredit: partyDr ? tax : 0, note: 'ضريبة ' + note, ref: h.INVOICEID });
+  }
+  return legs;
+}
+
+function postInvoice_(ctx, h, lines, reverse, date) {
+  const v = autoVoucher_(ctx, { TRANSDATE: date || h.INVOICEDATE, JOURNALNAME: h.INVOICETYPE === 'Sales' ? 'SI' : 'PI',
+    DESCRIPTION: (reverse ? 'إلغاء ' : '') + (h.INVOICETYPE === 'Sales' ? 'فاتورة مبيعات ' : 'فاتورة مشتريات ') + h.INVOICEID + ' — ' + (h.PARTYNAME || h.PARTYID),
+    REFERENCE: h.PARTYREF || h.INVOICEID, SOURCE: 'Invoice', SOURCEREF: h.INVOICEID }, invoiceLegs_(ctx, h, lines, reverse));
+  writeVoucher_(ctx, v);
+  return v.head.rec.VOUCHER;
+}
+
+function invLines_(ctx, id) {
+  return ctx.table('invlines').rows.filter(function (l) { return low_(l.INVOICEID) === low_(id); })
+    .sort(function (a, b) { return num_(a.LINENUM) - num_(b.LINENUM); });
+}
+
+/** حفظ فاتورة (الرأس + السطور) وترحيلها مباشرة إذا post = true. */
+function saveInvoice(token, head, lines, isNew, post) {
+  const s = auth_(token);
+  need_(s, 'invoices', isNew ? 'add' : 'edit');
+  if (post) need_(s, 'invoices', 'post');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    head = Object.assign({}, head || {});
+    if (isNew) head.INVOICEID = '@pending';
+    else {
+      const ex = ctx.find('invoices', head.INVOICEID);
+      if (!ex) throw new Error('الفاتورة غير موجودة');
+      if (ex.STATUS !== 'Draft') throw new Error('لا يمكن تعديل فاتورة مُرحّلة أو ملغاة');
+    }
+    const ph = prepare_('invoices', head, isNew ? 'add' : 'edit', ctx);
+    ph.rec.STATUS = 'Draft';
+    ph.rec.PAIDAMOUNT = 0;
+    const id = ph.rec.INVOICEID;
+    const rows = (lines || []).filter(function (x) { return x && (x.ITEMDESCRIPTION || x.MAINACCOUNTID || num_(x.UNITPRICE)); });
+    if (!rows.length) throw new Error('الفاتورة لا تحتوي على سطور');
+    let sub = 0, tax = 0;
+    const pl = rows.map(function (x, i) {
+      const p = prepare_('invlines', {
+        INVOICEID: id, LINENUM: i + 1, ITEMDESCRIPTION: x.ITEMDESCRIPTION || '', MAINACCOUNTID: x.MAINACCOUNTID || '',
+        SUB2_OPERATINGUNIT: x.SUB2_OPERATINGUNIT || '', QTY: toNum_(x.QTY === '' || x.QTY === undefined ? 1 : x.QTY, { ar: 'سطر ' + (i + 1) + ' — الكمية' }),
+        UNITPRICE: toNum_(x.UNITPRICE, { ar: 'سطر ' + (i + 1) + ' — السعر' }), TAXPERCENT: toNum_(x.TAXPERCENT || 0, { ar: 'سطر ' + (i + 1) + ' — الضريبة' })
+      }, 'add', ctx);
+      sub += num_(p.rec.LINEAMOUNT); tax += num_(p.rec.TAXAMOUNT);
+      return p;
+    });
+    ph.rec.SUBTOTAL = round_(sub, 3); ph.rec.TAXAMOUNT = round_(tax, 3); ph.rec.TOTALAMOUNT = round_(sub + tax, 3);
+    if (!(ph.rec.TOTALAMOUNT > 0)) throw new Error('إجمالي الفاتورة يجب أن يكون أكبر من صفر');
+    // التحقق من القيد قبل أي كتابة
+    if (post) prepareVoucher_(ctx, { TRANSDATE: ph.rec.INVOICEDATE, JOURNALNAME: ph.rec.INVOICETYPE === 'Sales' ? 'SI' : 'PI' },
+      invoiceLegs_(ctx, ph.rec, pl.map(function (p) { return p.rec; })), 'add');
+    const lt = ctx.table('invlines');
+    const old = [];
+    lt.rows.forEach(function (r, i) { if (!isNew && low_(r.INVOICEID) === low_(id)) old.push(i); });
+    deleteRows_(lt, old);
+    ctx.resetIndex('invlines');
+    if (id === '@pending') {
+      const no = ph.rec.INVOICETYPE === 'Sales' ? nextSeq_('SISEQ', 'SIPREFIX', 'SI-') : nextSeq_('PISEQ', 'PIPREFIX', 'PI-');
+      ph.rec.INVOICEID = no;
+      pl.forEach(function (p) { p.rec.INVOICEID = no; });
+    }
+    if (post) {
+      ph.rec.GLVOUCHER = postInvoice_(ctx, ph.rec, pl.map(function (p) { return p.rec; }));
+      ph.rec.STATUS = 'Posted'; ph.rec.POSTEDBY = s.username; ph.rec.POSTEDON = stamp_();
+    }
+    commit_('invoices', ph, ctx);
+    pl.forEach(function (p) { commit_('invlines', p, ctx); });
+    return { id: ph.rec.INVOICEID, status: ph.rec.STATUS, total: ph.rec.TOTALAMOUNT, gl: ph.rec.GLVOUCHER || '' };
+  });
+}
+
+/** action: post | cancel (قيد عكسي) | delete (مسودة فقط) */
+function invoiceAction(token, id, action, date) {
+  const s = auth_(token);
+  need_(s, 'invoices', action === 'delete' ? 'delete' : 'post');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    const t = ctx.table('invoices');
+    const h = ctx.find('invoices', id);
+    if (!h) throw new Error('الفاتورة غير موجودة');
+    const i = t.rows.indexOf(h);
+    if (action === 'delete') {
+      if (h.STATUS !== 'Draft') throw new Error('يمكن حذف الفواتير في حالة مسودة فقط — الفاتورة المُرحّلة تُلغى');
+      const lt = ctx.table('invlines');
+      const idx = [];
+      lt.rows.forEach(function (r, k) { if (low_(r.INVOICEID) === low_(id)) idx.push(k); });
+      deleteRows_(lt, idx);
+      deleteRows_(t, [i]);
+      return true;
+    }
+    if (action === 'post') {
+      if (h.STATUS !== 'Draft') throw new Error('الفاتورة مُرحّلة مسبقاً');
+      checkOpenPeriod_(ctx, h.INVOICEDATE, 'الفاتورة');
+      h.GLVOUCHER = postInvoice_(ctx, h, invLines_(ctx, id));
+      h.STATUS = 'Posted'; h.POSTEDBY = s.username; h.POSTEDON = stamp_();
+    } else if (action === 'cancel') {
+      if (h.STATUS !== 'Posted') throw new Error('يمكن إلغاء الفواتير المُرحّلة فقط');
+      if (num_(h.PAIDAMOUNT) > 0.0005) throw new Error('الفاتورة عليها سداد ' + h.PAIDAMOUNT + ' — ألغِ سندات القبض/الصرف المرتبطة أولاً');
+      const d = date ? toDate_(date, ctx.dateFmt, { ar: 'تاريخ الإلغاء' }) : today_();
+      if (d < String(h.INVOICEDATE)) throw new Error('تاريخ الإلغاء قبل تاريخ الفاتورة');
+      h.REVERSALVOUCHER = postInvoice_(ctx, h, invLines_(ctx, id), true, d);
+      h.STATUS = 'Cancelled';
+    } else throw new Error('إجراء غير معروف');
+    writeRow_(t, i, h);
+    return { gl: action === 'post' ? h.GLVOUCHER : h.REVERSALVOUCHER };
+  });
+}
+
+/** يضيف (أو يطرح عند الإلغاء) مبلغ السند على المسدد من الفاتورة المرتبطة به. */
+function applyInvoicePay_(ctx, r, sign) {
+  if (!r.INVOICEID) return;
+  const h = ctx.find('invoices', r.INVOICEID);
+  if (!h) throw new Error('الفاتورة غير موجودة "' + r.INVOICEID + '"');
+  const applied = round_(num_(r.AMOUNT) * (num_(r.EXCHANGERATE) || 1) / (num_(h.EXCHANGERATE) || 1), 3);
+  h.PAIDAMOUNT = round_(num_(h.PAIDAMOUNT) + sign * applied, 3);
+  if (h.PAIDAMOUNT < 0) h.PAIDAMOUNT = 0;
+  ctx.touch('invoices', h);
+}
+
+/** التحقق من ربط السند بفاتورة: نفس الطرف، نوع مطابق، ولا يتجاوز المتبقي. */
+function checkInvoiceLink_(ctx, rec) {
+  if (!rec.INVOICEID) return;
+  const h = ctx.find('invoices', rec.INVOICEID);
+  if (!h) throw new Error('الفاتورة غير موجودة "' + rec.INVOICEID + '"');
+  rec.INVOICEID = h.INVOICEID;
+  if (h.STATUS !== 'Posted') throw new Error('الفاتورة ' + h.INVOICEID + ' غير مُرحّلة');
+  const want = h.INVOICETYPE === 'Sales' ? ['Receipt', 'Customer'] : ['Payment', 'Vendor'];
+  if (rec.VOUCHERTYPE !== want[0] || rec.PARTYTYPE !== want[1]) {
+    throw new Error('الفاتورة ' + h.INVOICEID + (h.INVOICETYPE === 'Sales' ? ' فاتورة مبيعات وتُحصَّل بسند قبض من العميل' : ' فاتورة مشتريات وتُسدَّد بسند صرف للمورد'));
+  }
+  if (low_(h.PARTYID) !== low_(rec.PARTYID)) throw new Error('الفاتورة ' + h.INVOICEID + ' تخص ' + h.PARTYID + ' وليس ' + rec.PARTYID);
+  const applied = num_(rec.AMOUNT) * (num_(rec.EXCHANGERATE) || 1) / (num_(h.EXCHANGERATE) || 1);
+  const rem = round_(num_(h.TOTALAMOUNT) - num_(h.PAIDAMOUNT), 3);
+  if (applied > rem + 0.0005) throw new Error('المبلغ أكبر من المتبقي على الفاتورة ' + h.INVOICEID + ' (' + rem + ' ' + h.CURRENCYCODE + ')');
+}
+
 /* ============================== Budgets: header + lines ============================== */
 
 /** حفظ موازنة كاملة (الرأس + كل السطور؛ تُستبدل السطور بالكامل). */
@@ -2658,8 +2945,10 @@ function saveCashVoucher(token, rec, isNew, post) {
     if (post) {
       p.rec.GLVOUCHER = postCash_(ctx, p.rec);
       p.rec.STATUS = 'Posted'; p.rec.POSTEDBY = s.username; p.rec.POSTEDON = stamp_();
+      applyInvoicePay_(ctx, p.rec, 1);
     }
     commit_('cashvouchers', p, ctx);
+    ctx.flush();
     return { no: p.rec.VOUCHERNO, status: p.rec.STATUS, gl: p.rec.GLVOUCHER || '' };
   });
 }
@@ -2681,7 +2970,9 @@ function cashAction(token, no, action, date) {
     }
     if (action === 'post') {
       if (r.STATUS !== 'Draft') throw new Error('السند مُرحّل مسبقاً');
+      checkInvoiceLink_(ctx, r);
       r.GLVOUCHER = postCash_(ctx, r);
+      applyInvoicePay_(ctx, r, 1);
       r.STATUS = 'Posted'; r.POSTEDBY = s.username; r.POSTEDON = stamp_();
     } else if (action === 'cancel') {
       if (r.STATUS !== 'Posted') throw new Error('يمكن إلغاء السندات المُرحّلة فقط');
@@ -2689,8 +2980,10 @@ function cashAction(token, no, action, date) {
       if (d < String(r.TRANSDATE)) throw new Error('تاريخ الإلغاء قبل تاريخ السند');
       r.REVERSALVOUCHER = postCash_(ctx, r, true, d);
       r.STATUS = 'Cancelled';
+      applyInvoicePay_(ctx, r, -1);
     } else throw new Error('إجراء غير معروف');
     writeRow_(t, i, r);
+    ctx.flush();
     return { gl: action === 'post' ? r.GLVOUCHER : r.REVERSALVOUCHER };
   });
 }
@@ -3177,6 +3470,12 @@ function saveSettings(token, data) {
   if ('DATEFORMAT' in data) out.DATEFORMAT = data.DATEFORMAT === 'DMY' ? 'DMY' : 'MDY';
   if ('RETAINEDEARNINGSACCOUNT' in data) out.RETAINEDEARNINGSACCOUNT = String(data.RETAINEDEARNINGSACCOUNT).trim().slice(0, 40);
   if ('OPENINGBALANCEACCOUNT' in data) out.OPENINGBALANCEACCOUNT = String(data.OPENINGBALANCEACCOUNT).trim().slice(0, 40);
+  ['SALESACCOUNT', 'PURCHASEACCOUNT', 'SALESTAXACCOUNT', 'PURCHTAXACCOUNT'].forEach(function (k) { if (k in data) out[k] = String(data[k]).trim().slice(0, 40); });
+  if ('DEFAULTTAXPERCENT' in data) {
+    const tx = Number(data.DEFAULTTAXPERCENT);
+    if (!(tx >= 0 && tx <= 100)) throw new Error('نسبة الضريبة الافتراضية بين 0 و100');
+    out.DEFAULTTAXPERCENT = String(tx);
+  }
   if ('DEPJOURNALNAME' in data) out.DEPJOURNALNAME = String(data.DEPJOURNALNAME).trim().slice(0, 20);
   if ('DEPOFFSETACCOUNT' in data) out.DEPOFFSETACCOUNT = String(data.DEPOFFSETACCOUNT).trim().slice(0, 40);
   if ('DEPMONTHS' in data) {

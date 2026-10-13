@@ -330,6 +330,9 @@
       if (it && it.p && low(it.p) !== low(el.value)) { setVal(form, c.k, ''); fchg(cel); }
     });
 
+    if (e === 'cashvouchers') cashChange(form, k, el);
+    if (e === 'budgetheads' && k === 'BUDGETTYPE') bgAccList();
+    if (e === 'budgetheads' && k === 'PERIODTYPE') drawBgFoot();
     if (e === 'transfers' && k === 'FIXEDASSETNUMBER') {
       var ta = refFind(S.b.refs.assets, el.value);
       setVal(form, 'ASSETNAME', ta ? ta.n : '');
@@ -670,7 +673,7 @@
     { h: 1, ar: 'المحاسبة', en: 'Accounting' },
     { id: 'gl', icon: 'book', ar: 'القيود المحاسبية', en: 'Journal entries', perm: 'gl' },
     { id: 'finreports', icon: 'chart', ar: 'التقارير المالية', en: 'Financial reports', perm: 'reports' },
-    { id: 'budgets', icon: 'list', ar: 'إدخال الموازنة التقديرية', en: 'Budget entry', perm: 'budget' },
+    { id: 'budgets', icon: 'list', ar: 'الموازنات التقديرية', en: 'Budgets', perm: 'budget' },
     { id: 'budgetctl', icon: 'chart', ar: 'مراقبة الموازنة', en: 'Budget control', perm: 'budget' },
     { id: 'currency', icon: 'globe', ar: 'العملات وأسعار الصرف', en: 'Currencies & rates', perm: 'masterdata' },
     { id: 'fiscal', icon: 'lock', ar: 'السنوات المالية والإقفال', en: 'Fiscal years & closing', perm: 'fiscal' },
@@ -682,6 +685,7 @@
     { id: 'vendreports', icon: 'chart', ar: 'تقارير الموردين', en: 'Vendor reports', perm: 'vendors' },
     { h: 1, ar: 'الصناديق والبنوك', en: 'Cash & banks' },
     { id: 'banks', icon: 'book', ar: 'الصناديق والبنوك', en: 'Cash & bank accounts', perm: 'banks' },
+    { id: 'cashvouchers', icon: 'send', ar: 'سندات القبض والصرف', en: 'Receipts & payments', perm: 'cashvouchers' },
     { id: 'bankreports', icon: 'chart', ar: 'تقارير الصناديق والبنوك', en: 'Cash & bank reports', perm: 'banks' },
     { h: 1, ar: 'البيانات الأساسية', en: 'Master data' },
     { id: 'units', icon: 'tree', ar: 'الوحدات التشغيلية', en: 'Operating units', perm: 'masterdata' },
@@ -749,7 +753,9 @@
         case 'currency': return await pageCurrency();
         case 'gl': return await (S.view.voucher ? pageGLVoucher() : pageGL());
         case 'reports': return await pageReports();
-        case 'customers': case 'banks': case 'budgets':
+        case 'budgets': return await (S.view.id ? pageBudgetDoc() : pageBudgetList());
+        case 'cashvouchers': return await (S.view.no ? pageCashDoc() : pageCashList());
+        case 'customers': case 'banks':
           return await (S.view.key !== undefined || S.view.isNew ? pageRecord(S.page) : pageList(S.page));
         case 'custreports': return await pageParty('Customer');
         case 'vendreports': return await pageParty('Vendor');
@@ -883,8 +889,7 @@
       typeOfEntity(e) && '|',
       typeOfEntity(e) && can(s.perm, 'edit') && can('gl', 'add') && { icon: 'send', ar: 'ترحيل الأرصدة الافتتاحية', en: 'Post opening balances', on: "FA.openingDlg('" + typeOfEntity(e) + "')" },
       typeOfEntity(e) && { icon: 'chart', ar: 'التقارير وكشف الحساب', en: 'Reports & statement', on: "FA.go('" + PT[typeOfEntity(e)].page + "')" },
-      e === 'budgets' && '|',
-      e === 'budgets' && { icon: 'chart', ar: 'مراقبة الموازنة', en: 'Budget control', on: "FA.go('budgetctl')" }
+      e === 'banks' && can('cashvouchers', 'view') && { icon: 'send', ar: 'سندات القبض والصرف', en: 'Receipts & payments', on: "FA.go('cashvouchers')" }
     ]) + phead('<a onclick="FA.go(\'' + e + '\')">' + esc(L(s.title)) + '</a> | ' + T('العرض القياسي', 'Standard view'), esc(L(s.title))) +
       '<div class="content"><div class="card">' + grid(gid, {
         rows: function () { return S.data[e] || []; }, cols: schemaCols(e), key: function (r) { return keyStr(e, r); },
@@ -3173,6 +3178,419 @@
       S.view.tab === 'stmt' ? 'portrait' : 'landscape');
   }
 
+  /* ======================= Status badge for any entity ======================= */
+  function stBadge(e, v) {
+    var cls = { Draft: 'b-gray', Approved: 'b-info', Posted: 'b-ok', Cancelled: 'b-err' }[v] || 'b-gray';
+    return v ? '<span class="badge ' + cls + '">' + esc(displayVal(fld(e, 'STATUS'), v)) + '</span>' : '';
+  }
+
+  /* ======================= Amount in Arabic words (تفقيط) ======================= */
+  function tafqeet(n, cur) {
+    var ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة', 'عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر',
+      'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
+    var tens = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
+    var hund = ['', 'مائة', 'مائتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
+    var sc = [null, ['ألف', 'ألفان', 'آلاف', 'ألفاً'], ['مليون', 'مليونان', 'ملايين', 'مليوناً'], ['مليار', 'ملياران', 'مليارات', 'ملياراً']];
+    var u1000 = function (x) {
+      var p = [], h = Math.floor(x / 100), r = x % 100;
+      if (h) p.push(hund[h]);
+      if (r) p.push(r < 20 ? ones[r] : (r % 10 ? ones[r % 10] + ' و' + tens[Math.floor(r / 10)] : tens[Math.floor(r / 10)]));
+      return p.join(' و');
+    };
+    n = Math.round((Number(n) || 0) * 100) / 100;
+    var whole = Math.floor(n), frac = Math.round((n - whole) * 100), parts = [];
+    for (var g = 3; g >= 0; g--) {
+      var c = Math.floor(whole / Math.pow(1000, g)) % 1000;
+      if (!c) continue;
+      if (!g) { parts.push(u1000(c)); continue; }
+      var w = sc[g];
+      parts.push(c === 1 ? w[0] : c === 2 ? w[1] : c <= 10 ? u1000(c) + ' ' + w[2] : c % 100 >= 11 ? u1000(c) + ' ' + w[3] : u1000(c) + ' ' + w[0]);
+    }
+    var txt = (parts.join(' و') || 'صفر') + ' ' + (cur || '');
+    if (frac) txt += ' و' + u1000(frac) + ' من مائة';
+    return 'فقط ' + txt + ' لا غير';
+  }
+
+  /* ======================= Receipts & payments ======================= */
+  async function pageCashList() {
+    var s = sch('cashvouchers');
+    crumbs([S.b.settings.ORGNAME, L(s.title)]);
+    await load('cashvouchers');
+    var ty = S.view.t || '';
+    var tabs = [['', T('الكل', 'All')], ['Receipt', T('سندات القبض', 'Receipts')], ['Payment', T('سندات الصرف', 'Payments')]];
+    $('#main').innerHTML = apane([
+      can('cashvouchers', 'add') && { icon: 'plus', ar: 'سند قبض جديد', en: 'New receipt', on: "FA.go('cashvouchers',{no:'@new',t:'Receipt'})" },
+      can('cashvouchers', 'add') && { icon: 'plus', ar: 'سند صرف جديد', en: 'New payment', on: "FA.go('cashvouchers',{no:'@new',t:'Payment'})" },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.cashReload()' },
+      { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: "FA.exportGrid('cashvouchers','cashv')" }
+    ]) + phead(T('الصناديق والبنوك', 'Cash & banks'), esc(L(s.title))) +
+      '<div class="content"><div class="seg">' + tabs.map(function (t) {
+        return '<button class="' + (t[0] === ty ? 'on' : '') + '" onclick="FA.go(\'cashvouchers\',{t:\'' + t[0] + '\'})">' + esc(t[1]) + '</button>';
+      }).join('') + '</div><div class="card">' + grid('cashv', {
+        rows: function () {
+          return (S.data.cashvouchers || []).filter(function (r) { return !ty || r.VOUCHERTYPE === ty; })
+            .sort(function (a, b) { return String(b.TRANSDATE).localeCompare(String(a.TRANSDATE)) || String(b.VOUCHERNO).localeCompare(String(a.VOUCHERNO)); });
+        },
+        key: function (r) { return r.VOUCHERNO; }, open: function (r) { go('cashvouchers', { no: r.VOUCHERNO }); },
+        cols: schemaCols('cashvouchers').map(function (c) {
+          if (c.k === 'STATUS') c.html = function (r) { return stBadge('cashvouchers', r.STATUS); };
+          if (c.k === 'AMOUNT') c.total = !!ty;
+          return c;
+        })
+      }) + '</div></div>';
+    gridRender('cashv');
+  }
+  async function cashReload() { await load('cashvouchers', true); render(); }
+
+  async function pageCashDoc() {
+    var s = sch('cashvouchers');
+    await load('cashvouchers');
+    var no = S.view.no, isNew = no === '@new';
+    var t = S.view.t || 'Receipt';
+    var banks = S.b.refs.banks || [];
+    var rec = isNew ? { VOUCHERTYPE: t, TRANSDATE: today(), PARTYTYPE: t === 'Receipt' ? 'Customer' : 'Vendor', PAYMENTMETHOD: 'Cash',
+      BANKACCOUNTID: banks.length ? banks[0].c : '', CURRENCYCODE: banks.length ? (banks[0].cur || localCur()) : localCur(), EXCHANGERATE: 1, STATUS: 'Draft' }
+      : (S.data.cashvouchers || []).filter(function (r) { return r.VOUCHERNO === no; })[0];
+    if (!rec) { go('cashvouchers'); return; }
+    if (isNew) rec.EXCHANGERATE = rateFor(rec.CURRENCYCODE, rec.TRANSDATE) || 1;
+    var draft = rec.STATUS === 'Draft';
+    var ed = draft && can('cashvouchers', isNew ? 'add' : 'edit');
+    var title = rec.VOUCHERTYPE === 'Payment' ? T('سند صرف', 'Payment voucher') : T('سند قبض', 'Receipt voucher');
+    crumbs([S.b.settings.ORGNAME, L(s.title), isNew ? T('جديد', 'New') : no]);
+    $('#main').innerHTML = apane([
+      { icon: 'back', ar: 'رجوع', en: 'Back', on: "FA.go('cashvouchers')", cls: 'back' },
+      ed && can('cashvouchers', 'post') && { icon: 'send', ar: 'حفظ وترحيل', en: 'Save & post', on: 'FA.cashSave(' + (isNew ? 1 : 0) + ',1)', cls: 'pri' },
+      ed && { icon: 'save', ar: 'حفظ كمسودة', en: 'Save draft', on: 'FA.cashSave(' + (isNew ? 1 : 0) + ',0)' },
+      '|',
+      !isNew && rec.STATUS === 'Posted' && can('cashvouchers', 'post') && { icon: 'undo', ar: 'إلغاء السند', en: 'Cancel voucher', on: 'FA.cashCancelDlg()', cls: 'danger' },
+      !isNew && { icon: 'list', ar: 'طباعة السند', en: 'Print voucher', on: 'FA.cashPrint()' },
+      !isNew && rec.GLVOUCHER && can('gl', 'view') && { icon: 'book', ar: 'عرض القيد', en: 'View journal entry', on: "FA.go('gl',{voucher:'" + String(rec.GLVOUCHER).replace(/[^\w-]/g, '') + "'})" },
+      !isNew && draft && can('cashvouchers', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: 'FA.cashDelete()', cls: 'danger' }
+    ]) + phead('<a onclick="FA.go(\'cashvouchers\')">' + esc(L(s.title)) + '</a>', esc(title) + ' ' + (isNew ? T('جديد', 'new') : esc(no)) + ' ' + stBadge('cashvouchers', rec.STATUS)) +
+      '<div class="content compact">' + formHtml('cashvouchers', rec, isNew, !ed, { flat: true,
+        hide: isNew ? ['VOUCHERNO', 'STATUS', 'GLVOUCHER', 'REVERSALVOUCHER', 'POSTEDBY', 'POSTEDON'] : (rec.STATUS === 'Cancelled' ? [] : ['REVERSALVOUCHER']) }) +
+      '<div class="card cash-words" id="cashWords"></div></div>';
+    cashWords();
+  }
+  function cashWords() {
+    var form = $('[data-form="cashvouchers"]'), box = $('#cashWords');
+    if (!form || !box) return;
+    var r = readForm(form), amt = Number(parseNum(r.AMOUNT)) || 0;
+    var cur = r.CURRENCYCODE || localCur(), rate = Number(parseNum(r.EXCHANGERATE)) || 1;
+    box.innerHTML = amt ? '<b>' + esc(tafqeet(amt, cur)) + '</b>' + (cur.toUpperCase() !== localCur() ? '<span>' + T('المعادل بالعملة المحلية: ', 'Local equivalent: ') + fmtNum(amt * rate, 3) + ' ' + esc(localCur()) + '</span>' : '')
+      : '<span class="muted">' + T('اكتب المبلغ ليظهر تفقيطه هنا', 'Enter the amount to see it in words') + '</span>';
+  }
+  /** تغييرات نموذج السند: البنك ← العملة والسعر، نوع الطرف ← قائمة الأطراف. */
+  function cashChange(form, k, el) {
+    if (k === 'BANKACCOUNTID') {
+      var b = refFind(S.b.refs.banks, el.value);
+      var cur = (b && b.cur) || localCur();
+      setVal(form, 'CURRENCYCODE', cur);
+      setVal(form, 'EXCHANGERATE', rateFor(cur, readForm(form).TRANSDATE) || '');
+    }
+    if (k === 'TRANSDATE') {
+      var c = readForm(form).CURRENCYCODE;
+      if (c && c.toUpperCase() !== localCur()) setVal(form, 'EXCHANGERATE', rateFor(c, el.value) || '');
+    }
+    if (k === 'PARTYTYPE') { setVal(form, 'PARTYID', ''); rebuildList(form, 'PARTYID'); }
+    if (k === 'VOUCHERTYPE' && !readForm(form).PARTYID) {
+      setVal(form, 'PARTYTYPE', el.value === 'Payment' ? 'Vendor' : 'Customer'); rebuildList(form, 'PARTYID');
+    }
+    if (k === 'PARTYID') {
+      var r = readForm(form);
+      setVal(form, 'PARTYNAME', lookupName(lookupKey(fld('cashvouchers', 'PARTYID'), r), r.PARTYID, r));
+    }
+    cashWords();
+  }
+  async function cashSave(isNew, post) {
+    var form = $('[data-form="cashvouchers"]');
+    if (!validateForm(form)) return;
+    var rec = readForm(form);
+    if (!isNew) rec.VOUCHERNO = S.view.no;
+    if (post && !(await confirmBox(T('حفظ السند وترحيل قيده الآن؟', 'Save the voucher and post its journal entry now?')))) return;
+    try {
+      var r = await api('saveCashVoucher', S.token, rec, !!isNew, !!post);
+      toast((post ? T('تم ترحيل السند ', 'Posted voucher ') + r.no + T(' — القيد ', ' — entry ') + r.gl : T('تم حفظ السند ', 'Saved voucher ') + r.no), 'ok');
+      await load('cashvouchers', true);
+      S.party = {}; delete S.data.glheaders; delete S.data.gllines;
+      go('cashvouchers', { no: r.no });
+    } catch (e) { fail(e); }
+  }
+  function cashCancelDlg() {
+    modal(T('إلغاء السند', 'Cancel voucher'),
+      '<p style="margin-top:0">' + T('يُنشأ قيد عكسي مُرحّل يلغي أثر السند، ويبقى السند في السجل بحالة "ملغى".', 'A posted reversing entry is created; the voucher stays on record as "Cancelled".') + '</p>' +
+      '<div class="fld"><label>' + T('تاريخ الإلغاء', 'Cancellation date') + '</label><input class="inp" type="date" id="cxDate" value="' + today() + '"></div>',
+      '<button class="btn red" onclick="FA.cashAct(\'cancel\')">' + icon('undo') + T('إلغاء السند', 'Cancel voucher') + '</button><button class="btn" onclick="FA.closeModal()">' + T('رجوع', 'Back') + '</button>');
+  }
+  async function cashAct(action) {
+    var d = $('#cxDate') ? $('#cxDate').value : '';
+    closeModal();
+    try {
+      var r = await api('cashAction', S.token, S.view.no, action, d);
+      toast(T('تم', 'Done') + (r && r.gl ? ' — ' + r.gl : ''), 'ok');
+      await load('cashvouchers', true);
+      S.party = {}; delete S.data.glheaders; delete S.data.gllines;
+      if (action === 'delete') go('cashvouchers'); else render();
+    } catch (e) { fail(e); }
+  }
+  async function cashDelete() { if (await confirmBox(T('حذف السند؟', 'Delete the voucher?'), T('حذف', 'Delete'), true)) cashAct('delete'); }
+  function cashPrint() {
+    var r = (S.data.cashvouchers || []).filter(function (x) { return x.VOUCHERNO === S.view.no; })[0];
+    if (!r) return;
+    var rec = r.VOUCHERTYPE === 'Receipt';
+    var bank = refFind(S.b.refs.banks, r.BANKACCOUNTID) || {};
+    var row = function (a, b) { return '<tr><th>' + esc(a) + '</th><td>' + b + '</td></tr>'; };
+    var html = '<div class="doc cashdoc" dir="' + document.documentElement.dir + '">' + printHeader(rec ? T('سند قبض', 'Receipt voucher') : T('سند صرف', 'Payment voucher')) +
+      '<div class="cd-top"><div>' + T('رقم السند: ', 'No.: ') + '<b>' + esc(r.VOUCHERNO) + '</b></div><div>' + T('التاريخ: ', 'Date: ') + '<b>' + esc(r.TRANSDATE) + '</b></div>' +
+      '<div class="cd-amt">' + fmtNum(r.AMOUNT, 2) + ' <small>' + esc(r.CURRENCYCODE) + '</small></div></div>' +
+      (r.STATUS === 'Cancelled' ? '<div class="cd-void">' + T('ملغى', 'CANCELLED') + '</div>' : '') +
+      '<table class="cd-t">' +
+      row(rec ? T('استلمنا من', 'Received from') : T('صرفنا إلى', 'Paid to'), '<b>' + esc(r.PARTYNAME || '') + '</b> <bdi>(' + esc(r.PARTYID) + ')</bdi> — ' + esc(displayVal(fld('cashvouchers', 'PARTYTYPE'), r.PARTYTYPE))) +
+      row(T('مبلغ وقدره', 'The sum of'), esc(tafqeet(r.AMOUNT, r.CURRENCYCODE))) +
+      row(T('وذلك عن', 'Being'), esc(r.DESCRIPTION || '')) +
+      row(rec ? T('أُودع في', 'Deposited to') : T('صُرف من', 'Paid from'), esc(r.BANKACCOUNTID + ' — ' + (bank.n || ''))) +
+      row(T('طريقة الدفع', 'Payment method'), esc(displayVal(fld('cashvouchers', 'PAYMENTMETHOD'), r.PAYMENTMETHOD)) + (r.CHEQUENUMBER ? ' — ' + T('رقم: ', 'No.: ') + esc(r.CHEQUENUMBER) : '')) +
+      (r.GLVOUCHER ? row(T('رقم القيد', 'Journal entry'), esc(r.GLVOUCHER) + (r.REVERSALVOUCHER ? ' / ' + T('قيد الإلغاء ', 'reversal ') + esc(r.REVERSALVOUCHER) : '')) : '') +
+      '</table><div class="signs">' + [rec ? T('المستلم (أمين الصندوق)', 'Received by (cashier)') : T('المستلم', 'Received by'), T('المحاسب', 'Accountant'), T('المدير المالي', 'Finance manager')].map(function (x) {
+        return '<div><b>' + esc(x) + '</b><span>' + T('الاسم:', 'Name:') + '</span><span>' + T('التوقيع:', 'Signature:') + '</span></div>';
+      }).join('') + '</div></div>';
+    printDoc(html, 'portrait');
+  }
+
+  /* ======================= Budgets: header + lines ======================= */
+  async function pageBudgetList() {
+    var s = sch('budgetheads');
+    crumbs([S.b.settings.ORGNAME, L(s.title)]);
+    await Promise.all([load('budgetheads'), load('budgets')]);
+    $('#main').innerHTML = apane([
+      can('budget', 'add') && { icon: 'plus', ar: 'موازنة جديدة', en: 'New budget', on: "FA.go('budgets',{id:'@new'})" },
+      can('budget', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: 'FA.bgDeleteSelected()', cls: 'danger' },
+      '|',
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.bgReload()' },
+      { icon: 'download', ar: 'تصدير السطور', en: 'Export lines', on: "FA.bgExportAll()" },
+      can('budget', 'view') && { icon: 'chart', ar: 'مراقبة الموازنة', en: 'Budget control', on: "FA.go('budgetctl')" }
+    ]) + phead(T('المحاسبة', 'Accounting'), esc(L(s.title))) +
+      '<div class="content"><div class="card">' + grid('bgl', {
+        rows: function () { return (S.data.budgetheads || []).slice().sort(function (a, b) { return String(b.BUDGETID).localeCompare(String(a.BUDGETID), undefined, { numeric: true }); }); },
+        key: function (r) { return r.BUDGETID; }, select: true, open: function (r) { go('budgets', { id: r.BUDGETID }); },
+        cols: schemaCols('budgetheads').map(function (c) {
+          if (c.k === 'STATUS') c.html = function (r) { return stBadge('budgetheads', r.STATUS); };
+          if (c.k === 'TOTALAMOUNT') c.total = true;
+          return c;
+        })
+      }) + '</div></div>';
+    gridRender('bgl');
+  }
+  async function bgReload() { await Promise.all([load('budgetheads', true), load('budgets', true)]); S.bud = null; render(); }
+  async function bgDeleteSelected() {
+    var rows = selected('bgl');
+    if (!rows.length) return toast(T('حدد موازنة واحدة على الأقل', 'Select at least one budget'));
+    if (rows.some(function (r) { return r.STATUS !== 'Draft'; })) return toast(T('يمكن حذف الموازنات في حالة مسودة فقط', 'Only draft budgets can be deleted'), 'err');
+    if (!(await confirmBox(T('حذف ', 'Delete ') + rows.length + T(' موازنة؟', ' budget(s)?'), T('حذف', 'Delete'), true))) return;
+    try {
+      for (var i = 0; i < rows.length; i++) await api('budgetAction', S.token, rows[i].BUDGETID, 'delete');
+      S.grids.bgl.sel = {}; await bgReload();
+    } catch (e) { fail(e); }
+  }
+  function bgExportAll() { exportRows('budgets', S.data.budgets || [], 'Budgets'); }
+
+  async function pageBudgetDoc() {
+    var s = sch('budgetheads');
+    await Promise.all([load('budgetheads'), load('budgets')]);
+    var id = S.view.id, isNew = id === '@new';
+    var head = isNew ? { BUDGETYEAR: String(new Date().getFullYear()), BUDGETTYPE: 'Expense', ENTRYDATE: today(), PERIODTYPE: 'Annual', STATUS: 'Draft' }
+      : (S.data.budgetheads || []).filter(function (h) { return h.BUDGETID === id; })[0];
+    if (!head) { go('budgets'); return; }
+    var lines = isNew ? [{}, {}, {}] : (S.data.budgets || []).filter(function (l) { return l.BUDGETID === id; })
+      .sort(function (a, b) { return (Number(a.LINENUM) || 0) - (Number(b.LINENUM) || 0); });
+    var ed = head.STATUS === 'Draft' && can('budget', isNew ? 'add' : 'edit');
+    S.bgLines = lines.map(function (l) { return { MAINACCOUNTID: l.MAINACCOUNTID || '', SUB2_OPERATINGUNIT: l.SUB2_OPERATINGUNIT || '', SUB1_OPERATINGUNIT: l.SUB1_OPERATINGUNIT || '',
+      OPERATINGUNIT: l.OPERATINGUNIT || '', AMOUNT: l.AMOUNT === undefined ? '' : l.AMOUNT, NOTE: l.NOTE || '' }; });
+    S.bgEd = ed;
+    crumbs([S.b.settings.ORGNAME, L(s.title), isNew ? T('جديد', 'New') : id]);
+    $('#main').innerHTML = apane([
+      { icon: 'back', ar: 'رجوع', en: 'Back', on: "FA.go('budgets')", cls: 'back' },
+      ed && { icon: 'save', ar: 'حفظ', en: 'Save', on: 'FA.bgSave(' + (isNew ? 1 : 0) + ')' },
+      ed && { icon: 'plus', ar: 'إضافة سطر', en: 'Add line', on: 'FA.bgAddLine()' },
+      ed && { icon: 'upload', ar: 'استيراد سطور من Excel', en: 'Import lines from Excel', on: 'FA.bgImport()' },
+      '|',
+      !isNew && can('budget', 'approve') && { icon: 'check', ar: 'اعتماد', en: 'Approve', on: "FA.bgAct('approve')", dis: head.STATUS !== 'Draft' },
+      !isNew && can('budget', 'approve') && { icon: 'undo', ar: 'إلغاء الاعتماد', en: 'Unapprove', on: "FA.bgAct('unapprove')", dis: head.STATUS !== 'Approved' },
+      '|',
+      { icon: 'download', ar: 'تصدير السطور', en: 'Export lines', on: 'FA.bgExport()' },
+      !isNew && { icon: 'list', ar: 'طباعة', en: 'Print', on: 'FA.bgPrint()' },
+      !isNew && head.STATUS === 'Draft' && can('budget', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: "FA.bgAct('delete')", cls: 'danger' }
+    ]) + phead('<a onclick="FA.go(\'budgets\')">' + esc(L(s.title)) + '</a>', (isNew ? T('موازنة جديدة', 'New budget') : esc(id)) + ' ' + stBadge('budgetheads', head.STATUS)) +
+      '<div class="content compact">' + formHtml('budgetheads', head, isNew, !ed, { flat: true,
+        hide: isNew ? ['BUDGETID', 'TOTALAMOUNT', 'STATUS', 'APPROVEDBY', 'APPROVEDON'] : ['TOTALAMOUNT'] }) +
+      '<div class="card"><div class="ftab-h" style="cursor:default;padding:6px 12px"><h3>' + T('تفاصيل الموازنة', 'Budget lines') + '</h3>' +
+      (ed ? '<div class="sum"><button class="btn sm" onclick="FA.bgAddLine()">' + icon('plus') + T('سطر', 'Line') + '</button></div>' : '') + '</div><div class="gl-wrap">' +
+      '<table class="gl-grid bg-grid"><thead id="bgHead"></thead><tbody id="bgBody"></tbody><tfoot id="bgFoot"></tfoot></table></div></div>' +
+      '<datalist id="dl_bgacc"></datalist><datalist id="dl_bgsub2">' + datalistOpts('Sub2_OperatingUnit', null, {}) + '</datalist>' +
+      '<input type="file" id="bgFile" class="hidden" accept=".xlsx,.xls,.csv" onchange="FA.bgImportFile(this)"></div>';
+    bgAccList();
+    drawBgLines();
+  }
+  function bgType() { var el = $('[data-form="budgetheads"] [data-k="BUDGETTYPE"]'); return el ? el.value : 'Expense'; }
+  function bgAccList() {
+    var rev = bgType() === 'Revenue';
+    var dl = $('#dl_bgacc');
+    if (dl) dl.innerHTML = (S.b.refs.accounts || []).filter(function (a) { return !a.h && (a.t === 'Revenue') === rev; })
+      .map(function (a) { return '<option value="' + esc(a.c) + '">' + esc(a.n) + '</option>'; }).join('');
+  }
+  function bgUnits(l) {
+    var s2 = refFind(S.b.lookups.Sub2_OperatingUnit, l.SUB2_OPERATINGUNIT);
+    l.SUB1_OPERATINGUNIT = s2 ? s2.p || '' : (l.SUB2_OPERATINGUNIT ? l.SUB1_OPERATINGUNIT : '');
+    var s1 = refFind(S.b.lookups.Sub1_OperatingUnit, l.SUB1_OPERATINGUNIT);
+    l.OPERATINGUNIT = s1 ? s1.p || '' : (l.SUB2_OPERATINGUNIT ? l.OPERATINGUNIT : '');
+  }
+  function bgUnitTxt(lk, c) { return c ? '<bdi>' + esc(c) + '</bdi> <small>' + esc(lookupName(lk, c)) + '</small>' : ''; }
+  function drawBgLines() {
+    var ed = S.bgEd;
+    $('#bgHead').innerHTML = '<tr><th class="c-no">#</th><th class="c-acc">' + T('رقم الحساب', 'Account') + '</th><th class="c-name">' + T('اسم الحساب', 'Account name') + '</th>' +
+      '<th class="c-unit">' + T('الوحدة الفرعية 2', 'Sub-unit 2') + '</th><th class="c-u">' + T('الوحدة الفرعية 1', 'Sub-unit 1') + '</th><th class="c-u">' + T('الوحدة الرئيسية', 'Operating unit') + '</th>' +
+      '<th class="c-amt">' + T('المبلغ التقديري', 'Budget amount') + '</th><th class="c-note">' + T('ملاحظات', 'Notes') + '</th>' + (ed ? '<th class="c-x"></th>' : '') + '</tr>';
+    $('#bgBody').innerHTML = S.bgLines.map(function (l, i) {
+      var inp = function (k, attrs, cls) {
+        var v = l[k];
+        if (k === 'AMOUNT' && v !== '' && v !== undefined) v = fmtNum(v, 3);
+        return '<input class="cell ' + (cls || '') + '" data-bg="' + k + '" data-i="' + i + '" value="' + esc(v === undefined ? '' : v) + '" ' + (attrs || '') + ' onchange="FA.bgCell(this)">';
+      };
+      var u = '<td class="c-u s1">' + bgUnitTxt('Sub1_OperatingUnit', l.SUB1_OPERATINGUNIT) + '</td><td class="c-u ou">' + bgUnitTxt('OperatingUnit', l.OPERATINGUNIT) + '</td>';
+      if (!ed) {
+        return '<tr><td class="c-no">' + (i + 1) + '</td><td dir="ltr">' + esc(l.MAINACCOUNTID) + '</td><td class="c-name">' + esc(lookupName('@allAccounts', l.MAINACCOUNTID)) + '</td>' +
+          '<td>' + bgUnitTxt('Sub2_OperatingUnit', l.SUB2_OPERATINGUNIT) + '</td>' + u + '<td class="n">' + fmtNum(l.AMOUNT, 3) + '</td><td class="c-note" title="' + esc(l.NOTE) + '">' + esc(l.NOTE) + '</td></tr>';
+      }
+      return '<tr><td class="c-no">' + (i + 1) + '</td><td class="c-acc">' + inp('MAINACCOUNTID', 'list="dl_bgacc" dir="ltr"') + '</td>' +
+        '<td class="c-name gl-name">' + esc(lookupName('@accounts', l.MAINACCOUNTID)) + '</td>' +
+        '<td class="c-unit"><div class="unitcell">' + inp('SUB2_OPERATINGUNIT', 'list="dl_bgsub2" dir="ltr"') + '<span class="gl-name">' + esc(lookupName('Sub2_OperatingUnit', l.SUB2_OPERATINGUNIT)) + '</span></div></td>' + u +
+        '<td class="c-amt">' + inp('AMOUNT', 'inputmode="decimal"', 'num') + '</td><td class="c-note">' + inp('NOTE') + '</td>' +
+        '<td class="c-x"><button class="ib red" tabindex="-1" title="' + T('حذف السطر', 'Remove line') + '" onclick="FA.bgDelLine(' + i + ')">' + icon('trash') + '</button></td></tr>';
+    }).join('');
+    drawBgFoot();
+  }
+  function drawBgFoot() {
+    var tot = 0, n = 0;
+    S.bgLines.forEach(function (l) { var a = Number(parseNum(l.AMOUNT)) || 0; tot += a; if (l.MAINACCOUNTID) n++; });
+    var per = ($('[data-form="budgetheads"] [data-k="PERIODTYPE"]') || {}).value;
+    $('#bgFoot').innerHTML = '<tr><td colspan="6">' + T('الإجمالي', 'Total') + ' (' + n + T(' سطر', ' lines') + ')' +
+      (per === 'Monthly' ? ' <span class="badge b-info">' + T('شهري — الإجمالي السنوي: ', 'Monthly — annual total: ') + fmtNum(tot * 12, 3) + '</span>' : '') +
+      '</td><td class="n">' + fmtNum(tot, 3) + '</td><td colspan="' + (S.bgEd ? 2 : 1) + '"></td></tr>';
+  }
+  function bgCell(el) {
+    var i = Number(el.getAttribute('data-i')), k = el.getAttribute('data-bg');
+    var l = S.bgLines[i], tr = el.closest('tr');
+    var v = el.value;
+    if (k === 'AMOUNT') { v = parseNum(v); if (v !== '' && !isNaN(Number(v))) el.value = fmtNum(v, 3); }
+    l[k] = v;
+    if (k === 'MAINACCOUNTID') $('.c-name', tr).textContent = lookupName('@accounts', v);
+    if (k === 'SUB2_OPERATINGUNIT') {
+      bgUnits(l);
+      $('.unitcell .gl-name', tr).textContent = lookupName('Sub2_OperatingUnit', v);
+      $('.s1', tr).innerHTML = bgUnitTxt('Sub1_OperatingUnit', l.SUB1_OPERATINGUNIT);
+      $('.ou', tr).innerHTML = bgUnitTxt('OperatingUnit', l.OPERATINGUNIT);
+    }
+    drawBgFoot();
+  }
+  function bgAddLine() {
+    var last = S.bgLines[S.bgLines.length - 1] || {};
+    S.bgLines.push({ MAINACCOUNTID: '', SUB2_OPERATINGUNIT: last.SUB2_OPERATINGUNIT || '', SUB1_OPERATINGUNIT: last.SUB1_OPERATINGUNIT || '', OPERATINGUNIT: last.OPERATINGUNIT || '', AMOUNT: '', NOTE: '' });
+    drawBgLines();
+    var el = $('[data-bg="MAINACCOUNTID"][data-i="' + (S.bgLines.length - 1) + '"]');
+    if (el) el.focus();
+  }
+  function bgDelLine(i) { S.bgLines.splice(i, 1); drawBgLines(); }
+  async function bgSave(isNew) {
+    var form = $('[data-form="budgetheads"]');
+    if (!validateForm(form)) return;
+    var head = readForm(form);
+    if (!isNew) head.BUDGETID = S.view.id;
+    var lines = S.bgLines.filter(function (l) { return l.MAINACCOUNTID || Number(parseNum(l.AMOUNT)); })
+      .map(function (l) { return { MAINACCOUNTID: l.MAINACCOUNTID, SUB2_OPERATINGUNIT: l.SUB2_OPERATINGUNIT, SUB1_OPERATINGUNIT: l.SUB2_OPERATINGUNIT ? '' : l.SUB1_OPERATINGUNIT,
+        OPERATINGUNIT: l.SUB2_OPERATINGUNIT || l.SUB1_OPERATINGUNIT ? '' : l.OPERATINGUNIT, AMOUNT: parseNum(l.AMOUNT), NOTE: l.NOTE }; });
+    try {
+      var r = await api('saveBudget', S.token, head, lines, !!isNew);
+      toast(T('تم حفظ الموازنة ', 'Budget saved ') + r.id + ' — ' + r.lines + T(' سطر', ' lines'), 'ok');
+      await Promise.all([load('budgetheads', true), load('budgets', true)]);
+      S.bud = null;
+      go('budgets', { id: r.id });
+    } catch (e) { fail(e); }
+  }
+  async function bgAct(action) {
+    var msgs = { approve: T('اعتماد الموازنة؟ تدخل بعدها في تقرير مراقبة الموازنة.', 'Approve the budget? It will then be used in budget control.'),
+      unapprove: T('إلغاء اعتماد الموازنة؟', 'Unapprove the budget?'), delete: T('حذف الموازنة؟', 'Delete the budget?') };
+    if (!(await confirmBox(msgs[action], null, action === 'delete'))) return;
+    try {
+      await api('budgetAction', S.token, S.view.id, action);
+      toast(T('تم', 'Done'), 'ok');
+      await Promise.all([load('budgetheads', true), load('budgets', true)]);
+      S.bud = null;
+      if (action === 'delete') go('budgets'); else render();
+    } catch (e) { fail(e); }
+  }
+  function bgExport() {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    var keys = ['MAINACCOUNTID', 'ACCOUNTNAME', 'SUB2_OPERATINGUNIT', 'SUB1_OPERATINGUNIT', 'OPERATINGUNIT', 'AMOUNT', 'NOTE'];
+    var data = S.bgLines.map(function (l) { var o = {}; keys.forEach(function (k) { o[k] = k === 'ACCOUNTNAME' ? lookupName('@allAccounts', l.MAINACCOUNTID) : l[k] || ''; }); return o; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data, { header: keys }), 'BudgetLines');
+    XLSX.writeFile(wb, 'budget_' + (S.view.id === '@new' ? 'new' : S.view.id) + '.xlsx');
+  }
+  function bgImport() {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    var fi = $('#bgFile'); fi.value = ''; fi.click();
+  }
+  function bgImportFile(inp) {
+    var file = inp.files && inp.files[0];
+    if (!file) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        var wb = XLSX.read(new Uint8Array(rd.result), { type: 'array' });
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false });
+        var pick = function (r, names) {
+          var ks = Object.keys(r);
+          for (var j = 0; j < names.length; j++) {
+            var hit = ks.filter(function (k) { return normAr(k).replace(/\s+/g, '') === normAr(names[j]).replace(/\s+/g, ''); })[0];
+            if (hit !== undefined && r[hit] !== '') return String(r[hit]).trim();
+          }
+          return '';
+        };
+        var add = rows.map(function (r) {
+          var l = { MAINACCOUNTID: pick(r, ['MAINACCOUNTID', 'Main account', 'Account', 'رقم الحساب']), SUB2_OPERATINGUNIT: pick(r, ['SUB2_OPERATINGUNIT', 'A_Sub2_OperatingUnit', 'Sub2_OperatingUnit', 'الوحدة الفرعية 2']),
+            AMOUNT: parseNum(pick(r, ['AMOUNT', 'Amount', 'Budget amount', 'المبلغ التقديري', 'المبلغ'])), NOTE: pick(r, ['NOTE', 'Note', 'Notes', 'ملاحظات', 'ملاحظة']) };
+          bgUnits(l);
+          return l;
+        }).filter(function (l) { return l.MAINACCOUNTID; });
+        if (!add.length) return toast(T('لم يُعثر على سطور — الأعمدة المطلوبة: رقم الحساب، الوحدة الفرعية 2، المبلغ التقديري، ملاحظات', 'No lines found — expected columns: MAINACCOUNTID, SUB2_OPERATINGUNIT, AMOUNT, NOTE'), 'err');
+        S.bgLines = S.bgLines.filter(function (l) { return l.MAINACCOUNTID || Number(parseNum(l.AMOUNT)); }).concat(add);
+        drawBgLines();
+        toast(T('أُضيف ', 'Added ') + add.length + T(' سطر — راجعها ثم اضغط حفظ', ' lines — review and save'), 'ok');
+      } catch (e) { fail(e); }
+    };
+    rd.readAsArrayBuffer(file);
+  }
+  function bgPrint() {
+    var h = (S.data.budgetheads || []).filter(function (x) { return x.BUDGETID === S.view.id; })[0];
+    if (!h) return;
+    var tot = 0;
+    var html = '<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(T('الموازنة التقديرية', 'Budget') + ' ' + h.BUDGETID) +
+      '<table class="meta"><tr><td>' + T('السنة: ', 'Year: ') + '<b>' + esc(h.BUDGETYEAR) + '</b></td><td>' + T('النوع: ', 'Type: ') + '<b>' + esc(displayVal(fld('budgetheads', 'BUDGETTYPE'), h.BUDGETTYPE)) + '</b></td><td>' +
+      T('سنوي/شهري: ', 'Period: ') + '<b>' + esc(displayVal(fld('budgetheads', 'PERIODTYPE'), h.PERIODTYPE)) + '</b></td><td>' + T('الحالة: ', 'Status: ') + '<b>' + esc(displayVal(fld('budgetheads', 'STATUS'), h.STATUS)) + '</b></td></tr>' +
+      '<tr><td colspan="2">' + T('البيان: ', 'Description: ') + esc(h.DESCRIPTION || '') + '</td><td>' + T('تاريخ الإدخال: ', 'Entry date: ') + esc(h.ENTRYDATE || '') + '</td><td>' + T('اعتمد: ', 'Approved by: ') + esc(h.APPROVEDBY || '') + '</td></tr></table>' +
+      '<table class="lines"><thead><tr><th>#</th><th>' + T('رقم الحساب', 'Account') + '</th><th>' + T('اسم الحساب', 'Account name') + '</th><th>' + T('الوحدة', 'Unit') + '</th><th>' + T('المبلغ التقديري', 'Amount') + '</th><th>' + T('ملاحظات', 'Notes') + '</th></tr></thead><tbody>' +
+      S.bgLines.map(function (l, i) {
+        tot += Number(l.AMOUNT) || 0;
+        return '<tr><td>' + (i + 1) + '</td><td dir="ltr">' + esc(l.MAINACCOUNTID) + '</td><td>' + esc(lookupName('@allAccounts', l.MAINACCOUNTID)) + '</td><td>' + esc(unitText(l.OPERATINGUNIT, l.SUB1_OPERATINGUNIT, l.SUB2_OPERATINGUNIT)) +
+          '</td><td class="n">' + fmtNum(l.AMOUNT, 3) + '</td><td>' + esc(l.NOTE || '') + '</td></tr>';
+      }).join('') + '</tbody><tfoot><tr><th colspan="4">' + T('الإجمالي', 'Total') + '</th><th class="n">' + fmtNum(tot, 3) + '</th><th></th></tr></tfoot></table>' +
+      '<div class="signs">' + [T('أعدّه', 'Prepared by'), T('المدير المالي', 'Finance manager'), T('المعتمد', 'Approved by')].map(function (x) {
+        return '<div><b>' + esc(x) + '</b><span>' + T('الاسم:', 'Name:') + '</span><span>' + T('التوقيع:', 'Signature:') + '</span></div>';
+      }).join('') + '</div></div>';
+    printDoc(html, 'portrait');
+  }
+
   /* ======================= Budget control ======================= */
   async function pageBudgetCtl(force) {
     crumbs([S.b.settings.ORGNAME, T('مراقبة الموازنة', 'Budget control')]);
@@ -3199,7 +3617,7 @@
     S.bcRep = rep;
     S.bcTitle = T('تقرير مراقبة الموازنة ', 'Budget control ') + f.year + ' (' + pad(f.m1) + '–' + pad(f.m2) + ')';
     var head = apane([
-      can('budget', 'view') && { icon: 'list', ar: 'إدخال الموازنة', en: 'Budget entry', on: "FA.go('budgets')" },
+      can('budget', 'view') && { icon: 'list', ar: 'الموازنات التقديرية', en: 'Budgets', on: "FA.go('budgets')" },
       '|',
       { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.bcRefresh()' },
       { icon: 'download', ar: 'Excel', en: 'Excel', on: 'FA.bcExport()' },
@@ -3462,16 +3880,16 @@
     var p = {};
     S.b.permPages.forEach(function (pg) { p[pg] = {}; S.b.permActions.forEach(function (a) { p[pg][a] = false; }); });
     var set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
-    var data = ['assets', 'books', 'journal', 'vendors', 'masterdata', 'customers', 'banks', 'budget'];
+    var data = ['assets', 'books', 'journal', 'vendors', 'masterdata', 'customers', 'banks', 'budget', 'cashvouchers'];
     if (role === 'SuperAdmin' || role === 'Admin') set(S.b.permPages, S.b.permActions);
-    else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
+    else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); set(['cashvouchers'], ['post']); }
     else set(data.concat(['reports', 'transfers', 'gl']), ['view']);
     return p;
   }
   var PAGE_NAMES = { assets: ['الأصول الثابتة', 'Fixed assets'], books: ['دفاتر الأصول', 'Books'], journal: ['يومية الأصول', 'FA journal'],
     vendors: ['الموردون', 'Vendors'], users: ['المستخدمون', 'Users'], settings: ['الإعدادات', 'Settings'],
     depreciation: ['الإهلاك التلقائي', 'Depreciation'], transfers: ['نقل الأصول', 'Asset transfers'], gl: ['القيود المحاسبية', 'Journal entries'], fiscal: ['السنوات المالية والإقفال', 'Fiscal years & closing'], reports: ['التقارير', 'Reports'], masterdata: ['البيانات الأساسية والحسابات', 'Master data & accounts'],
-    customers: ['العملاء وتقاريرهم', 'Customers & reports'], banks: ['الصناديق والبنوك وتقاريرها', 'Cash & banks & reports'], budget: ['الموازنة التقديرية', 'Budgets'] };
+    customers: ['العملاء وتقاريرهم', 'Customers & reports'], banks: ['الصناديق والبنوك وتقاريرها', 'Cash & banks & reports'], budget: ['الموازنة التقديرية', 'Budgets'], cashvouchers: ['سندات القبض والصرف', 'Receipts & payments'] };
   var ACT_NAMES = { view: ['دخول للصفحة', 'View'], add: ['إضافة', 'Add'], edit: ['تعديل', 'Edit'], delete: ['حذف', 'Delete'], approve: ['اعتماد', 'Approve'], post: ['ترحيل', 'Post'] };
 
   async function pageUsers() {
@@ -3764,6 +4182,9 @@
     finSet: finSet, finRefresh: finRefresh, finLedger: finLedger, finExport: finExport, finPrint: finPrint,
     accSearch: accSearch, accToggle: accToggle, accAll: accAll, exportRowsAcc: exportRowsAcc,
     openingDlg: openingDlg, openingGo: openingGo, partySet: partySet, partyRefresh: partyRefresh, partyExport: partyExport, partyPrint: partyPrint,
+    cashReload: cashReload, cashSave: cashSave, cashCancelDlg: cashCancelDlg, cashAct: cashAct, cashDelete: cashDelete, cashPrint: cashPrint,
+    bgReload: bgReload, bgDeleteSelected: bgDeleteSelected, bgExportAll: bgExportAll, bgCell: bgCell, bgAddLine: bgAddLine, bgDelLine: bgDelLine,
+    bgSave: bgSave, bgAct: bgAct, bgExport: bgExport, bgImport: bgImport, bgImportFile: bgImportFile, bgPrint: bgPrint,
     bcSet: bcSet, bcRefresh: bcRefresh, bcExport: bcExport, bcPrint: bcPrint,
     depCalc: depCalc, depCreate: depCreate, depExport: depExport, repFilter: repFilter, repRefresh: repRefresh, repExport: repExport
   };

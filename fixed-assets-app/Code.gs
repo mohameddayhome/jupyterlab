@@ -10,20 +10,20 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '8.0.0';
-const SETUP_VERSION = '8';
+const APP_VERSION = '9.0.0';
+const SETUP_VERSION = '9';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
 const AUDIT = ['CREATEDBY', 'CREATEDON', 'MODIFIEDBY', 'MODIFIEDON'];
-const PERM_PAGES = ['assets', 'books', 'journal', 'transfers', 'gl', 'fiscal', 'budget', 'customers', 'banks', 'depreciation', 'reports', 'masterdata', 'vendors', 'users', 'settings'];
+const PERM_PAGES = ['assets', 'books', 'journal', 'transfers', 'gl', 'fiscal', 'budget', 'customers', 'banks', 'cashvouchers', 'depreciation', 'reports', 'masterdata', 'vendors', 'users', 'settings'];
 const PERM_ACTIONS = ['view', 'add', 'edit', 'delete', 'approve', 'post'];
 const USER_COLS = ['USERNAME', 'FULLNAME', 'EMAIL', 'PASSWORDHASH', 'SALT', 'ROLE', 'PERMISSIONS', 'STATUS',
   'MUSTCHANGE', 'LASTLOGIN', 'CREATEDBY', 'CREATEDON', 'MODIFIEDBY', 'MODIFIEDON'];
 const SESSION_COLS = ['SESSIONID', 'USERNAME', 'CREATEDON', 'LASTSEEN', 'ACTIVE', 'CLIENT'];
 const SETTING_DEFAULTS = {
   ORGNAME: 'الإدارة المالية', ORGEMAIL: '', CURRENCY: 'DJF', SESSIONTIMEOUT: '60',
-  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ', RETAINEDEARNINGSACCOUNT: '', CLOSINGJOURNALNAME: 'YE', OPENINGBALANCEACCOUNT: '',
+  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ', RETAINEDEARNINGSACCOUNT: '', CLOSINGJOURNALNAME: 'YE', OPENINGBALANCEACCOUNT: '', BUDGETPREFIX: 'BG-', BUDGETSEQ: '0', RVPREFIX: 'RV-', RVSEQ: '0', PVPREFIX: 'PV-', PVSEQ: '0',
   DEPJOURNALNAME: 'FADEP', DEPOFFSETACCOUNT: '', DEPMONTHS: '3'
 };
 const PUBLIC_SETTINGS = ['ORGNAME', 'ORGEMAIL', 'CURRENCY', 'SESSIONTIMEOUT', 'MAXSESSIONS', 'DATEFORMAT', 'LOGO', 'JOURNALPREFIX',
@@ -58,7 +58,13 @@ const TRANS_TYPES = [
 
 const JOURNAL_STATUS = [o('Draft', 'مسودة'), o('Approved', 'معتمد'), o('Posted', 'مُرحّل')];
 const GL_SOURCES = [o('Manual', 'يدوي', 'Manual'), o('FAJournal', 'يومية الأصول', 'Fixed asset journal'), o('Transfer', 'نقل أصول', 'Asset transfer'),
-  o('YearEnd', 'إقفال السنة', 'Year-end closing')];
+  o('YearEnd', 'إقفال السنة', 'Year-end closing'), o('CashVoucher', 'سند قبض / صرف', 'Receipt / payment')];
+const BUDGET_TYPES = [o('Expense', 'مصروفات', 'Expense'), o('Revenue', 'إيرادات', 'Revenue')];
+const BUDGET_STATUS = [o('Draft', 'مسودة', 'Draft'), o('Approved', 'معتمدة', 'Approved')];
+const CASH_TYPES = [o('Receipt', 'سند قبض', 'Receipt'), o('Payment', 'سند صرف', 'Payment')];
+const CASH_PARTY = [o('Customer', 'عميل', 'Customer'), o('Vendor', 'مورد', 'Vendor'), o('Ledger', 'حساب أستاذ', 'Ledger account')];
+const CASH_STATUS = [o('Draft', 'مسودة', 'Draft'), o('Posted', 'مُرحّل', 'Posted'), o('Cancelled', 'ملغى', 'Cancelled')];
+const PAY_METHODS = [o('Cash', 'نقداً', 'Cash'), o('Check', 'شيك', 'Cheque'), o('Transfer', 'تحويل بنكي', 'Bank transfer')];
 const BUDGET_PERIODS = [o('Annual', 'سنوي (يوزّع على 12 شهراً)', 'Annual (spread over 12 months)'), o('Monthly', 'شهري (لكل شهر)', 'Monthly (each month)')];
 const ACCOUNT_KINDS = [o('Ledger', 'حساب أستاذ', 'Ledger'), o('Customer', 'عميل', 'Customer'), o('Vendor', 'مورد', 'Vendor'), o('Bank', 'صندوق / بنك', 'Bank')];
 const FISCAL_STATUS = [o('Open', 'مفتوحة', 'Open'), o('Closed', 'مقفلة', 'Closed')];
@@ -404,18 +410,66 @@ const SCHEMAS = {
     ]
   },
 
+  budgetheads: {
+    sheet: 'BudgetHeaders', perm: 'budget', key: ['BUDGETID'], title: { ar: 'الموازنات التقديرية', en: 'Budgets' },
+    sections: [{ id: 'h', ar: 'رأس الموازنة', en: 'Budget header', groups: [
+      { id: 'h1', ar: 'الموازنة', en: 'Budget' }, { id: 'h2', ar: 'البيان', en: 'Description' }, { id: 'h3', ar: 'الاعتماد', en: 'Approval' }] }],
+    fields: [
+      F('BUDGETID', 'رقم الموازنة', 'Budget ID', 'text', { key: 1, sys: 1, sec: 'h', grp: 'h1', list: 1 }),
+      F('BUDGETYEAR', 'سنة الموازنة', 'Budget year', 'text', { req: 1, sec: 'h', grp: 'h1', list: 1, aliases: ['Year'] }),
+      F('BUDGETTYPE', 'نوع الموازنة', 'Budget type', 'select', { opts: BUDGET_TYPES, req: 1, dflt: 'Expense', sec: 'h', grp: 'h1', list: 1 }),
+      F('ENTRYDATE', 'تاريخ الإدخال', 'Entry date', 'date', { req: 1, dflt: '@today', sec: 'h', grp: 'h1', list: 1 }),
+      F('PERIODTYPE', 'سنوي / شهري', 'Annual / monthly', 'select', { opts: BUDGET_PERIODS, req: 1, dflt: 'Annual', sec: 'h', grp: 'h1', list: 1 }),
+      F('DESCRIPTION', 'البيان', 'Description', 'text', { sec: 'h', grp: 'h2', list: 1 }),
+      F('TOTALAMOUNT', 'إجمالي المبلغ', 'Total amount', 'number', { dec: 3, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
+      F('STATUS', 'الحالة', 'Status', 'select', { opts: BUDGET_STATUS, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
+      F('APPROVEDBY', 'اعتمد بواسطة', 'Approved by', 'text', { sys: 1, sec: 'h', grp: 'h3', list: 1 }),
+      F('APPROVEDON', 'تاريخ الاعتماد', 'Approved on', 'text', { sys: 1, sec: 'h', grp: 'h3' })
+    ]
+  },
+
+  cashvouchers: {
+    sheet: 'CashVouchers', perm: 'cashvouchers', key: ['VOUCHERNO'], title: { ar: 'سندات القبض والصرف', en: 'Receipts & payments' },
+    sections: [{ id: 'v', ar: 'السند', en: 'Voucher', groups: [
+      { id: 'v1', ar: 'السند', en: 'Voucher' }, { id: 'v2', ar: 'الطرف', en: 'Party' }, { id: 'v3', ar: 'المبلغ', en: 'Amount' }, { id: 'v4', ar: 'الترحيل', en: 'Posting' }] }],
+    fields: [
+      F('VOUCHERNO', 'رقم السند', 'Voucher number', 'text', { key: 1, sys: 1, sec: 'v', grp: 'v1', list: 1 }),
+      F('VOUCHERTYPE', 'نوع السند', 'Voucher type', 'select', { opts: CASH_TYPES, req: 1, sec: 'v', grp: 'v1', list: 1 }),
+      F('TRANSDATE', 'التاريخ', 'Date', 'date', { req: 1, dflt: '@today', sec: 'v', grp: 'v1', list: 1 }),
+      F('BANKACCOUNTID', 'الصندوق / البنك', 'Cash/bank account', 'lookup', { lk: '@banks', req: 1, sec: 'v', grp: 'v1', list: 1 }),
+      F('PARTYTYPE', 'نوع الطرف', 'Party type', 'select', { opts: CASH_PARTY, req: 1, sec: 'v', grp: 'v2', list: 1 }),
+      F('PARTYID', 'العميل / المورد / الحساب', 'Party', 'lookup', { lkBy: 'PARTYTYPE', lkMap: { Customer: '@customers', Vendor: '@vendors', Ledger: '@accounts' }, req: 1, sec: 'v', grp: 'v2', list: 1 }),
+      F('PARTYNAME', 'اسم الطرف', 'Party name', 'text', { calc: 1, sec: 'v', grp: 'v2', list: 1 }),
+      F('SUB2_OPERATINGUNIT', 'الوحدة الفرعية 2', 'A_Sub2_OperatingUnit', 'lookup', { lk: 'Sub2_OperatingUnit', sec: 'v', grp: 'v2' }),
+      F('AMOUNT', 'المبلغ', 'Amount', 'number', { dec: 3, req: 1, sec: 'v', grp: 'v3', list: 1 }),
+      F('CURRENCYCODE', 'العملة', 'Currency', 'text', { calc: 1, sec: 'v', grp: 'v3', list: 1 }),
+      F('EXCHANGERATE', 'سعر الصرف', 'Exchange rate', 'number', { dec: 6, sec: 'v', grp: 'v3' }),
+      F('PAYMENTMETHOD', 'طريقة الدفع', 'Payment method', 'select', { opts: PAY_METHODS, dflt: 'Cash', sec: 'v', grp: 'v3', list: 1 }),
+      F('CHEQUENUMBER', 'رقم الشيك / الحوالة', 'Cheque / transfer no.', 'text', { sec: 'v', grp: 'v3', list: 1 }),
+      F('DESCRIPTION', 'البيان', 'Description', 'text', { sec: 'v', grp: 'v3', list: 1 }),
+      F('STATUS', 'الحالة', 'Status', 'select', { opts: CASH_STATUS, sys: 1, sec: 'v', grp: 'v4', list: 1 }),
+      F('GLVOUCHER', 'رقم القيد', 'Journal voucher', 'text', { sys: 1, sec: 'v', grp: 'v4', list: 1 }),
+      F('REVERSALVOUCHER', 'قيد الإلغاء', 'Reversal voucher', 'text', { sys: 1, sec: 'v', grp: 'v4' }),
+      F('POSTEDBY', 'رحّل بواسطة', 'Posted by', 'text', { sys: 1, sec: 'v', grp: 'v4' }),
+      F('POSTEDON', 'تاريخ الترحيل', 'Posted on', 'text', { sys: 1, sec: 'v', grp: 'v4' })
+    ]
+  },
+
   budgets: {
-    sheet: 'Budgets', perm: 'budget', key: ['LINEID'], autoId: 'LINEID', title: { ar: 'الموازنة التقديرية', en: 'Budget' },
+    sheet: 'Budgets', perm: 'budget', key: ['LINEID'], autoId: 'LINEID', title: { ar: 'سطور الموازنة التقديرية', en: 'Budget lines' },
     sections: [{ id: 'b', ar: 'سطر الموازنة', en: 'Budget line', groups: [
       { id: 'a', ar: 'الحساب', en: 'Account' }, { id: 'u', ar: 'الوحدة (سجّل الفرعية 2)', en: 'Unit (enter sub-unit 2)' }, { id: 'm', ar: 'المبلغ', en: 'Amount' }] }],
     fields: [
       F('LINEID', 'معرّف السطر', 'Line ID', 'text', { key: 1, sys: 1, sec: 'b', grp: 'm' }),
-      F('BUDGETYEAR', 'سنة الموازنة', 'Budget year', 'text', { req: 1, sec: 'b', grp: 'a', list: 1, aliases: ['Year', 'YEAR'] }),
+      F('BUDGETID', 'رقم الموازنة', 'Budget ID', 'text', { req: 1, sec: 'b', grp: 'a', list: 1 }),
+      F('LINENUM', 'رقم السطر', 'Line number', 'number', { dec: 0, sec: 'b', grp: 'a', list: 1 }),
+      F('BUDGETYEAR', 'سنة الموازنة', 'Budget year', 'text', { calc: 1, sec: 'b', grp: 'a', list: 1, aliases: ['Year', 'YEAR'] }),
+      F('BUDGETTYPE', 'نوع الموازنة', 'Budget type', 'select', { opts: BUDGET_TYPES, calc: 1, sec: 'b', grp: 'a', list: 1 }),
       F('MAINACCOUNTID', 'رقم الحساب', 'Main account', 'lookup', { lk: '@accounts', req: 1, sec: 'b', grp: 'a', list: 1, aliases: ['Account', 'MAINACCOUNT'] }),
       F('ACCOUNTNAME', 'اسم الحساب', 'Account name', 'text', { calc: 1, sec: 'b', grp: 'a', list: 1 })
     ].concat(unitFields_('', 'b', 'u', { ou: { list: 1 } })).concat([
       F('AMOUNT', 'المبلغ التقديري', 'Budget amount', 'number', { dec: 3, req: 1, sec: 'b', grp: 'm', list: 1, aliases: ['Amount', 'Budget'] }),
-      F('PERIODTYPE', 'سنوي / شهري', 'Annual / monthly', 'select', { opts: BUDGET_PERIODS, req: 1, dflt: 'Annual', sec: 'b', grp: 'm', list: 1, aliases: ['Period'] }),
+      F('PERIODTYPE', 'سنوي / شهري', 'Annual / monthly', 'select', { opts: BUDGET_PERIODS, calc: 1, sec: 'b', grp: 'm', list: 1, aliases: ['Period'] }),
       F('NOTE', 'ملاحظة', 'Note', 'text', { sec: 'b', grp: 'm', list: 1 })
     ])
   },
@@ -565,6 +619,7 @@ function setup() {
     migrateV6_();
     migrateV7_();
     migrateV8_();
+    migrateV9_();
 
     const def = ss.getSheetByName('Sheet1') || ss.getSheetByName('ورقة1');
     if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
@@ -759,6 +814,42 @@ function migrateV8_() {
   gl.rows.forEach(function (l, i) { if (l.LINEID && !l.ACCOUNTTYPE) { l.ACCOUNTTYPE = 'Ledger'; writeRow_(gl, i, l); } });
 }
 
+/** الإصدار 9: يوميات السندات، وتجميع سطور الموازنة القديمة (بدون رأس) في موازنات معتمدة. */
+function migrateV9_() {
+  const stamp = stamp_();
+  const jt = readTable_('JournalNames');
+  const have = {};
+  jt.rows.forEach(function (r) { have[low_(r.CODE)] = 1; });
+  [['RV', 'سندات القبض - Receipts'], ['PV', 'سندات الصرف - Payments']].forEach(function (x) {
+    if (!have[low_(x[0])]) appendRow_(jt, { CODE: x[0], NAME: x[1], CREATEDBY: 'setup', CREATEDON: stamp });
+  });
+  const types = {};
+  readTable_('MainAccounts').rows.forEach(function (a) { types[low_(a.MAINACCOUNTID)] = a.MAINACCOUNTTYPE; });
+  const bt = readTable_('Budgets');
+  const ht = readTable_('BudgetHeaders');
+  const groups = {}, order = [];
+  bt.rows.forEach(function (r, i) {
+    if (!r.LINEID || r.BUDGETID) return;
+    const type = types[low_(r.MAINACCOUNTID)] === 'Revenue' ? 'Revenue' : 'Expense';
+    const k = r.BUDGETYEAR + '|' + (r.PERIODTYPE || 'Annual') + '|' + type;
+    if (!groups[k]) { groups[k] = []; order.push(k); }
+    groups[k].push(i);
+  });
+  order.forEach(function (k) {
+    const p = k.split('|');
+    const id = nextSeq_('BUDGETSEQ', 'BUDGETPREFIX', 'BG-');
+    let total = 0;
+    groups[k].forEach(function (i, n) {
+      const r = bt.rows[i];
+      r.BUDGETID = id; r.LINENUM = n + 1; r.BUDGETTYPE = p[2]; r.PERIODTYPE = p[1];
+      total += num_(r.AMOUNT);
+      writeRow_(bt, i, r);
+    });
+    appendRow_(ht, { BUDGETID: id, BUDGETYEAR: p[0], BUDGETTYPE: p[2], ENTRYDATE: today_(), PERIODTYPE: p[1], DESCRIPTION: 'منقولة من الإصدار 8',
+      TOTALAMOUNT: round_(total, 3), STATUS: 'Approved', APPROVEDBY: 'setup', APPROVEDON: stamp, CREATEDBY: 'setup', CREATEDON: stamp });
+  });
+}
+
 /** بيانات تجريبية اختيارية مطابقة للصور (BLD_00001). */
 function seedDemoData() {
   ensureSetup_();
@@ -943,9 +1034,9 @@ function roleTemplate_(role) {
   const p = {};
   PERM_PAGES.forEach(function (pg) { p[pg] = {}; PERM_ACTIONS.forEach(function (a) { p[pg][a] = false; }); });
   const set = function (pages, acts) { pages.forEach(function (pg) { acts.forEach(function (a) { p[pg][a] = true; }); }); };
-  const data = ['assets', 'books', 'journal', 'vendors', 'masterdata', 'customers', 'banks', 'budget'];
+  const data = ['assets', 'books', 'journal', 'vendors', 'masterdata', 'customers', 'banks', 'budget', 'cashvouchers'];
   if (role === 'SuperAdmin' || role === 'Admin') set(PERM_PAGES, PERM_ACTIONS);
-  else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); }
+  else if (role === 'Accountant') { set(data.concat(['transfers', 'gl']), ['view', 'add', 'edit']); set(['fiscal'], ['view']); set(['depreciation'], ['view', 'add']); set(['reports'], ['view']); set(['cashvouchers'], ['post']); }
   else if (role !== 'none') set(data.concat(['reports', 'transfers', 'gl']), ['view']);
   return p;
 }
@@ -1161,11 +1252,11 @@ function lookups_() {
 
 function refs_(s) {
   const out = { assets: [], vendors: [], books: [], accounts: [], groups: [], currencies: [], rates: [], customers: [], banks: [] };
-  if (['customers', 'gl', 'reports'].some(function (pg) { return can_(s, pg, 'view'); })) {
+  if (['customers', 'gl', 'reports', 'cashvouchers'].some(function (pg) { return can_(s, pg, 'view'); })) {
     out.customers = readTable_('Customers').rows.filter(function (r) { return r.CUSTOMERACCOUNT; })
       .map(function (r) { return { c: String(r.CUSTOMERACCOUNT), n: String(r.NAME || ''), acc: r.LEDGERACCOUNT || '', cur: r.CURRENCYCODE || '' }; });
   }
-  if (['banks', 'gl', 'reports'].some(function (pg) { return can_(s, pg, 'view'); })) {
+  if (['banks', 'gl', 'reports', 'cashvouchers'].some(function (pg) { return can_(s, pg, 'view'); })) {
     out.banks = readTable_('BankAccounts').rows.filter(function (r) { return r.BANKACCOUNTID; })
       .map(function (r) { return { c: String(r.BANKACCOUNTID), n: String(r.NAME || ''), acc: r.LEDGERACCOUNT || '', cur: r.CURRENCYCODE || '' }; });
   }
@@ -1174,7 +1265,7 @@ function refs_(s) {
   out.rates = readTable_('ExchangeRates').rows.filter(function (r) { return r.CURRENCYCODE; })
     .map(function (r) { return { c: String(r.CURRENCYCODE), d: String(r.FROMDATE), r: num_(r.RATE) }; });
   out.accounts = readTable_('MainAccounts').rows.filter(function (r) { return r.MAINACCOUNTID; })
-    .map(function (r) { return { c: String(r.MAINACCOUNTID), n: String(r.NAME || ''), p: String(r.PARENTACCOUNT || ''), h: r.ACCOUNTLEVEL === 'Header' ? 1 : 0 }; });
+    .map(function (r) { return { c: String(r.MAINACCOUNTID), n: String(r.NAME || ''), p: String(r.PARENTACCOUNT || ''), h: r.ACCOUNTLEVEL === 'Header' ? 1 : 0, t: r.MAINACCOUNTTYPE || '' }; });
   out.groups = readTable_('AssetGroups').rows.filter(function (r) { return r.FIXEDASSETGROUPID; }).map(function (r) {
     return { c: String(r.FIXEDASSETGROUPID), n: String(r.NAME || ''), a: r.ASSETACCOUNT || '', ad: r.ACCUMDEPACCOUNT || '',
       de: r.DEPEXPENSEACCOUNT || '', di: r.DISPOSALACCOUNT || '' };
@@ -1189,7 +1280,7 @@ function refs_(s) {
     out.books = readTable_('AssetBooks').rows.filter(function (r) { return r.FIXEDASSETNUMBER; })
       .map(function (r) { return { a: String(r.FIXEDASSETNUMBER), c: String(r.BOOKID), n: String(r.STATUS || '') }; });
   }
-  if (can_(s, 'vendors', 'view') || can_(s, 'journal', 'view') || can_(s, 'gl', 'view')) {
+  if (can_(s, 'vendors', 'view') || can_(s, 'journal', 'view') || can_(s, 'gl', 'view') || can_(s, 'cashvouchers', 'view')) {
     out.vendors = readTable_('Vendors').rows.filter(function (r) { return r.VENDORACCOUNTNUMBER; })
       .map(function (r) { return { c: String(r.VENDORACCOUNTNUMBER), n: String(r.VENDORORGANIZATIONNAME || ''), acc: r.VENDORLEDGERACCOUNT || '', cur: r.CURRENCYCODE || '' }; });
   }
@@ -1559,11 +1650,49 @@ HOOKS.budgets = function (rec, ex, ctx) {
   rec.ACCOUNTNAME = (ctx.find('accounts', rec.MAINACCOUNTID) || {}).NAME || '';
   deriveChain_(ctx, rec, UNIT_CHAIN);
   if (num_(rec.AMOUNT) < 0) throw new Error('المبلغ التقديري لا يمكن أن يكون سالباً');
+  const acc = ctx.find('accounts', rec.MAINACCOUNTID);
+  const isRev = acc && acc.MAINACCOUNTTYPE === 'Revenue';
+  if (rec.BUDGETTYPE === 'Revenue' && !isRev) throw new Error('سطر ' + (rec.LINENUM || '') + ': الحساب ' + rec.MAINACCOUNTID + ' ليس حساب إيرادات (موازنة إيرادات)');
+  if (rec.BUDGETTYPE === 'Expense' && isRev) throw new Error('سطر ' + (rec.LINENUM || '') + ': الحساب ' + rec.MAINACCOUNTID + ' حساب إيرادات — استخدم موازنة إيرادات');
   const dup = ctx.table('budgets').rows.filter(function (b) {
-    return b.LINEID !== rec.LINEID && String(b.BUDGETYEAR) === String(rec.BUDGETYEAR) && low_(b.MAINACCOUNTID) === low_(rec.MAINACCOUNTID) &&
+    return b.LINEID !== rec.LINEID && low_(b.BUDGETID) !== low_(rec.BUDGETID) && String(b.BUDGETYEAR) === String(rec.BUDGETYEAR) && low_(b.MAINACCOUNTID) === low_(rec.MAINACCOUNTID) &&
       low_(b.OPERATINGUNIT) === low_(rec.OPERATINGUNIT) && low_(b.SUB1_OPERATINGUNIT) === low_(rec.SUB1_OPERATINGUNIT) && low_(b.SUB2_OPERATINGUNIT) === low_(rec.SUB2_OPERATINGUNIT);
   })[0];
-  if (dup) throw new Error('يوجد سطر موازنة لنفس الحساب والوحدة والسنة — عدّله بدلاً من إضافة سطر جديد');
+  if (dup) throw new Error('سطر ' + (rec.LINENUM || '') + ': الحساب ' + rec.MAINACCOUNTID + ' بنفس الوحدة موجود في الموازنة ' + dup.BUDGETID + ' لنفس السنة');
+};
+
+HOOKS.budgetheads = function (rec, ex, ctx) {
+  if (!/^\d{4}$/.test(rec.BUDGETYEAR)) throw new Error('سنة الموازنة يجب أن تكون 4 أرقام (مثل 2026)');
+  if (!rec.ENTRYDATE) rec.ENTRYDATE = today_();
+  if (ex && ex.STATUS && ex.STATUS !== 'Draft') throw new Error('لا يمكن تعديل موازنة معتمدة');
+};
+
+HOOKS.cashvouchers = function (rec, ex, ctx) {
+  const bank = ctx.find('banks', rec.BANKACCOUNTID);
+  if (!bank) throw new Error('الصندوق / البنك غير موجود "' + (rec.BANKACCOUNTID || '') + '"');
+  rec.BANKACCOUNTID = bank.BANKACCOUNTID;
+  const local = String(getSettings_().CURRENCY || '').toUpperCase();
+  rec.CURRENCYCODE = String(bank.CURRENCYCODE || local).toUpperCase();
+  if (rec.CURRENCYCODE === local) rec.EXCHANGERATE = 1;
+  else if (!(num_(rec.EXCHANGERATE) > 0)) {
+    rec.EXCHANGERATE = ctx.rate(rec.CURRENCYCODE, rec.TRANSDATE);
+    if (!(rec.EXCHANGERATE > 0)) throw new Error('لا يوجد سعر صرف للعملة ' + rec.CURRENCYCODE + ' بتاريخ ' + rec.TRANSDATE);
+  }
+  if (!(num_(rec.AMOUNT) > 0)) throw new Error('المبلغ يجب أن يكون أكبر من صفر');
+  if (rec.PARTYTYPE === 'Ledger') {
+    rec.PARTYID = postingAccount_(ctx, rec.PARTYID, 'الحساب');
+    if (!rec.PARTYID) throw new Error('اختر الحساب');
+    rec.PARTYNAME = (ctx.find('accounts', rec.PARTYID) || {}).NAME || '';
+  } else {
+    const P = PARTY[rec.PARTYTYPE];
+    if (!P) throw new Error('نوع الطرف غير معروف');
+    const p = ctx.find(P.entity, rec.PARTYID);
+    if (!p) throw new Error(P.ar + ' غير موجود "' + (rec.PARTYID || '') + '"');
+    rec.PARTYID = p[P.id];
+    rec.PARTYNAME = p[P.name] || '';
+  }
+  if (rec.SUB2_OPERATINGUNIT) checkLk_(ctx, rec, 'SUB2_OPERATINGUNIT', 'Sub2_OperatingUnit');
+  checkOpenPeriod_(ctx, rec.TRANSDATE, 'السند');
 };
 
 HOOKS.currencies = function (rec) {
@@ -1808,6 +1937,9 @@ function deleteRecords(token, entity, keys) {
         const T = entity === 'customers' ? 'Customer' : entity === 'banks' ? 'Bank' : 'Vendor';
         const id = r[PARTY[T].id];
         if (partyUsed_(ctx, T, id)) throw new Error('لا يمكن حذف ' + PARTY[T].ar + ' ' + id + ' لوجود قيود مرتبطة به');
+        if (ctx.table('cashvouchers').rows.some(function (c) { return low_(T === 'Bank' ? c.BANKACCOUNTID : c.PARTYTYPE === T ? c.PARTYID : '') === low_(id); })) {
+          throw new Error('لا يمكن حذف ' + PARTY[T].ar + ' ' + id + ' لوجود سندات قبض/صرف مرتبطة به');
+        }
       }
       if (entity === 'groups') {
         const gid = low_(r.FIXEDASSETGROUPID);
@@ -2396,6 +2528,173 @@ function fiscalReopen(token, year) {
   });
 }
 
+/* ============================== Budgets: header + lines ============================== */
+
+/** حفظ موازنة كاملة (الرأس + كل السطور؛ تُستبدل السطور بالكامل). */
+function saveBudget(token, head, lines, isNew) {
+  const s = auth_(token);
+  need_(s, 'budget', isNew ? 'add' : 'edit');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    head = head || {};
+    if (!isNew) {
+      const ex = ctx.find('budgetheads', head.BUDGETID);
+      if (!ex) throw new Error('الموازنة غير موجودة');
+      if (ex.STATUS !== 'Draft') throw new Error('لا يمكن تعديل موازنة معتمدة — ألغِ الاعتماد أولاً');
+    } else head.BUDGETID = '@pending';
+    const ph = prepare_('budgetheads', head, isNew ? 'add' : 'edit', ctx);
+    ph.rec.STATUS = 'Draft';
+    const id = ph.rec.BUDGETID;
+    const rows = (lines || []).filter(function (x) { return x && (x.MAINACCOUNTID || num_(x.AMOUNT)); });
+    if (!rows.length) throw new Error('الموازنة لا تحتوي على سطور');
+    const seen = {};
+    let total = 0;
+    const pl = rows.map(function (x, i) {
+      const p = prepare_('budgets', {
+        BUDGETID: id, LINENUM: i + 1, BUDGETYEAR: ph.rec.BUDGETYEAR, PERIODTYPE: ph.rec.PERIODTYPE, BUDGETTYPE: ph.rec.BUDGETTYPE,
+        MAINACCOUNTID: x.MAINACCOUNTID || '', SUB2_OPERATINGUNIT: x.SUB2_OPERATINGUNIT || '', SUB1_OPERATINGUNIT: x.SUB1_OPERATINGUNIT || '', OPERATINGUNIT: x.OPERATINGUNIT || '',
+        AMOUNT: toNum_(x.AMOUNT, { ar: 'سطر ' + (i + 1) + ' — المبلغ' }), NOTE: x.NOTE || ''
+      }, 'add', ctx);
+      const k = [low_(p.rec.MAINACCOUNTID), low_(p.rec.OPERATINGUNIT), low_(p.rec.SUB1_OPERATINGUNIT), low_(p.rec.SUB2_OPERATINGUNIT)].join('|');
+      if (seen[k]) throw new Error('السطر ' + (i + 1) + ' مكرر مع السطر ' + seen[k] + ' (نفس الحساب والوحدة)');
+      seen[k] = i + 1;
+      total += num_(p.rec.AMOUNT);
+      return p;
+    });
+    ph.rec.TOTALAMOUNT = round_(total, 3);
+    const bt = ctx.table('budgets');
+    const old = [];
+    bt.rows.forEach(function (r, i) { if (!isNew && low_(r.BUDGETID) === low_(id)) old.push(i); });
+    deleteRows_(bt, old);
+    ctx.resetIndex('budgets');
+    if (id === '@pending') {
+      const no = nextSeq_('BUDGETSEQ', 'BUDGETPREFIX', 'BG-');
+      ph.rec.BUDGETID = no;
+      pl.forEach(function (p) { p.rec.BUDGETID = no; });
+    }
+    commit_('budgetheads', ph, ctx);
+    pl.forEach(function (p) { commit_('budgets', p, ctx); });
+    return { id: ph.rec.BUDGETID, total: ph.rec.TOTALAMOUNT, lines: pl.length };
+  });
+}
+
+/** action: approve | unapprove | delete */
+function budgetAction(token, id, action) {
+  const s = auth_(token);
+  need_(s, 'budget', action === 'delete' ? 'delete' : 'approve');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    const ht = ctx.table('budgetheads');
+    const h = ctx.find('budgetheads', id);
+    if (!h) throw new Error('الموازنة غير موجودة');
+    const hi = ht.rows.indexOf(h);
+    if (action === 'delete') {
+      if (h.STATUS !== 'Draft') throw new Error('يمكن حذف الموازنات في حالة مسودة فقط');
+      const bt = ctx.table('budgets');
+      const idx = [];
+      bt.rows.forEach(function (r, i) { if (low_(r.BUDGETID) === low_(id)) idx.push(i); });
+      deleteRows_(bt, idx);
+      deleteRows_(ht, [hi]);
+      return true;
+    }
+    if (action === 'approve') {
+      if (h.STATUS !== 'Draft') throw new Error('الموازنة ليست في حالة مسودة');
+      if (!ctx.table('budgets').rows.some(function (r) { return low_(r.BUDGETID) === low_(id); })) throw new Error('الموازنة بدون سطور');
+      h.STATUS = 'Approved'; h.APPROVEDBY = s.username; h.APPROVEDON = stamp_();
+    } else if (action === 'unapprove') {
+      if (h.STATUS !== 'Approved') throw new Error('الموازنة غير معتمدة');
+      h.STATUS = 'Draft'; h.APPROVEDBY = ''; h.APPROVEDON = '';
+    } else throw new Error('إجراء غير معروف');
+    writeRow_(ht, hi, h);
+    return true;
+  });
+}
+
+/* ============================== Receipts & payments ============================== */
+
+/** قيود السند: القبض = من حـ/ الصندوق إلى حـ/ الطرف، والصرف عكسه. */
+function cashLegs_(ctx, r, reverse) {
+  const amt = num_(r.AMOUNT);
+  const bank = { pt: 'Bank', pid: r.BANKACCOUNTID, cur: r.CURRENCYCODE, rate: num_(r.EXCHANGERATE) || 1, note: r.DESCRIPTION || '', ref: r.CHEQUENUMBER || r.VOUCHERNO };
+  const party = { cur: r.CURRENCYCODE, rate: num_(r.EXCHANGERATE) || 1, s2: r.SUB2_OPERATINGUNIT || '', note: r.DESCRIPTION || '', ref: r.CHEQUENUMBER || r.VOUCHERNO };
+  if (r.PARTYTYPE === 'Ledger') party.acc = r.PARTYID; else { party.pt = r.PARTYTYPE; party.pid = r.PARTYID; }
+  let bankDr = r.VOUCHERTYPE === 'Receipt';
+  if (reverse) bankDr = !bankDr;
+  bank.curDebit = bankDr ? amt : 0; bank.curCredit = bankDr ? 0 : amt;
+  party.curDebit = bankDr ? 0 : amt; party.curCredit = bankDr ? amt : 0;
+  return bankDr ? [bank, party] : [party, bank];
+}
+
+function postCash_(ctx, r, reverse, date) {
+  const label = r.VOUCHERTYPE === 'Receipt' ? 'سند قبض' : 'سند صرف';
+  const v = autoVoucher_(ctx, { TRANSDATE: date || r.TRANSDATE, JOURNALNAME: r.VOUCHERTYPE === 'Receipt' ? 'RV' : 'PV',
+    DESCRIPTION: (reverse ? 'إلغاء ' : '') + label + ' ' + r.VOUCHERNO + ' — ' + (r.PARTYNAME || r.PARTYID) + (r.DESCRIPTION ? ' — ' + r.DESCRIPTION : ''),
+    REFERENCE: r.VOUCHERNO, SOURCE: 'CashVoucher', SOURCEREF: r.VOUCHERNO }, cashLegs_(ctx, r, reverse));
+  writeVoucher_(ctx, v);
+  return v.head.rec.VOUCHER;
+}
+
+/** حفظ سند (وترحيله مباشرة إذا post = true). */
+function saveCashVoucher(token, rec, isNew, post) {
+  const s = auth_(token);
+  need_(s, 'cashvouchers', isNew ? 'add' : 'edit');
+  if (post) need_(s, 'cashvouchers', 'post');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    rec = Object.assign({}, rec || {});
+    if (isNew) rec.VOUCHERNO = '@pending';
+    else {
+      const ex = ctx.find('cashvouchers', rec.VOUCHERNO);
+      if (!ex) throw new Error('السند غير موجود');
+      if (ex.STATUS !== 'Draft') throw new Error('لا يمكن تعديل سند مُرحّل أو ملغى');
+    }
+    const p = prepare_('cashvouchers', rec, isNew ? 'add' : 'edit', ctx);
+    p.rec.STATUS = 'Draft';
+    // نتحقق من القيد قبل أي كتابة
+    if (post) prepareVoucher_(ctx, { TRANSDATE: p.rec.TRANSDATE, JOURNALNAME: p.rec.VOUCHERTYPE === 'Receipt' ? 'RV' : 'PV' }, cashLegs_(ctx, p.rec), 'add');
+    if (p.rec.VOUCHERNO === '@pending') {
+      p.rec.VOUCHERNO = p.rec.VOUCHERTYPE === 'Receipt' ? nextSeq_('RVSEQ', 'RVPREFIX', 'RV-') : nextSeq_('PVSEQ', 'PVPREFIX', 'PV-');
+    }
+    if (post) {
+      p.rec.GLVOUCHER = postCash_(ctx, p.rec);
+      p.rec.STATUS = 'Posted'; p.rec.POSTEDBY = s.username; p.rec.POSTEDON = stamp_();
+    }
+    commit_('cashvouchers', p, ctx);
+    return { no: p.rec.VOUCHERNO, status: p.rec.STATUS, gl: p.rec.GLVOUCHER || '' };
+  });
+}
+
+/** action: post | cancel (قيد عكسي بتاريخ اليوم أو التاريخ المحدد) | delete (مسودة فقط) */
+function cashAction(token, no, action, date) {
+  const s = auth_(token);
+  need_(s, 'cashvouchers', action === 'delete' ? 'delete' : 'post');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    const t = ctx.table('cashvouchers');
+    const r = ctx.find('cashvouchers', no);
+    if (!r) throw new Error('السند غير موجود');
+    const i = t.rows.indexOf(r);
+    if (action === 'delete') {
+      if (r.STATUS !== 'Draft') throw new Error('يمكن حذف السندات في حالة مسودة فقط — السند المُرحّل يُلغى');
+      deleteRows_(t, [i]);
+      return true;
+    }
+    if (action === 'post') {
+      if (r.STATUS !== 'Draft') throw new Error('السند مُرحّل مسبقاً');
+      r.GLVOUCHER = postCash_(ctx, r);
+      r.STATUS = 'Posted'; r.POSTEDBY = s.username; r.POSTEDON = stamp_();
+    } else if (action === 'cancel') {
+      if (r.STATUS !== 'Posted') throw new Error('يمكن إلغاء السندات المُرحّلة فقط');
+      const d = date ? toDate_(date, ctx.dateFmt, { ar: 'تاريخ الإلغاء' }) : today_();
+      if (d < String(r.TRANSDATE)) throw new Error('تاريخ الإلغاء قبل تاريخ السند');
+      r.REVERSALVOUCHER = postCash_(ctx, r, true, d);
+      r.STATUS = 'Cancelled';
+    } else throw new Error('إجراء غير معروف');
+    writeRow_(t, i, r);
+    return { gl: action === 'post' ? r.GLVOUCHER : r.REVERSALVOUCHER };
+  });
+}
+
 /* ============================== Parties: customers / vendors / cash & banks ============================== */
 
 const PARTY = {
@@ -2502,7 +2801,9 @@ function budgetData(token, year) {
   const s = auth_(token);
   need_(s, 'budget', 'view');
   year = String(year || new Date().getFullYear());
-  const budgets = readTable_('Budgets').rows.filter(function (b) { return b.LINEID && String(b.BUDGETYEAR) === year; }).map(function (b) {
+  const approved = {};
+  readTable_('BudgetHeaders').rows.forEach(function (h) { if (h.BUDGETID && h.STATUS === 'Approved') approved[low_(h.BUDGETID)] = 1; });
+  const budgets = readTable_('Budgets').rows.filter(function (b) { return b.LINEID && String(b.BUDGETYEAR) === year && approved[low_(b.BUDGETID)]; }).map(function (b) {
     return { acc: String(b.MAINACCOUNTID), ou: b.OPERATINGUNIT || '', s1: b.SUB1_OPERATINGUNIT || '', s2: b.SUB2_OPERATINGUNIT || '', amt: num_(b.AMOUNT), per: b.PERIODTYPE };
   });
   const heads = {};

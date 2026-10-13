@@ -71,6 +71,7 @@
   .abtn:disabled svg.i { color: #a19f9d; }
   .abtn.danger svg.i { color: var(--danger); }
   .abtn.back svg.i { color: var(--text); }
+  .abtn.pri { background: var(--primary); color: #fff; } .abtn.pri svg.i { color: #fff; } .abtn.pri:hover:not(:disabled) { background: var(--primary-dark); }
   .apane .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
   .apane .tab { font-weight: 600; border-bottom: 2px solid transparent; border-radius: 0; }
   .apane .tab.on { border-bottom-color: var(--primary); }
@@ -354,7 +355,20 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   table.gl-grid td.c-no, table.gl-grid th.c-no { width: 34px; text-align: center; color: var(--muted); padding: 0 4px; }
   table.gl-grid .c-acc { width: 110px; } table.gl-grid .c-name { width: 170px; padding: 0 6px; color: #3b3a39; }
-  table.gl-grid .c-type { width: 124px; } table.gl-grid select.cell { width: 100%; border: 0; background: transparent; font: inherit; height: 28px; padding: 0 4px; }
+  table.gl-grid .c-type { width: 124px; }
+  table.gl-grid.bg-grid .c-u { width: 150px; padding: 0 6px; font-size: 12px; color: #3b3a39; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin: 0 0 10px; background: #fff; }
+  .seg button { border: 0; background: none; padding: 6px 14px; font: inherit; cursor: pointer; color: #323130; }
+  .seg button + button { border-inline-start: 1px solid var(--border); }
+  .seg button.on { background: var(--primary); color: #fff; }
+  .cash-words { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: center; font-size: 14px; }
+  .cash-words b { color: var(--primary-dark); } .cash-words .muted { color: #8a8886; }
+  .cashdoc .cd-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 6px 0 12px; font-size: 13px; }
+  .cashdoc .cd-amt { border: 2px solid #000; padding: 6px 14px; font-size: 18px; font-weight: 700; direction: ltr; }
+  .cashdoc .cd-void { text-align: center; color: #a4262c; border: 2px solid #a4262c; font-weight: 800; font-size: 20px; padding: 4px; margin-bottom: 10px; }
+  .cashdoc table.cd-t { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 18px; }
+  .cashdoc table.cd-t th { width: 140px; text-align: start; padding: 9px 8px; border-bottom: 1px dotted #999; white-space: nowrap; }
+  .cashdoc table.cd-t td { padding: 9px 8px; border-bottom: 1px dotted #999; } table.gl-grid select.cell { width: 100%; border: 0; background: transparent; font: inherit; height: 28px; padding: 0 4px; }
   .pinfo { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 10px 14px; background: #f3f6fb; border-bottom: 1px solid var(--border); font-size: 13px; }
   .doc .pinfo { padding: 6px 0; background: none; border: 0; font-size: 11px; }
   table.stmt.bct tr.bad td.v { color: #a4262c; font-weight: 700; }

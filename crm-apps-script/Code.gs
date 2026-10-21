@@ -74,7 +74,7 @@ const PAY_METHODS = ['Cash', 'Cheque', 'Transfer'];
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = '8';
+const APP_VERSION = '9';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -188,8 +188,30 @@ function fieldIndex_(name, hm) {
 /** Reads a sheet into plain objects (dates → yyyy-MM-dd strings for transport). */
 function readTable(name, keepDates) {
   const key = name + (keepDates ? '#d' : '');
-  if (!MEMO[key]) MEMO[key] = readTableRaw_(name, keepDates);
+  if (!MEMO[key]) MEMO[key] = name === 'Customers' ? mergeCustomers_(readTableRaw_(name, keepDates)) : readTableRaw_(name, keepDates);
   return MEMO[key];
+}
+
+/**
+ * One customer per account everywhere in the app, even if the sheet holds repeated rows
+ * (e.g. a file imported twice or into the wrong table): the first row wins and its empty
+ * fields are filled from the repeats. MEMO.dupCustomers tells the UI to offer a cleanup.
+ */
+function mergeCustomers_(rows) {
+  const byId = {}, out = [];
+  let dups = 0;
+  rows.forEach(function (r) {
+    const id = r.account;
+    if (!id) return;
+    const b = byId[id];
+    if (!b) { byId[id] = r; out.push(r); return; }
+    dups++;
+    Object.keys(r).forEach(function (k) {
+      if (k !== '_row' && (b[k] === '' || b[k] === null || b[k] === undefined) && r[k] !== '' && r[k] !== null && r[k] !== undefined) b[k] = r[k];
+    });
+  });
+  MEMO.dupCustomers = dups;
+  return out;
 }
 
 function readTableRaw_(name, keepDates) {
@@ -397,6 +419,7 @@ function lookups_(user) {
     currencies: readTable('Currencies').map(function (c) { return { code: String(c.code).toUpperCase(), name: c.name, rate: c.rate }; }),
     users: users.filter(function (u) { return u.active; }).map(function (u) { return { username: u.username, name: u.fullName || u.username }; }),
     payMethods: PAY_METHODS,
+    dupCustomers: MEMO.dupCustomers || 0,
     transactionTypes: ['Invoice', 'Payment', 'Credit note', 'Debit note', 'Settlement', 'Opening balance', 'Adjustment']
   };
 }
@@ -996,7 +1019,7 @@ function txAmounts_(t, fx) {
 }
 
 function fxInfo_(fx) {
-  return { currency: fx.display, base: fx.base, local: fx.local, missingRates: Object.keys(fx.missing) };
+  return { currency: fx.display, base: fx.base, local: fx.local, missingRates: Object.keys(fx.missing), dupCustomers: MEMO.dupCustomers || 0 };
 }
 
 /** Currencies used in customers / transactions that have no rate yet. */

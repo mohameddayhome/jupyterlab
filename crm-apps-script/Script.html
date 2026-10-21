@@ -2,7 +2,7 @@
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = '8';
+const CLIENT_VERSION = '9';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -104,6 +104,7 @@ const I18N = {
     imp_result: 'نتيجة الاستيراد', imp_added: 'أُضيف', imp_updated: 'حُدِّث', imp_dups: 'مكرر تم تخطيه', imp_noIdRows: 'صفوف بلا رقم أساسي/تاريخ',
     imp_newCust: 'عملاء جدد أُنشئوا', imp_unknown: 'حركات لعملاء غير موجودين (لن تظهر حتى إضافة العملاء)',
     imp_replaceTx: 'سيتم حذف الحركات المستوردة سابقاً فقط، وتبقى الحركات والسندات المسجّلة من التطبيق.',
+    dupFound: 'يوجد {n} صف عميل مكرر في شيت العملاء (نفس رقم العميل). تم دمجها تلقائياً في التقارير، ويُفضّل حذفها نهائياً:', askAdmin: 'اطلب من مدير النظام تنظيفها من صفحة الاستيراد.',
     cleanDup: 'تنظيف العملاء المكررين', cleanDupDone: 'تم حذف {n} صف مكرر من العملاء',
     editReceipt: 'تعديل سند التحصيل', CompanyLogo: 'شعار الشركة', uploadLogo: 'رفع شعار', removeLogo: 'إزالة الشعار',
     logoHint: 'PNG أو JPG أو SVG — يُصغَّر تلقائياً ويظهر في القائمة وشاشة الدخول وكل المطبوعات وكشوف الحساب',
@@ -246,6 +247,7 @@ const I18N = {
     imp_result: 'Import result', imp_added: 'Added', imp_updated: 'Updated', imp_dups: 'Duplicates skipped', imp_noIdRows: 'Rows without key/date',
     imp_newCust: 'New customers created', imp_unknown: 'Transactions for unknown customers (hidden until the customers exist)',
     imp_replaceTx: 'Only previously imported transactions are removed; entries and receipts made in the app are kept.',
+    dupFound: '{n} repeated customer rows found in the Customers sheet (same account). They are merged automatically in reports; better remove them:', askAdmin: 'Ask the administrator to clean them from the Import page.',
     cleanDup: 'Clean duplicate customers', cleanDupDone: '{n} duplicate customer rows removed',
     editReceipt: 'Edit collection receipt', CompanyLogo: 'Company logo', uploadLogo: 'Upload logo', removeLogo: 'Remove logo',
     logoHint: 'PNG, JPG or SVG — resized automatically; shown in the menu, sign-in screen, all printouts and statements',
@@ -695,9 +697,16 @@ function readTools(el) {
   return o;
 }
 function missingNotice(r) {
-  if (!r || !r.missingRates || !r.missingRates.length) return '';
-  return `<div class="panel notice">⚠ ${t('missingRates')}: <b>${r.missingRates.map(esc).join('، ')}</b>
-    ${hasPage('currencies') ? `<button class="section-action" data-go="currencies">${t('p_currencies')} ←</button>` : ''}</div>`;
+  if (!r) return '';
+  return dupNotice(r.dupCustomers) + (!r.missingRates || !r.missingRates.length ? '' :
+    `<div class="panel notice">⚠ ${t('missingRates')}: <b>${r.missingRates.map(esc).join('، ')}</b>
+    ${hasPage('currencies') ? `<button class="section-action" data-go="currencies">${t('p_currencies')} ←</button>` : ''}</div>`);
+}
+/** Repeated customer rows in the sheet (merged automatically) → offer the cleanup. */
+function dupNotice(n) {
+  if (!n) return '';
+  return `<div class="panel notice">⚠ ${t('dupFound', { n: NI.format(n) })}
+    ${S.user.isAdmin && hasPage('import') ? btn('cleanDup', '🧹 ' + t('cleanDup'), 'button-ghost') : `<span>${t('askAdmin')}</span>`}</div>`;
 }
 
 /**
@@ -1189,7 +1198,7 @@ const VIEWS = {
 
   customers() {
     setContent(heading('customers', [can('add') && btn('newCustomer', '＋ ' + t('addCustomer')), exportBtn(), btn('print', '🖨 ' + t('print'), 'button-ghost')]) + listBlock('customers'));
-    loadList('customers');
+    loadList('customers').then(() => { if (S.lookups.dupCustomers) $('#content .page-heading').insertAdjacentHTML('afterend', dupNotice(S.lookups.dupCustomers)); });
   },
 
   transactions() {
@@ -2316,6 +2325,7 @@ const ACT = {
     const r = await call('removeDuplicateCustomers');
     toast(t('cleanDupDone', { n: NI.format(r.removed) }));
     await refreshLookups();
+    reload();
   }
 };
 

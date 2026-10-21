@@ -2,7 +2,7 @@
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = '9';
+const CLIENT_VERSION = '10';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -93,6 +93,11 @@ const I18N = {
     passwordHint: 'اتركها فارغة للإبقاء على كلمة المرور الحالية', pagesN: '{n} صفحة', day: 'يوم',
     settingsSaved: 'تم حفظ الإعدادات',
     err_OUTDATED: 'ملف Code.gs في Apps Script غير محدّث: استبدله بالنسخة الجديدة كاملة، احفظ (Ctrl+S)، ثم Deploy ← Manage deployments ← تعديل ← New version.',
+    permTitle: 'الصلاحيات حسب الصفحة', pageCol: 'الصفحة', perm_view: 'عرض', perm_add: 'إضافة', perm_edit: 'تعديل', perm_delete: 'حذف', perm_post: 'ترحيل',
+    permHint: 'اختيار أي عملية يفعّل «عرض» تلقائياً. صفحات التقارير عرض فقط. مدير النظام له كل الصلاحيات.',
+    changePw: 'تغيير كلمة المرور', curPw: 'كلمة المرور الحالية', newPw: 'كلمة المرور الجديدة', confirmPw: 'تأكيد كلمة المرور الجديدة',
+    pwChanged: 'تم تغيير كلمة المرور', pwMismatch: 'كلمتا المرور غير متطابقتين', err_WRONG_PASSWORD: 'كلمة المرور الحالية غير صحيحة',
+    err_PASSWORD_SHORT: 'كلمة المرور يجب ألا تقل عن 6 أحرف',
     imp_map: 'مطابقة الأعمدة', imp_field: 'الحقل في التطبيق', imp_col: 'العمود في الملف', imp_ignored: 'يُتجاهل',
     imp_detected: 'تم اختيار الجدول «{e}» تلقائياً حسب أعمدة الملف',
     imp_mismatch: 'تنبيه: أعمدة الملف تخص جدول «{b}» وليس «{e}». الاستيراد في الجدول الخطأ يُنشئ بيانات غير صحيحة.',
@@ -236,6 +241,11 @@ const I18N = {
     passwordHint: 'Leave empty to keep the current password', pagesN: '{n} pages', day: 'days',
     settingsSaved: 'Settings saved',
     err_OUTDATED: 'Code.gs in Apps Script is out of date: replace it with the new version, save (Ctrl+S), then Deploy → Manage deployments → Edit → New version.',
+    permTitle: 'Permissions by page', pageCol: 'Page', perm_view: 'View', perm_add: 'Add', perm_edit: 'Edit', perm_delete: 'Delete', perm_post: 'Post',
+    permHint: 'Ticking any action also ticks “View”. Report pages are view-only. Administrators have every permission.',
+    changePw: 'Change password', curPw: 'Current password', newPw: 'New password', confirmPw: 'Confirm new password',
+    pwChanged: 'Password changed', pwMismatch: 'Passwords do not match', err_WRONG_PASSWORD: 'Current password is wrong',
+    err_PASSWORD_SHORT: 'Password must be at least 6 characters',
     imp_map: 'Column mapping', imp_field: 'App field', imp_col: 'File column', imp_ignored: 'ignored',
     imp_detected: 'Table «{e}» selected automatically from the file columns',
     imp_mismatch: 'Warning: the file columns belong to «{b}», not «{e}». Importing into the wrong table creates bad data.',
@@ -352,7 +362,21 @@ const ymd = d => d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate
 const today = () => ymd(new Date());
 const monthStart = () => today().slice(0, 8) + '01';
 const yearStart = () => today().slice(0, 5) + '01-01';
-const can = a => S.user && (S.user.isAdmin || S.user['can' + a[0].toUpperCase() + a.slice(1)]);
+/** Actions available per page in the permissions matrix (same list as PAGE_ACTIONS in Code.gs). */
+const PAGE_ACTS = {
+  customers: ['add', 'edit', 'delete'], transactions: ['add', 'edit', 'delete', 'post'], receipts: ['add', 'edit', 'delete', 'post'],
+  groups: ['add', 'edit', 'delete'], followup: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete']
+};
+const ACTIONS = ['add', 'edit', 'delete', 'post'];
+/** Can the user do `a` (add/edit/delete/post) on `page` (default: the page on screen)? */
+const can = (a, page) => {
+  const u = S.user;
+  if (!u) return false;
+  if (u.isAdmin) return true;
+  page = page || S.view;
+  if (u.perms) return !!(u.perms[page] && u.perms[page].indexOf(a) > -1);
+  return !!u['can' + a[0].toUpperCase() + a.slice(1)]; // users created before per-page permissions
+};
 const hasPage = p => S.user && (p === 'messages' || S.user.pages.indexOf(p) > -1);
 const groupName = id => { const g = S.lookups.groups.find(x => x.id === id); return g ? g.name : (id || ''); };
 const collectorName = u => { if (!u) return t('unassigned'); const c = S.lookups.collectors.find(x => x.username === u); return c ? c.name : u; };
@@ -615,6 +639,7 @@ function renderShell() {
       ${nav('workspace')}${nav('reports')}${nav('admin')}
       <div class="profile"><div class="avatar">${esc((u.fullName || u.username)[0].toUpperCase())}</div>
         <div><p class="profile-name">${esc(u.fullName || u.username)}</p><p class="profile-role">${esc(t(u.role))}</p></div>
+        <button class="icon-button" data-act="changePw" title="${t('changePw')}" aria-label="${t('changePw')}">🔑</button>
         <button class="icon-button" data-act="logout" title="${t('logout')}" aria-label="${t('logout')}">⎋</button></div>
     </aside>
     <div class="scrim" id="scrim" data-act="menu"></div>
@@ -761,6 +786,14 @@ function stat(label, value, mark, markCls, foot) {
     <div class="stat-mark ${markCls || ''}">${mark}</div></div>${foot ? `<div class="stat-foot">${foot}</div>` : ''}</article>`;
 }
 
+function permSummary(r) {
+  if (r.role === 'Admin') return t('all');
+  let pm = null;
+  try { pm = r.perms ? JSON.parse(r.perms) : null; } catch (e) { pm = null; }
+  if (!pm) return ['Add', 'Edit', 'Delete', 'Post'].filter(a => r['can' + a]).map(a => t('f_can' + a)).join(' · ');
+  return Object.keys(pm).map(pg => t('p_' + pg) + ': ' + pm[pg].map(a => t('perm_' + a)).join('/')).join(' · ') || '—';
+}
+
 const SETTING_INPUTS = ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'WhatsAppCountryCode', 'SessionMinutes'];
 const SETTING_TEXTS = ['BankDetails', 'StatementNote'];
 
@@ -802,7 +835,7 @@ const LISTS = {
     select: r => can('post') && r.postStatus === 'Draft',
     actions: r => {
       const draft = r.postStatus === 'Draft';
-      return (draft && can('edit') && (!r.payMethod || hasPage('receipts')) ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') +
+      return (draft && (r.payMethod ? hasPage('receipts') && can('edit', 'receipts') : can('edit')) ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') +
         (draft && can('post') ? `<button data-act="rowPost" title="${t('post')}">⇪</button>` : '') +
         (!draft && S.user.isAdmin ? `<button data-act="rowUnpost" title="${t('unpost')}">↺</button>` : '') +
         ((draft || S.user.isAdmin) && can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '');
@@ -853,7 +886,7 @@ const LISTS = {
     cols: () => [
       { k: 'username', l: t('f_username') }, { k: 'fullName', l: t('f_fullName') }, { k: 'role', l: t('f_role'), f: v => pill(t(v), v === 'Admin' ? 'info' : 'neutral') },
       { k: 'pages', l: t('f_pages'), f: (v, r) => r.role === 'Admin' ? t('all') : t('pagesN', { n: String(v || '').split(',').filter(String).length }) },
-      { k: 'canAdd', l: t('f_actions'), f: (v, r) => r.role === 'Admin' ? t('all') : ['Add', 'Edit', 'Delete', 'Post'].filter(a => r['can' + a]).map(a => t('f_can' + a)).join(' · ') },
+      { k: 'perms', l: t('f_actions'), cls: 'clip', f: (v, r) => esc(permSummary(r)), x: r => permSummary(r) },
       { k: 'isCollector', l: t('f_isCollector'), f: v => v ? '✓' : '' }, { k: 'scope', l: t('f_scope'), f: v => t('scope_' + (v || 'all')) },
       { k: 'active', l: t('f_active'), f: v => pill(v ? t('Active') : t('Inactive'), v ? 'healthy' : 'neutral') }, { k: 'lastLogin', l: t('f_lastLogin') }],
     actions: () => `<button data-act="rowEdit">✎</button><button data-act="rowDelete">🗑</button>`
@@ -948,7 +981,7 @@ const FORMS = {
     { k: 'username', req: 1 }, { k: 'fullName', req: 1 }, { k: 'email', type: 'email' }, { k: 'password', type: 'password', hint: t('passwordHint') },
     { k: 'role', type: 'select', o: [['User', t('User')], ['Admin', t('Admin')]], noAll: 1 },
     { k: 'scope', type: 'select', o: [['all', t('scope_all')], ['own', t('scope_own')]], noAll: 1 },
-    { k: 'active', type: 'check' }, { k: 'isCollector', type: 'check' }, { k: 'actions', type: 'flags', span: 1 }, { k: 'pages', type: 'pages', span: 1 }]
+    { k: 'active', type: 'check' }, { k: 'isCollector', type: 'check' }, { k: 'pages', type: 'perm', span: 1 }]
 };
 const ENTITY_TITLE = { Customers: 'p_customers', Transactions: 'p_transactions', CustomerGroups: 'p_groups', FollowUps: 'p_followup', Users: 'p_users', Currencies: 'p_currencies' };
 const ID_KEY = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', FollowUps: 'id', Users: 'userId', Currencies: 'code' };
@@ -972,6 +1005,20 @@ function fieldHtml(f, rec, isNew) {
     case 'check': return `<label class="check" style="align-self:end;min-height:34px"><input type="checkbox" name="${f.k}" ${v ? 'checked' : ''}>${t('f_' + f.k)}</label>`;
     case 'flags': return `<div class="${cls}">${label}<div class="check-grid">${['canAdd', 'canEdit', 'canDelete', 'canPost'].map(k =>
       `<label class="check"><input type="checkbox" name="${k}" ${rec[k] ? 'checked' : ''}>${t('f_' + k)}</label>`).join('')}</div></div>`;
+    case 'perm': { // page × (view, add, edit, delete, post)
+      const view = String(rec.pages || '').split(',').map(x => x.trim());
+      let pm = null;
+      try { pm = rec.perms ? JSON.parse(rec.perms) : null; } catch (e) { pm = null; }
+      const has = (pg, a) => pm ? !!(pm[pg] && pm[pg].indexOf(a) > -1) : view.indexOf(pg) > -1 && !!rec['can' + a[0].toUpperCase() + a.slice(1)];
+      const cols = ['view'].concat(ACTIONS);
+      return `<div class="${cls}">${t('permTitle')}<div class="table-wrap perm-wrap"><table class="perm"><thead><tr><th>${t('pageCol')}</th>${cols.map(c =>
+        `<th><label class="check"><input type="checkbox" data-permcol="${c}">${t('perm_' + c)}</label></th>`).join('')}</tr></thead>
+        <tbody>${PAGES.filter(p => p.id !== 'messages').map(p => `<tr data-pg="${p.id}"><td>${p.glyph} ${t('p_' + p.id)}</td>
+          <td><input type="checkbox" name="v_${p.id}" data-perm="view" ${view.indexOf(p.id) > -1 ? 'checked' : ''}></td>
+          ${ACTIONS.map(a => (PAGE_ACTS[p.id] || []).indexOf(a) > -1
+            ? `<td><input type="checkbox" name="a_${p.id}_${a}" data-perm="${a}" ${has(p.id, a) ? 'checked' : ''}></td>` : '<td class="na">—</td>').join('')}</tr>`).join('')}</tbody></table></div>
+        <span class="field-hint">${t('permHint')}</span></div>`;
+    }
     case 'pages': {
       const sel = String(v || '').split(',');
       return `<div class="${cls}">${label}<div class="check-grid">${PAGES.filter(p => p.id !== 'messages').map(p =>
@@ -991,7 +1038,7 @@ function openForm(entity, rec, isNew) {
     <form class="form-panel" id="recForm" style="padding:16px 0 0">
       <div class="form-grid">${fields.map(f => fieldHtml(f, rec, isNew)).join('')}</div>
       <div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button><button class="button-primary" type="submit">${t('save')}</button></div>
-    </form>`);
+    </form>`, entity === 'Users');
 }
 
 /** Transaction form: amount × rate → debit/credit, currency → exchange rate. */
@@ -1021,6 +1068,16 @@ async function submitForm(form) {
   fields.forEach(f => {
     if (f.type === 'flags') ['canAdd', 'canEdit', 'canDelete', 'canPost'].forEach(k => { data[k] = form.elements[k].checked; });
     else if (f.type === 'pages') data.pages = $$('input[name=page]:checked', form).map(i => i.value).join(',');
+    else if (f.type === 'perm') {
+      const perms = {}, pages = [];
+      $$('tr[data-pg]', form).forEach(tr => {
+        const pg = tr.dataset.pg;
+        if ($('[data-perm=view]', tr).checked) pages.push(pg);
+        const acts = $$('input[data-perm]:not([data-perm=view]):checked', tr).map(i => i.dataset.perm);
+        if (acts.length) perms[pg] = acts;
+      });
+      data.pages = pages.join(','); data.perms = perms;
+    }
     else if (f.type === 'check') data[f.k] = form.elements[f.k].checked;
     else if (f.type === 'number') data[f.k] = form.elements[f.k].value.trim() === '' ? '' : parseNum(form.elements[f.k].value);
     else data[f.k] = form.elements[f.k].value.trim();
@@ -1077,9 +1134,9 @@ async function openCustomer(account, from, to, keep, currency) {
       ${kv('f_taxNo', esc(c.taxNo))}${kv('f_createdAt', esc(c.createdAt))}</div>
       ${c.notes ? `<div class="drawer-label">${t('f_notes')}</div><p>${esc(c.notes)}</p>` : ''}
       <div class="card-actions">
-        ${hasPage('customers') && can('edit') ? btn('custEdit', '✎ ' + t('edit'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
-        ${hasPage('receipts') && can('add') ? btn('newReceipt', '⊕ ' + t('collect'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
-        ${hasPage('followup') && can('add') ? btn('newFollow', '☎ ' + t('logAction'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
+        ${hasPage('customers') && can('edit', 'customers') ? btn('custEdit', '✎ ' + t('edit'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
+        ${hasPage('receipts') && can('add', 'receipts') ? btn('newReceipt', '⊕ ' + t('collect'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
+        ${hasPage('followup') && can('add', 'followup') ? btn('newFollow', '☎ ' + t('logAction'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
         ${hasPage('statement') ? btn('goStatement', '§ ' + t('p_statement'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
         ${btn('compose', '✉ ' + t('msgColleague'), 'button-ghost', `data-acc="${esc(c.account)}"`)}
         ${exportBtn()}${btn('stmtPrint', '🖨 ' + t('print'), 'button-ghost')}
@@ -1104,7 +1161,7 @@ const VIEWS = {
   async dashboard() {
     const f = S.rep.dashboard = S.rep.dashboard || {};
     const actions = () => [`<div class="view-tools inline-tools" id="dashTools">${curTool(f)}</div>`,
-      hasPage('transactions') && can('add') && btn('newTx', '＋ ' + t('addTransaction'))];
+      hasPage('transactions') && can('add', 'transactions') && btn('newTx', '＋ ' + t('addTransaction'))];
     setContent(heading('dashboard', actions()) + `<div class="skeleton">${t('loading')}</div>`);
     const d = await call('getDashboard', f.currency || '');
     setBadge('overdue', d.kpi.overdueCustomers); setBadge('followup', d.kpi.overdueCustomers); setBadge('credit', d.kpi.creditOver);
@@ -1584,7 +1641,7 @@ async function runReport() {
           <p>${t('lastFollowUp')}: ${esc(c.lastFollowUp || '—')}${c.promiseDate ? `<br>${t('f_promiseDate')}: <b style="color:var(--text)">${esc(c.promiseDate)}</b>` : ''}</p>
           <div class="card-actions">
             ${can('add') ? btn('newFollow', '☎ ' + t('logAction'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
-            ${hasPage('receipts') && can('add') ? btn('newReceipt', '⊕ ' + t('collect'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
+            ${hasPage('receipts') && can('add', 'receipts') ? btn('newReceipt', '⊕ ' + t('collect'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
             ${btn('openCust', t('statement'), 'button-ghost', `data-acc="${esc(c.account)}"`)}
             ${c.phone ? `<a class="button-ghost link-btn" href="tel:${esc(c.phone)}">${t('call')}</a>` : ''}
             ${c.email ? `<a class="button-ghost link-btn" href="mailto:${esc(c.email)}">${t('mail')}</a>` : ''}
@@ -1984,7 +2041,7 @@ function openCollect(account, rc) {
       </div>
       <div class="field">${t('pickInvoices')} <span class="req">*</span><div id="allocBox" class="alloc-box"><div class="empty">${t('chooseCustomer')}</div></div></div>
       <label class="field">${t('f_description')}<textarea name="description">${esc(/^Collection - (Cash|Cheque|Transfer)$/.test(x.description || '') ? '' : (x.description || ''))}</textarea></label>
-      ${can('post') ? `<label class="check"><input type="checkbox" name="post">${t('postNow')}</label>` : ''}
+      ${can('post', 'receipts') ? `<label class="check"><input type="checkbox" name="post">${t('postNow')}</label>` : ''}
       <div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button><button class="button-primary" type="submit">${t('save')}</button></div>
     </form>`, true);
   rcMethod();
@@ -2263,6 +2320,15 @@ const ACT = {
   newTx() { openForm('Transactions', { date: today(), type: 'Invoice', currency: localCur(), exchange: 1 }, true); },
   newGroup() { openForm('CustomerGroups', {}, true); },
   newCurrency(el) { openForm('Currencies', { code: (el && el.dataset.code) || '', active: true }, true); },
+  changePw() {
+    openModal(`<div class="drawer-head"><h2>🔑 ${t('changePw')}</h2><button class="icon-button" data-act="closeModal">×</button></div>
+      <form class="form-panel" id="pwForm" style="padding:12px 0 0">
+        <label class="field">${t('curPw')} <span class="req">*</span><input name="cur" type="password" autocomplete="current-password" required></label>
+        <label class="field">${t('newPw')} <span class="req">*</span><input name="next" type="password" autocomplete="new-password" minlength="6" required></label>
+        <label class="field">${t('confirmPw')} <span class="req">*</span><input name="again" type="password" autocomplete="new-password" minlength="6" required></label>
+        <div class="form-actions"><button type="button" class="button-ghost" data-act="closeModal">${t('cancel')}</button><button class="button-primary" type="submit">${t('save')}</button></div>
+      </form>`);
+  },
   newUser() { openForm('Users', { role: 'User', scope: 'all', active: true, pages: 'dashboard,customers' }, true); },
   newFollow(el) { openForm('FollowUps', { account: el.dataset.acc || '', actionDate: today(), actionType: 'Call', status: 'Open' }, true); },
   openCust(el) { openCustomer(el.dataset.acc); },
@@ -2283,12 +2349,12 @@ const ACT = {
     if (['customers', 'groups', 'users', 'currencies'].indexOf(view) > -1) await refreshLookups();
     loadList(view);
   },
-  async rowPost(el) { const { view, row } = rowOf(el); const n = await call('postTransactions', [row.rowId], false); toast(t('postedN', { n })); loadList(view); },
-  async rowUnpost(el) { const { view, row } = rowOf(el); const n = await call('postTransactions', [row.rowId], true); toast(t('unpostedN', { n })); loadList(view); },
+  async rowPost(el) { const { view, row } = rowOf(el); const n = await call('postTransactions', [row.rowId], false, S.view); toast(t('postedN', { n })); loadList(view); },
+  async rowUnpost(el) { const { view, row } = rowOf(el); const n = await call('postTransactions', [row.rowId], true, S.view); toast(t('unpostedN', { n })); loadList(view); },
   async postSelected() {
     const ids = $$('[data-sel]:checked').map(i => i.dataset.sel);
     if (!ids.length) { toast(t('selectDraft'), 'error'); return; }
-    const n = await call('postTransactions', ids, false);
+    const n = await call('postTransactions', ids, false, S.view);
     toast(t('postedN', { n })); loadList(S.view);
   },
   odTab(el) { S.rep.overdue.tab = el.dataset.tab; runReport(); },
@@ -2386,6 +2452,17 @@ document.addEventListener('change', e => {
   if (e.target.form && e.target.form.id === 'recForm' && FORM && FORM.entity === 'Currencies' && e.target.name === 'code') {
     const h = $('[data-hint="rate"]'); if (h) h.textContent = t('rateOf', { c: e.target.value.toUpperCase(), b: baseCur() }); return;
   }
+  if (e.target.matches('input[data-perm]')) {
+    const tr = e.target.closest('tr');
+    if (e.target.dataset.perm === 'view' && !e.target.checked) $$('input[data-perm]', tr).forEach(i => { i.checked = false; });
+    if (e.target.dataset.perm !== 'view' && e.target.checked) $('[data-perm=view]', tr).checked = true;
+    return;
+  }
+  if (e.target.matches('input[data-permcol]')) {
+    const c = e.target.dataset.permcol, on = e.target.checked;
+    $$(`table.perm input[data-perm="${c}"]`).forEach(i => { i.checked = on; i.dispatchEvent(new Event('change', { bubbles: true })); });
+    return;
+  }
   if (e.target.form && e.target.form.id === 'rcForm') {
     const n = e.target.name;
     if (n === 'account') loadAlloc(e.target.value);
@@ -2425,6 +2502,13 @@ document.addEventListener('submit', async e => {
   else if (e.target.id === 'recForm') submitForm(e.target);
   else if (e.target.id === 'rcForm') submitReceipt(e.target);
   else if (e.target.id === 'msgForm') submitMessage(e.target);
+  else if (e.target.id === 'pwForm') {
+    const E = e.target.elements;
+    if (E.next.value !== E.again.value) { toast(t('pwMismatch'), 'error'); return; }
+    if (E.next.value.length < 6) { toast(t('err_PASSWORD_SHORT'), 'error'); return; }
+    const b = e.target.querySelector('button[type=submit]'); b.disabled = true;
+    try { await call('changePassword', E.cur.value, E.next.value); closeModal(); toast(t('pwChanged')); } catch (err) { b.disabled = false; }
+  }
   else if (e.target.id === 'replyForm') submitReply(e.target);
   else if (e.target.id === 'mailForm') sendEmail(e.target);
   else if (e.target.id === 'waForm') sendWhatsApp(e.target);

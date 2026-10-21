@@ -38,7 +38,8 @@ const SCHEMA = {
     ['passwordHash', 'PasswordHash'], ['salt', 'Salt'], ['role', 'Role'], ['pages', 'Pages'],
     ['canAdd', 'CanAdd'], ['canEdit', 'CanEdit'], ['canDelete', 'CanDelete'], ['canPost', 'CanPost'],
     ['isCollector', 'IsCollector'], ['scope', 'DataScope'], ['active', 'Active'],
-    ['lastLogin', 'LastLogin'], ['createdAt', 'CreatedAt']
+    ['lastLogin', 'LastLogin'], ['createdAt', 'CreatedAt'],
+    ['perms', 'Permissions'] // JSON {page: [add, edit, delete, post]} — empty = legacy global flags
   ],
   FollowUps: [
     ['id', 'FollowUpId'], ['account', 'Customer account'], ['voucher', 'Voucher'],
@@ -69,12 +70,17 @@ const BOOL_FIELDS = ['isDeleted', 'canAdd', 'canEdit', 'canDelete', 'canPost', '
 const ALL_PAGES = ['dashboard', 'customers', 'transactions', 'receipts', 'groups', 'statement', 'balances', 'paid',
   'overdue', 'credit', 'followup', 'collection', 'collections', 'performance', 'currencies', 'import', 'users'];
 const PAY_METHODS = ['Cash', 'Cheque', 'Transfer'];
+/** Actions that make sense on each page (permissions matrix). */
+const PAGE_ACTIONS = {
+  customers: ['add', 'edit', 'delete'], transactions: ['add', 'edit', 'delete', 'post'], receipts: ['add', 'edit', 'delete', 'post'],
+  groups: ['add', 'edit', 'delete'], followup: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete']
+};
 
 // Which entity each page edits (used for permission checks on writes).
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = '9';
+const APP_VERSION = '10';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -364,6 +370,16 @@ function login(username, password) {
   return { token: token, user: publicUser_(user), settings: getSettings_(), lookups: lookups_(user) };
 }
 
+/** Any signed-in user changes their own password (current password required). */
+function changePassword(token, current, next) {
+  const user = auth_(token);
+  if (hash_(String(current || ''), user.salt) !== user.passwordHash) throw new Error('WRONG_PASSWORD');
+  if (String(next || '').length < 6) throw new Error('PASSWORD_SHORT');
+  const salt = Utilities.getUuid();
+  withLock_(function () { updateRow_('Users', user._row, { salt: salt, passwordHash: hash_(String(next), salt) }); });
+  return true;
+}
+
 function logout(token) {
   CacheService.getScriptCache().remove('sess_' + token);
   return true;
@@ -386,10 +402,21 @@ function auth_(token, page, noSlide) {
   return user;
 }
 
-function requireAction_(user, action) {
-  if (user.isAdmin) return;
-  const flag = { add: 'canAdd', edit: 'canEdit', delete: 'canDelete', post: 'canPost' }[action];
-  if (!user[flag]) throw new Error('NO_PERMISSION');
+/** {page: [actions]} from the Permissions column, or null for users still on the old global flags. */
+function permMap_(u) {
+  if (!u.perms) return null;
+  try { const m = JSON.parse(u.perms); return m && typeof m === 'object' ? m : null; } catch (e) { return null; }
+}
+
+function hasAction_(user, action, page) {
+  if (user.isAdmin) return true;
+  const pm = permMap_(user);
+  if (pm) return !!(pm[page] && pm[page].indexOf(action) > -1);
+  return !!user[{ add: 'canAdd', edit: 'canEdit', delete: 'canDelete', post: 'canPost' }[action]];
+}
+
+function requireAction_(user, action, page) {
+  if (!hasAction_(user, action, page)) throw new Error('NO_PERMISSION');
 }
 
 function publicUser_(u) {
@@ -398,7 +425,8 @@ function publicUser_(u) {
     userId: u.userId, username: u.username, fullName: u.fullName, email: u.email, role: u.role,
     pages: isAdmin ? ALL_PAGES : String(u.pages || '').split(',').map(function (p) { return p.trim(); }).filter(String),
     canAdd: isAdmin || u.canAdd, canEdit: isAdmin || u.canEdit, canDelete: isAdmin || u.canDelete,
-    canPost: isAdmin || u.canPost, isCollector: u.isCollector, scope: u.scope || 'all', isAdmin: isAdmin
+    canPost: isAdmin || u.canPost, isCollector: u.isCollector, scope: u.scope || 'all', isAdmin: isAdmin,
+    perms: isAdmin ? null : permMap_(u)
   };
 }
 
@@ -533,7 +561,7 @@ function saveRecord(token, entity, record, isNew) {
   const page = ENTITY_PAGE[entity];
   if (!page) throw new Error('Unknown entity');
   const user = auth_(token, page);
-  requireAction_(user, isNew ? 'add' : 'edit');
+  requireAction_(user, isNew ? 'add' : 'edit', page);
   return withLock_(function () {
     const now = new Date();
     const who = user.fullName || user.username;
@@ -620,6 +648,18 @@ function saveUser_(rec, isNew) {
   });
   if (clash) throw new Error('DUPLICATE_ID');
   if (Array.isArray(rec.pages)) rec.pages = rec.pages.join(',');
+  if (rec.perms && typeof rec.perms === 'object') {
+    const clean = {};
+    Object.keys(rec.perms).forEach(function (pg) {
+      const allowed = PAGE_ACTIONS[pg] || [];
+      const acts = (rec.perms[pg] || []).filter(function (a) { return allowed.indexOf(a) > -1; });
+      if (acts.length) clean[pg] = acts;
+    });
+    ['add', 'edit', 'delete', 'post'].forEach(function (a) {
+      rec['can' + a.charAt(0).toUpperCase() + a.slice(1)] = Object.keys(clean).some(function (pg) { return clean[pg].indexOf(a) > -1; });
+    });
+    rec.perms = JSON.stringify(clean);
+  }
   const pw = rec.password; delete rec.password;
   if (pw) { rec.salt = Utilities.getUuid(); rec.passwordHash = hash_(pw, rec.salt); }
   delete rec.lastLogin;
@@ -638,7 +678,7 @@ function saveUser_(rec, isNew) {
 function deleteRecord(token, entity, id) {
   const page = ENTITY_PAGE[entity];
   const user = auth_(token, page);
-  requireAction_(user, 'delete');
+  requireAction_(user, 'delete', page);
   return withLock_(function () {
     if (entity === 'Transactions') {
       const t = getById_(entity, id);
@@ -671,10 +711,11 @@ function deleteRecord(token, entity, id) {
 }
 
 /** Post (ترحيل) or un-post draft transactions. Only posted rows affect balances & reports. */
-function postTransactions(token, ids, unpost) {
+function postTransactions(token, ids, unpost, page) {
   const user = auth_(token);
-  if (!user.isAdmin && user.pageList.indexOf('transactions') === -1 && user.pageList.indexOf('receipts') === -1) throw new Error('NO_PERMISSION');
-  requireAction_(user, 'post');
+  // Posting is allowed from the page it is done on (transactions or receipts).
+  const pages = (page === 'transactions' || page === 'receipts') ? [page] : ['transactions', 'receipts'];
+  if (!pages.some(function (p) { return (user.isAdmin || user.pageList.indexOf(p) > -1) && hasAction_(user, 'post', p); })) throw new Error('NO_PERMISSION');
   if (unpost && !user.isAdmin) throw new Error('NO_PERMISSION');
   return withLock_(function () {
     const set = {};
@@ -784,8 +825,8 @@ function txKey_(o) {
 function importRows(token, entity, rows, mode, opts) {
   const user = auth_(token, 'import');
   opts = opts || {};
-  requireAction_(user, 'add');
-  if (mode === 'replace') requireAction_(user, 'delete');
+  requireAction_(user, 'add', 'import');
+  if (mode === 'replace') requireAction_(user, 'delete', 'import');
   if (IMPORT_ENTITIES.indexOf(entity) === -1) throw new Error('Unknown entity');
   DATE_ORDER = opts.dateOrder || 'auto';
   const skipDup = opts.skipDuplicates !== false;
@@ -1043,7 +1084,7 @@ function getCurrencyStatus(token) {
 /** Saves reporting / local currency. Changing the reporting currency re-bases every rate. */
 function saveCurrencySettings(token, vals) {
   const user = auth_(token, 'currencies');
-  requireAction_(user, 'edit');
+  requireAction_(user, 'edit', 'currencies');
   return withLock_(function () {
     const s = getSettings_();
     const oldBase = String(s.ReportCurrency || s.LocalCurrency || '').toUpperCase();
@@ -1138,7 +1179,7 @@ function nextReceiptNo_() {
 function saveReceipt(token, r) {
   const user = auth_(token, 'receipts');
   const editing = !!r.rowId;
-  requireAction_(user, editing ? 'edit' : 'add');
+  requireAction_(user, editing ? 'edit' : 'add', 'receipts');
   assertCustomerVisible_(user, r.account);
   if (PAY_METHODS.indexOf(r.payMethod) === -1) throw new Error('REQUIRED_FIELDS');
   if (r.payMethod === 'Cheque' && !String(r.chequeNo || '').trim()) throw new Error('CHEQUE_REQUIRED');
@@ -1167,7 +1208,7 @@ function saveReceipt(token, r) {
     if (readTable('Transactions').some(function (t) { return !t.isDeleted && t.payMethod && String(t.voucher) === voucher && t.rowId !== r.rowId; })) throw new Error('DUPLICATE_ID');
     const now = new Date(), who = user.fullName || user.username;
     const exchange = toNum_(r.exchange) || 1;
-    const post = !!r.post && (user.isAdmin || user.canPost);
+    const post = !!r.post && hasAction_(user, 'post', 'receipts');
     const tx = {
       voucher: voucher, type: 'Payment', account: r.account, date: r.date, description: r.description || ('Collection - ' + r.payMethod),
       amountCur: round2_(total / exchange), currency: String(r.currency || open.currency || '').toUpperCase(), exchange: exchange,
@@ -1190,7 +1231,7 @@ function saveReceipt(token, r) {
     }));
     if (!post && !existing) {
       const posters = readTable('Users').filter(function (u) {
-        return u.active && u.username !== user.username && (u.role === 'Admin' || u.canPost);
+        return u.active && u.username !== user.username && (u.role === 'Admin' || hasAction_(u, 'post', 'receipts'));
       }).map(function (u) { return u.username; });
       notify_(posters, 'RECEIPT_PENDING', voucher + ' — ' + fmtInt_(total) + ' — ' + who, r.account);
     }

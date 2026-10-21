@@ -2,7 +2,7 @@
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = '7';
+const CLIENT_VERSION = '8';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -93,6 +93,18 @@ const I18N = {
     passwordHint: 'اتركها فارغة للإبقاء على كلمة المرور الحالية', pagesN: '{n} صفحة', day: 'يوم',
     settingsSaved: 'تم حفظ الإعدادات',
     err_OUTDATED: 'ملف Code.gs في Apps Script غير محدّث: استبدله بالنسخة الجديدة كاملة، احفظ (Ctrl+S)، ثم Deploy ← Manage deployments ← تعديل ← New version.',
+    imp_map: 'مطابقة الأعمدة', imp_field: 'الحقل في التطبيق', imp_col: 'العمود في الملف', imp_ignored: 'يُتجاهل',
+    imp_detected: 'تم اختيار الجدول «{e}» تلقائياً حسب أعمدة الملف',
+    imp_mismatch: 'تنبيه: أعمدة الملف تخص جدول «{b}» وليس «{e}». الاستيراد في الجدول الخطأ يُنشئ بيانات غير صحيحة.',
+    imp_noid: 'الملف لا يحتوي العمود الأساسي لهذا الجدول ({f})، لا يمكن الاستيراد.', imp_confirmWrong: 'أعمدة الملف لا تخص هذا الجدول. متأكد من الاستيراد؟',
+    imp_options: 'خيارات الحركات', imp_sign: 'إشارة المبلغ بعملة الحركة (عند غياب أعمدة المدين/الدائن)',
+    sign_auto: 'تلقائي حسب نوع الحركة (فاتورة = مدين، دفعة = دائن)', sign_pos: 'موجب = مدين (Dynamics)', sign_neg: 'سالب = مدين',
+    imp_dates: 'ترتيب التاريخ في ملفات CSV', date_auto: 'تلقائي', date_dmy: 'يوم/شهر/سنة', date_mdy: 'شهر/يوم/سنة',
+    imp_createCust: 'إنشاء العملاء غير الموجودين تلقائياً', imp_skipDup: 'تخطي الحركات المكررة (نفس السند والعميل والتاريخ والمبلغ)',
+    imp_result: 'نتيجة الاستيراد', imp_added: 'أُضيف', imp_updated: 'حُدِّث', imp_dups: 'مكرر تم تخطيه', imp_noIdRows: 'صفوف بلا رقم أساسي/تاريخ',
+    imp_newCust: 'عملاء جدد أُنشئوا', imp_unknown: 'حركات لعملاء غير موجودين (لن تظهر حتى إضافة العملاء)',
+    imp_replaceTx: 'سيتم حذف الحركات المستوردة سابقاً فقط، وتبقى الحركات والسندات المسجّلة من التطبيق.',
+    cleanDup: 'تنظيف العملاء المكررين', cleanDupDone: 'تم حذف {n} صف مكرر من العملاء',
     editReceipt: 'تعديل سند التحصيل', CompanyLogo: 'شعار الشركة', uploadLogo: 'رفع شعار', removeLogo: 'إزالة الشعار',
     logoHint: 'PNG أو JPG أو SVG — يُصغَّر تلقائياً ويظهر في القائمة وشاشة الدخول وكل المطبوعات وكشوف الحساب',
     logoSaved: 'تم حفظ الشعار', err_LOGO_INVALID: 'الصورة غير مدعومة أو كبيرة جداً، جرّب صورة أبسط',
@@ -223,6 +235,18 @@ const I18N = {
     passwordHint: 'Leave empty to keep the current password', pagesN: '{n} pages', day: 'days',
     settingsSaved: 'Settings saved',
     err_OUTDATED: 'Code.gs in Apps Script is out of date: replace it with the new version, save (Ctrl+S), then Deploy → Manage deployments → Edit → New version.',
+    imp_map: 'Column mapping', imp_field: 'App field', imp_col: 'File column', imp_ignored: 'ignored',
+    imp_detected: 'Table «{e}» selected automatically from the file columns',
+    imp_mismatch: 'Warning: the file columns belong to «{b}», not «{e}». Importing into the wrong table creates bad data.',
+    imp_noid: 'The file has no key column for this table ({f}); it cannot be imported.', imp_confirmWrong: 'The file columns do not match this table. Import anyway?',
+    imp_options: 'Transaction options', imp_sign: 'Transaction-amount sign (when debit/credit columns are empty)',
+    sign_auto: 'Automatic by type (invoice = debit, payment = credit)', sign_pos: 'Positive = debit (Dynamics)', sign_neg: 'Negative = debit',
+    imp_dates: 'Date order in CSV files', date_auto: 'Automatic', date_dmy: 'Day/Month/Year', date_mdy: 'Month/Day/Year',
+    imp_createCust: 'Create missing customers automatically', imp_skipDup: 'Skip duplicate transactions (same voucher, customer, date, amount)',
+    imp_result: 'Import result', imp_added: 'Added', imp_updated: 'Updated', imp_dups: 'Duplicates skipped', imp_noIdRows: 'Rows without key/date',
+    imp_newCust: 'New customers created', imp_unknown: 'Transactions for unknown customers (hidden until the customers exist)',
+    imp_replaceTx: 'Only previously imported transactions are removed; entries and receipts made in the app are kept.',
+    cleanDup: 'Clean duplicate customers', cleanDupDone: '{n} duplicate customer rows removed',
     editReceipt: 'Edit collection receipt', CompanyLogo: 'Company logo', uploadLogo: 'Upload logo', removeLogo: 'Remove logo',
     logoHint: 'PNG, JPG or SVG — resized automatically; shown in the menu, sign-in screen, all printouts and statements',
     logoSaved: 'Logo saved', err_LOGO_INVALID: 'Image not supported or too large, try a simpler one',
@@ -1348,14 +1372,29 @@ const VIEWS = {
       <section class="panel form-panel">
         <p class="subtitle" style="margin:0;line-height:1.7">${t('imp_help')}</p>
         <div class="form-grid">
-          <label class="field">${t('imp_entity')}<select id="impEntity">${opts([['Customers', t('p_customers')], ['Transactions', t('p_transactions')], ['CustomerGroups', t('p_groups')], ['Currencies', t('p_currencies')]], 'Customers')}</select></label>
-          <label class="field">${t('imp_mode')}<select id="impMode">${opts([['append', t('append')], ['upsert', t('upsert')]].concat(can('delete') ? [['replace', t('replace')]] : []), 'upsert')}</select></label>
           <label class="field span2">${t('chooseFile')}<input type="file" id="impFile" accept=".xlsx,.xls,.csv"></label>
+          <label class="field">${t('imp_entity')}<select id="impEntity">${opts([['Customers', t('p_customers')], ['Transactions', t('p_transactions')], ['CustomerGroups', t('p_groups')], ['Currencies', t('p_currencies')]], IMP.entity || 'Customers')}</select></label>
+          <label class="field">${t('imp_mode')}<select id="impMode">${opts([['append', t('append')], ['upsert', t('upsert')]].concat(can('delete') ? [['replace', t('replace')]] : []), 'upsert')}</select></label>
         </div>
+        <div id="impTxOpts" class="imp-opts" hidden>
+          <h3 class="section-title">${t('imp_options')}</h3>
+          <div class="form-grid">
+            <label class="field">${t('imp_sign')}<select id="impSign">${opts([['auto', t('sign_auto')], ['posDebit', t('sign_pos')], ['negDebit', t('sign_neg')]], 'auto')}</select></label>
+            <label class="field">${t('imp_dates')}<select id="impDates">${opts([['auto', t('date_auto')], ['dmy', t('date_dmy')], ['mdy', t('date_mdy')]], 'auto')}</select></label>
+            <label class="check"><input type="checkbox" id="impCreate" checked>${t('imp_createCust')}</label>
+            <label class="check"><input type="checkbox" id="impSkip" checked>${t('imp_skipDup')}</label>
+          </div>
+          <p class="field-hint" id="impReplaceHint" hidden>${t('imp_replaceTx')}</p>
+        </div>
+        <div id="impNotice"></div>
         <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          ${btn('impTemplate', '⬇ ' + t('template'), 'button-ghost')}${btn('impRun', t('importNow'), 'button-primary', 'id="impRun" disabled')}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${btn('impTemplate', '⬇ ' + t('template'), 'button-ghost')}${S.user.isAdmin ? btn('cleanDup', '🧹 ' + t('cleanDup'), 'button-ghost') : ''}</div>
+          ${btn('impRun', t('importNow'), 'button-primary', 'id="impRun" disabled')}</div>
       </section>
+      <div id="impResult"></div>
       <div id="impPreview"></div>`);
+    IMP.rows = null; IMP.preview = null;
+    impOptions();
   }
 };
 
@@ -1586,50 +1625,112 @@ function groupCustomers(rows) {
 }
 
 // ───────── Import ─────────
-const IMP = { rows: null };
+const IMP = { rows: null, preview: null, entity: '' };
+const IMP_KEY = { Customers: 'Customer account', Transactions: 'Customer account + Date', CustomerGroups: 'GroupId', Currencies: 'Code' };
+
+/**
+ * Reads the first sheet. Date cells are converted from their Excel serial numbers directly
+ * (no browser time-zone shift, which used to move dates to the previous day 23:59).
+ */
 function readImportFile(file) {
   if (typeof XLSX === 'undefined') { toast(t('xlsxMissing'), 'error'); return; }
   const reader = new FileReader();
-  reader.onload = e => {
-    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+  reader.onload = async e => {
+    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: false, cellNF: true, raw: /\.csv$/i.test(file.name) });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const raw = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
-    // google.script.run cannot send Date objects → convert to strings.
-    IMP.rows = raw.map(r => {
-      const o = {};
-      Object.keys(r).forEach(k => {
-        const v = r[k];
-        o[k] = v instanceof Date ? ymd(v) + ' ' + z(v.getHours()) + ':' + z(v.getMinutes()) : v;
-      });
-      return o;
+    Object.keys(ws).forEach(addr => {
+      const c = ws[addr];
+      if (addr[0] === '!' || !c || c.t !== 'n') return;
+      const fmt = c.z || (c.XF && c.XF.numFmtId != null && XLSX.SSF._table ? XLSX.SSF._table[c.XF.numFmtId] : '');
+      if (fmt && XLSX.SSF.is_date(fmt)) {
+        const d = XLSX.SSF.parse_date_code(c.v);
+        if (!d) return;
+        const txt = d.y + '-' + z(d.m) + '-' + z(d.d) + (d.H || d.M ? ' ' + z(d.H) + ':' + z(d.M) : '');
+        ws[addr] = { t: 's', v: txt, w: txt };
+      }
     });
+    IMP.rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }).map(r => {
+      const o = {};
+      Object.keys(r).forEach(k => { o[String(k).trim()] = typeof r[k] === 'string' ? r[k].trim() : r[k]; });
+      return o;
+    }).filter(r => Object.values(r).some(v => v !== '' && v != null));
+    $('#impResult').innerHTML = '';
     const heads = IMP.rows.length ? Object.keys(IMP.rows[0]) : [];
-    const sample = IMP.rows.slice(0, 5);
-    $('#impPreview').innerHTML = `<section class="panel section">
-      <div class="section-head"><h2 class="section-title">${t('previewTitle')}</h2><span class="badge blue">${t('rowsFound')}: ${NI.format(IMP.rows.length)}</span></div>
-      <div class="table-wrap"><table><thead><tr>${heads.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
-      <tbody>${sample.map(r => '<tr>' + heads.map(h => `<td>${typeof r[h] === 'number' ? money(r[h]) : bdi(r[h])}</td>`).join('') + '</tr>').join('')}</tbody></table></div></section>`;
-    $('#impRun').disabled = !IMP.rows.length;
+    IMP.preview = heads.length ? await call('previewImport', heads) : null;
+    if (IMP.preview && IMP.preview.best && IMP.preview.best !== $('#impEntity').value) {
+      setComboValue($('#impEntity'), IMP.preview.best);
+      toast(t('imp_detected', { e: entityName(IMP.preview.best) }));
+    }
+    renderImportPreview();
   };
   reader.readAsArrayBuffer(file);
+}
+const entityName = e => t({ Customers: 'p_customers', Transactions: 'p_transactions', CustomerGroups: 'p_groups', Currencies: 'p_currencies' }[e]);
+function setComboValue(sel, v) {
+  sel.value = v;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function impOptions() {
+  const e = $('#impEntity').value;
+  IMP.entity = e;
+  $('#impTxOpts').hidden = e !== 'Transactions';
+  $('#impReplaceHint').hidden = !(e === 'Transactions' && $('#impMode').value === 'replace');
+}
+function renderImportPreview() {
+  impOptions();
+  const box = $('#impPreview'), note = $('#impNotice');
+  if (!IMP.rows) { box.innerHTML = ''; note.innerHTML = ''; return; }
+  const e = $('#impEntity').value;
+  const pv = IMP.preview && IMP.preview.entities[e];
+  const heads = IMP.rows.length ? Object.keys(IMP.rows[0]) : [];
+  let warn = '';
+  if (pv && !pv.hasId) warn = `<div class="panel notice danger">⛔ ${t('imp_noid', { f: IMP_KEY[e] })}</div>`;
+  else if (IMP.preview && IMP.preview.best && IMP.preview.best !== e) warn = `<div class="panel notice danger">⚠ ${t('imp_mismatch', { b: entityName(IMP.preview.best), e: entityName(e) })}</div>`;
+  note.innerHTML = warn;
+  $('#impRun').disabled = !IMP.rows.length || (pv && !pv.hasId);
+  const fieldLabel = f => I18N.en['f_' + f] ? t('f_' + f) : f === 'custName' ? t('f_name') : f;
+  box.innerHTML = `<section class="panel section">
+      <div class="section-head"><h2 class="section-title">${t('imp_map')}</h2><span class="badge blue">${t('rowsFound')}: ${NI.format(IMP.rows.length)}</span></div>
+      <div class="map-grid">${(pv ? pv.pairs : heads.map(h => [h, ''])).map(p => `<div class="map-item ${p[1] ? 'ok' : 'off'}"><span>${esc(p[0])}</span><b>${p[1] ? '→ ' + esc(fieldLabel(p[1])) : t('imp_ignored')}</b></div>`).join('')}</div>
+    </section>
+    <section class="panel section">
+      <div class="section-head"><h2 class="section-title">${t('previewTitle')}</h2></div>
+      <div class="table-wrap"><table><thead><tr>${heads.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${IMP.rows.slice(0, 5).map(r => '<tr>' + heads.map(h => `<td>${typeof r[h] === 'number' ? money(r[h]) : bdi(r[h])}</td>`).join('') + '</tr>').join('')}</tbody></table></div></section>`;
 }
 
 async function runImport() {
   const entity = $('#impEntity').value, mode = $('#impMode').value;
   if (!IMP.rows || !IMP.rows.length) return;
-  if (mode === 'replace' && !confirm(t('replace') + ' — ' + t('confirmDelete'))) return;
+  if (IMP.preview && IMP.preview.best && IMP.preview.best !== entity && !confirm(t('imp_confirmWrong'))) return;
+  if (mode === 'replace' && !confirm(t('replace') + ' — ' + t('confirmDelete') + (entity === 'Transactions' ? '\n' + t('imp_replaceTx') : ''))) return;
+  const o = entity === 'Transactions'
+    ? { sign: $('#impSign').value, dateOrder: $('#impDates').value, createCustomers: $('#impCreate').checked, skipDuplicates: $('#impSkip').checked }
+    : { dateOrder: 'auto' };
   const b = $('#impRun'); b.disabled = true;
-  const total = { inserted: 0, updated: 0, skipped: 0 };
+  const total = { inserted: 0, updated: 0, skipped: 0, duplicates: 0, createdCustomers: 0, unknownAccounts: 0 };
   const size = 2000;
+  let done = false;
   try {
     for (let i = 0; i < IMP.rows.length; i += size) {
       b.textContent = `${t('importNow')} ${NI.format(Math.min(i + size, IMP.rows.length))}/${NI.format(IMP.rows.length)}`;
-      const r = await call('importRows', entity, IMP.rows.slice(i, i + size), i === 0 ? mode : (mode === 'replace' ? 'append' : mode));
-      total.inserted += r.inserted; total.updated += r.updated; total.skipped += r.skipped;
+      const r = await call('importRows', entity, IMP.rows.slice(i, i + size), i === 0 ? mode : (mode === 'replace' ? 'append' : mode), o);
+      Object.keys(total).forEach(k => { total[k] += r[k] || 0; });
     }
-    toast(t('importedMsg', { i: NI.format(total.inserted), u: NI.format(total.updated), s: NI.format(total.skipped) }));
+    done = true;
+    toast(t('importedMsg', { i: NI.format(total.inserted), u: NI.format(total.updated), s: NI.format(total.skipped + total.duplicates) }));
+    const row = (k, v, cls) => v ? `<div class="mini-stat ${cls || ''}"><span>${t(k)}</span><b>${NI.format(v)}</b></div>` : '';
+    $('#impResult').innerHTML = `<section class="panel section imp-result"><div class="section-head"><h2 class="section-title">✓ ${t('imp_result')} — ${esc(entityName(entity))}</h2></div>
+      <div class="mini-stats" style="padding:0 16px 14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        ${row('imp_added', total.inserted, 'pos')}${row('imp_updated', total.updated)}${row('imp_dups', total.duplicates)}
+        ${row('imp_noIdRows', total.skipped, 'neg')}${row('imp_newCust', total.createdCustomers)}${row('imp_unknown', total.unknownAccounts, 'neg')}
+        ${!total.inserted && !total.updated ? `<div class="mini-stat"><span>${t('imp_added')}</span><b>0</b></div>` : ''}</div></section>`;
     await refreshLookups();
-  } finally { b.disabled = false; b.textContent = t('importNow'); }
+  } finally {
+    b.textContent = t('importNow');
+    if (done) { IMP.rows = null; $('#impFile').value = ''; } // prevents importing the same file twice by mistake
+    b.disabled = !IMP.rows;
+  }
 }
 
 // ───────── Export to Excel (.xlsx) ─────────
@@ -2209,7 +2310,13 @@ const ACT = {
       exportXlsx();
     });
   },
-  impRun: runImport
+  impRun: runImport,
+  async cleanDup() {
+    if (!confirm(t('cleanDup') + '?')) return;
+    const r = await call('removeDuplicateCustomers');
+    toast(t('cleanDupDone', { n: NI.format(r.removed) }));
+    await refreshLookups();
+  }
 };
 
 function rowOf(el) {
@@ -2292,6 +2399,8 @@ document.addEventListener('change', e => {
     s.pageSize = +e.target.value; s.page = 1; loadList(v); return;
   }
   if (e.target.id === 'impFile' && e.target.files[0]) readImportFile(e.target.files[0]);
+  if (e.target.id === 'impEntity') renderImportPreview();
+  if (e.target.id === 'impMode') impOptions();
   if (e.target.id === 'logoFile' && e.target.files[0]) logoDataUrl(e.target.files[0]).then(saveLogo).catch(() => toast(t('err_LOGO_INVALID'), 'error'));
 });
 document.addEventListener('keydown', e => {

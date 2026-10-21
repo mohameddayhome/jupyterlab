@@ -74,7 +74,7 @@ const PAY_METHODS = ['Cash', 'Cheque', 'Transfer'];
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = '7';
+const APP_VERSION = '8';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -225,7 +225,10 @@ function normalizeValue_(key, v, keepDates) {
 function toDate_(v) {
   if (v === '' || v === null || v === undefined) return null;
   if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v) ? null : v;
-  if (typeof v === 'number') return new Date(Math.round((v - 25569) * 86400000)); // Excel serial
+  if (typeof v === 'number') { // Excel serial → same calendar day/time, no timezone drift
+    const u = new Date(Math.round((v - 25569) * 86400) * 1000);
+    return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes());
+  }
   const s = String(v).trim();
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
   if (m) return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0));
@@ -235,18 +238,24 @@ function toDate_(v) {
     if (m[6] && /pm/i.test(m[6]) && h < 12) h += 12;
     if (m[6] && /am/i.test(m[6]) && h === 12) h = 0;
     const a = +m[1], b = +m[2];
-    const month = a > 12 ? b : a, day = a > 12 ? a : b;
+    // DATE_ORDER: 'dmy' / 'mdy' chosen on the import page; 'auto' = month first unless the first part > 12.
+    const dayFirst = DATE_ORDER === 'dmy' ? true : DATE_ORDER === 'mdy' ? false : a > 12;
+    const month = dayFirst ? b : a, day = dayFirst ? a : b;
     return new Date(+m[3], month - 1, day, h, +(m[5] || 0));
   }
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
 
+let DATE_ORDER = 'auto';
+
 function toNum_(v) {
   if (v === '' || v === null || v === undefined) return 0;
   if (typeof v === 'number') return v;
-  const n = parseFloat(String(v).replace(/[^\d.\-]/g, ''));
-  return isNaN(n) ? 0 : n;
+  const str = String(v).trim();
+  const neg = /^\(.*\)$/.test(str); // accounting style (1,234.00)
+  const n = parseFloat(str.replace(/[^\d.\-]/g, ''));
+  return isNaN(n) ? 0 : (neg ? -Math.abs(n) : n);
 }
 
 function toBool_(v) {
@@ -681,98 +690,226 @@ function postTransactions(token, ids, unpost) {
  * Import rows parsed client-side (Excel/CSV from Dynamics 365).
  * rows: array of objects keyed by the file's headers. mode: 'append' | 'replace' | 'upsert'.
  */
-function importRows(token, entity, rows, mode) {
-  const user = auth_(token, 'import');
-  requireAction_(user, 'add');
-  if (mode === 'replace') requireAction_(user, 'delete');
-  if (['Customers', 'Transactions', 'CustomerGroups', 'Currencies'].indexOf(entity) === -1) throw new Error('Unknown entity');
-  const norm = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9؀-ۿ]/g, ''); };
-  const aliases = {
-    account: ['customeraccount', 'account', 'custaccount', 'accountnum', 'رقمالعميل'],
-    name: ['name', 'customername', 'اسمالعميل'],
-    group: ['customergroup', 'group', 'custgroup', 'groupid'],
-    phone: ['contactnumber', 'phone', 'telephone', 'primarycontactphone'],
-    email: ['email', 'primarycontactemail', 'emailaddress'],
-    type: ['transactiontype', 'transtype', 'type'],
-    amountCur: ['amountintransactioncurrency', 'amountcur', 'amount'],
-    exchange: ['excange', 'exchange', 'exchangerate', 'exchrate'],
-    creditMST: ['creditinlocalcurrency', 'creditmst', 'credit'],
-    debitMST: ['debitinlocalcurrency', 'debitmst', 'debit'],
-    createdAt: ['createddateandtime', 'createdat', 'createddatetime'],
-    dueDate: ['duedate', 'due'],
-    groupName: ['groupname', 'description']
-  };
+const IMPORT_ENTITIES = ['Customers', 'Transactions', 'CustomerGroups', 'Currencies'];
+const IMPORT_ALIASES = {
+  account: ['customeraccount', 'account', 'custaccount', 'accountnum', 'رقمالعميل', 'حسابالعميل'],
+  name: ['name', 'customername', 'اسمالعميل', 'الاسم'],
+  group: ['customergroup', 'group', 'custgroup', 'groupid'],
+  phone: ['contactnumber', 'phone', 'telephone', 'primarycontactphone'],
+  email: ['email', 'primarycontactemail', 'emailaddress'],
+  type: ['transactiontype', 'transtype', 'type'],
+  amountCur: ['amountintransactioncurrency', 'amountcur', 'amount'],
+  exchange: ['excange', 'exchange', 'exchangerate', 'exchrate'],
+  creditMST: ['creditinlocalcurrency', 'creditmst', 'credit'],
+  debitMST: ['debitinlocalcurrency', 'debitmst', 'debit'],
+  createdAt: ['createddateandtime', 'createdat', 'createddatetime'],
+  dueDate: ['duedate', 'due'],
+  groupName: ['groupname', 'description'],
+  custName: ['name', 'customername', 'اسمالعميل']   // transactions only: used to create missing customers
+};
+const importNorm_ = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9؀-ۿ]/g, ''); };
+
+/** Returns header → field mapper for an entity (exact names, aliases, then prefix match). */
+function importMapper_(entity) {
   const fieldFor = {};
   SCHEMA[entity].forEach(function (f) {
-    fieldFor[norm(f[1])] = f[0];
-    fieldFor[norm(f[0])] = f[0];
-    (aliases[f[0]] || []).forEach(function (a) { if (!fieldFor[a]) fieldFor[a] = f[0]; });
+    fieldFor[importNorm_(f[1])] = f[0];
+    fieldFor[importNorm_(f[0])] = f[0];
   });
+  Object.keys(IMPORT_ALIASES).forEach(function (k) {
+    const own = SCHEMA[entity].some(function (f) { return f[0] === k; }) || (k === 'custName' && entity === 'Transactions');
+    if (own) IMPORT_ALIASES[k].forEach(function (a) { if (!fieldFor[a]) fieldFor[a] = k; });
+  });
+  return function (h) {
+    const n = importNorm_(h);
+    if (fieldFor[n]) return fieldFor[n];
+    const hit = Object.keys(fieldFor).filter(function (a) { return a.length >= 6 && n.indexOf(a) === 0; })
+      .sort(function (a, b) { return b.length - a.length; })[0]; // e.g. "Amount in transaction currency (- if Debit)"
+    return hit ? fieldFor[hit] : '';
+  };
+}
+
+/** Column mapping of the file for every table + the table that fits best. */
+function previewImport(token, headers) {
+  auth_(token, 'import');
+  const out = {};
+  let best = '', bestScore = -1;
+  IMPORT_ENTITIES.forEach(function (e) {
+    const map = importMapper_(e);
+    const pairs = headers.map(function (h) { return [h, map(h)]; });
+    const fields = {};
+    pairs.forEach(function (p) { if (p[1]) fields[p[1]] = true; });
+    const hasId = !!fields[ID_FIELD[e] === 'rowId' ? 'account' : ID_FIELD[e]] && (e !== 'Transactions' || !!fields.date);
+    const score = hasId ? Object.keys(fields).length : 0;
+    out[e] = { pairs: pairs, matched: Object.keys(fields).length, hasId: hasId, score: score };
+    if (score > bestScore) { bestScore = score; best = e; }
+  });
+  return { entities: out, best: bestScore > 0 ? best : '' };
+}
+
+function txKey_(o) {
+  const d = toDate_(o.date);
+  return [String(o.voucher || '').trim(), String(o.account || '').trim(), d ? Utilities.formatDate(d, TZ, 'yyyy-MM-dd') : '',
+    round2_(toNum_(o.debitMST)), round2_(toNum_(o.creditMST)), String(o.type || '').trim().toLowerCase()].join('|');
+}
+
+/**
+ * Import rows parsed client-side (Excel/CSV from Dynamics 365).
+ * rows: objects keyed by the file's headers. mode: 'append' | 'upsert' | 'replace'.
+ * opts: { dateOrder: 'auto'|'dmy'|'mdy', sign: 'auto'|'posDebit'|'negDebit', createCustomers, skipDuplicates }
+ */
+function importRows(token, entity, rows, mode, opts) {
+  const user = auth_(token, 'import');
+  opts = opts || {};
+  requireAction_(user, 'add');
+  if (mode === 'replace') requireAction_(user, 'delete');
+  if (IMPORT_ENTITIES.indexOf(entity) === -1) throw new Error('Unknown entity');
+  DATE_ORDER = opts.dateOrder || 'auto';
+  const skipDup = opts.skipDuplicates !== false;
+  const map = importMapper_(entity);
+  const headerField = {};
   const now = new Date(), who = user.fullName || user.username;
   const mapped = rows.map(function (src) {
     const o = {};
     Object.keys(src).forEach(function (h) {
-      const n = norm(h);
-      let k = fieldFor[n];
-      if (!k) { // e.g. "Amount in transaction currency (- if Debit /+ if Credit)"
-        const hit = Object.keys(fieldFor).filter(function (a) { return a.length >= 6 && n.indexOf(a) === 0; })
-          .sort(function (a, b) { return b.length - a.length; })[0];
-        k = hit && fieldFor[hit];
-      }
-      if (k && (o[k] === undefined || o[k] === '')) o[k] = src[h];
+      const k = headerField[h] !== undefined ? headerField[h] : (headerField[h] = map(h));
+      if (k && (o[k] === undefined || o[k] === '')) o[k] = typeof src[h] === 'string' ? src[h].trim() : src[h];
     });
     return o;
-  }).filter(function (o) { return o[ID_FIELD[entity]] || (entity === 'Transactions' && o.account); });
+  }).filter(function (o) {
+    return entity === 'Transactions' ? (o.account !== undefined && o.account !== '' && toDate_(o.date)) : (o[ID_FIELD[entity]] !== undefined && o[ID_FIELD[entity]] !== '');
+  });
+  const noId = rows.length - mapped.length;
 
+  const creditRe = /pay|receipt|credit|settle|سداد|دفع|تحصيل|قبض|دائن/i, debitRe = /invoice|debit|فاتور|مدين/i, openRe = /opening|افتتاح/i;
   mapped.forEach(function (o) {
     if (entity === 'Transactions') {
-      o.rowId = o.rowId || Utilities.getUuid();
+      o.account = String(o.account).trim();
+      o.rowId = Utilities.getUuid();
       o.isDeleted = toBool_(o.isDeleted);
-      o.postStatus = o.postStatus || 'Posted'; // data coming from D365 is already posted
-      o.createdByName = o.createdByName || who;
+      o.postStatus = 'Posted'; // data coming from D365 is already posted
+      o.createdByName = o.createdByName || ('Import · ' + who);
       o.createdAt = o.createdAt || now;
-      // Derive debit / credit from the signed amount when local columns are empty.
-      if (!toNum_(o.debitMST) && !toNum_(o.creditMST) && o.amountCur !== undefined) {
-        const amt = toNum_(o.amountCur) * (toNum_(o.exchange) || 1);
-        if (amt < 0) o.debitMST = -amt; else o.creditMST = amt;
-      }
-      // A negative debit is really a credit (and vice versa).
+      delete o.createdById; // marks the row as imported (re-import "replace" only removes imported rows)
+      if (o.date) o.date = toDate_(o.date);
+      if (o.dueDate) o.dueDate = toDate_(o.dueDate) || '';
       let d = toNum_(o.debitMST), c = toNum_(o.creditMST);
-      if (d < 0) { c -= d; d = 0; }
+      // Local debit/credit columns missing or empty → use the signed transaction amount.
+      if (!d && !c && o.amountCur !== undefined && o.amountCur !== '') {
+        const amt = toNum_(o.amountCur) * (toNum_(o.exchange) || 1);
+        let isDebit;
+        if (opts.sign === 'posDebit') isDebit = amt > 0;
+        else if (opts.sign === 'negDebit') isDebit = amt < 0;
+        else if (openRe.test(o.type || '')) isDebit = amt > 0;              // opening balance keeps its sign
+        else if (creditRe.test(o.type || '')) isDebit = false;              // payments / credit notes
+        else if (debitRe.test(o.type || '')) isDebit = true;                // invoices / debit notes
+        else isDebit = amt > 0;                                             // Dynamics convention
+        if (isDebit) d = Math.abs(amt); else c = Math.abs(amt);
+      }
+      if (d < 0) { c -= d; d = 0; } // a negative debit is really a credit (and vice versa)
       if (c < 0) { d -= c; c = 0; }
       o.debitMST = d; o.creditMST = c;
       if (o.currency) o.currency = String(o.currency).trim().toUpperCase();
-    }
-    if (entity === 'Customers') {
-      o.status = o.status || 'Active';
-      o.updatedBy = who; o.updatedAt = now;
+    } else {
+      o[ID_FIELD[entity]] = String(o[ID_FIELD[entity]]).trim();
+      if (entity === 'Currencies') { o.code = o.code.toUpperCase(); o.active = o.active === undefined || o.active === '' ? true : o.active; }
+      if (entity === 'Customers') { o.status = o.status || 'Active'; o.updatedBy = who; o.updatedAt = now; }
     }
   });
 
   return withLock_(function () {
     const sh = sheet_(entity);
-    if (mode === 'replace' && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).clearContent();
-    let inserted = 0, updated = 0;
-    if (mode === 'upsert' && entity !== 'Transactions' && sh.getLastRow() > 1) {
-      // One read + one write for the whole batch (fast for thousands of customers).
-      const hm = headerMap_(sh), idx = fieldIndex_(entity, hm);
-      const range = sh.getRange(2, 1, sh.getLastRow() - 1, hm.headers.length);
-      const values = range.getValues();
-      const pos = {};
-      values.forEach(function (row, i) { pos[String(row[idx[ID_FIELD[entity]]]).trim()] = i; });
-      const fresh = [];
-      mapped.forEach(function (o) {
-        const i = pos[String(o[ID_FIELD[entity]]).trim()];
-        if (i === undefined) { fresh.push(o); return; }
-        for (const k in o) if (idx[k] !== undefined && o[k] !== '' && o[k] !== undefined) values[i][idx[k]] = toSheetValue_(k, o[k]);
-        updated++;
-      });
-      range.setValues(values);
-      appendRows(entity, fresh); inserted = fresh.length;
-    } else {
-      appendRows(entity, mapped); inserted = mapped.length;
+    let inserted = 0, updated = 0, duplicates = 0, createdCustomers = 0;
+    if (mode === 'replace' && sh.getLastRow() > 1) {
+      if (entity === 'Transactions') { // keep what was entered in the app (receipts, manual entries)
+        const hm = headerMap_(sh), idx = fieldIndex_('Transactions', hm);
+        const range = sh.getRange(2, 1, sh.getLastRow() - 1, hm.headers.length);
+        const keep = range.getValues().filter(function (r) { return String(r[idx.createdById] || '') !== ''; });
+        range.clearContent();
+        if (keep.length) sh.getRange(2, 1, keep.length, hm.headers.length).setValues(keep);
+      } else {
+        sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).clearContent();
+      }
+      invalidate_();
     }
-    return { inserted: inserted, updated: updated, skipped: rows.length - mapped.length };
+    if (entity === 'Transactions') {
+      let list = mapped;
+      if (skipDup) {
+        const seen = {};
+        readTable('Transactions').forEach(function (t) { if (!t.isDeleted) seen[txKey_(t)] = true; });
+        list = mapped.filter(function (o) { const k = txKey_(o); if (seen[k]) { duplicates++; return false; } seen[k] = true; return true; });
+      }
+      // Customers that don't exist yet would make these rows invisible everywhere.
+      const known = {};
+      readTable('Customers').forEach(function (c) { known[c.account] = true; });
+      const missing = {};
+      list.forEach(function (o) { if (!known[o.account] && !missing[o.account]) missing[o.account] = { account: o.account, name: o.custName || o.account, currency: o.currency || '' }; });
+      const missingList = Object.keys(missing).map(function (k) { return missing[k]; });
+      if (opts.createCustomers !== false && missingList.length) {
+        appendRows('Customers', missingList.map(function (m) {
+          return { account: m.account, name: m.name, currency: m.currency, status: 'Active', notes: 'Created by import', createdAt: now, updatedBy: who, updatedAt: now };
+        }));
+        createdCustomers = missingList.length;
+      }
+      list.forEach(function (o) { delete o.custName; });
+      appendRows('Transactions', list); inserted = list.length;
+      return { inserted: inserted, updated: 0, skipped: noId, duplicates: duplicates, createdCustomers: createdCustomers,
+        unknownAccounts: opts.createCustomers === false ? missingList.length : 0 };
+    }
+    // Master data: one row per ID (within the file and against the sheet).
+    const idKey = ID_FIELD[entity];
+    const uniq = {}, rowsU = [];
+    mapped.forEach(function (o) { if (uniq[o[idKey]]) { duplicates++; return; } uniq[o[idKey]] = true; rowsU.push(o); });
+    const pos = {};
+    let values = null, range = null, idx = null;
+    if (sh.getLastRow() > 1) {
+      const hm = headerMap_(sh); idx = fieldIndex_(entity, hm);
+      range = sh.getRange(2, 1, sh.getLastRow() - 1, hm.headers.length);
+      values = range.getValues();
+      values.forEach(function (row, i) { const id = String(row[idx[idKey]]).trim(); if (id && pos[id] === undefined) pos[id] = i; });
+    }
+    const fresh = [];
+    rowsU.forEach(function (o) {
+      const i = pos[o[idKey]];
+      if (i === undefined) { fresh.push(o); return; }
+      if (mode !== 'upsert') { duplicates++; return; }     // append never creates a second row for the same ID
+      for (const k in o) if (idx[k] !== undefined && o[k] !== '' && o[k] !== undefined) values[i][idx[k]] = toSheetValue_(k, o[k]);
+      updated++;
+    });
+    if (updated) range.setValues(values);
+    appendRows(entity, fresh); inserted = fresh.length;
+    return { inserted: inserted, updated: updated, skipped: noId, duplicates: duplicates, createdCustomers: 0, unknownAccounts: 0 };
+  });
+}
+
+/**
+ * Removes repeated customer rows (same account), keeping the first one and filling its empty
+ * fields from the repeats — fixes files imported twice or into the wrong table.
+ */
+function removeDuplicateCustomers(token) {
+  const user = auth_(token, 'import');
+  if (!user.isAdmin) throw new Error('NO_PERMISSION');
+  return withLock_(function () {
+    const sh = sheet_('Customers');
+    if (sh.getLastRow() < 2) return { removed: 0 };
+    const hm = headerMap_(sh), idx = fieldIndex_('Customers', hm);
+    const range = sh.getRange(2, 1, sh.getLastRow() - 1, hm.headers.length);
+    const values = range.getValues();
+    const first = {}, keep = [];
+    let removed = 0;
+    values.forEach(function (row) {
+      const id = String(row[idx.account]).trim();
+      if (!id) return;
+      if (first[id] === undefined) { first[id] = keep.length; keep.push(row); return; }
+      const base = keep[first[id]];
+      row.forEach(function (v, c) { if ((base[c] === '' || base[c] === null) && v !== '' && v !== null) base[c] = v; });
+      removed++;
+    });
+    if (removed) {
+      range.clearContent();
+      sh.getRange(2, 1, keep.length, hm.headers.length).setValues(keep);
+    }
+    return { removed: removed };
   });
 }
 

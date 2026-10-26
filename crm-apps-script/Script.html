@@ -2277,6 +2277,7 @@ const ACT = {
   newGroup() { openForm('CustomerGroups', {}, true); },
   newCurrency(el) { openForm('Currencies', { code: (el && el.dataset.code) || '', active: true }, true); },
   changePw() {
+    $('#sidebar').classList.remove('open'); $('#scrim').classList.remove('open'); // phone: close the menu first
     openModal(`<div class="drawer-head"><h2>🔑 ${t('changePw')}</h2><button class="icon-button" data-act="closeModal">×</button></div>
       <form class="form-panel" id="pwForm" style="padding:12px 0 0">
         <label class="field">${t('curPw')} <span class="req">*</span><input name="cur" type="password" autocomplete="current-password" required></label>

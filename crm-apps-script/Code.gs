@@ -80,7 +80,7 @@ const PAGE_ACTIONS = {
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -148,7 +148,7 @@ function setup() {
   }
   const settings = readTable('Settings');
   const defaults = { AppName: 'CRM Console', LocalCurrency: 'SAR', ReportCurrency: 'SAR', ConversionBasis: 'local', CompanyName: 'My Company',
-    CompanyAddress: '', CompanyPhone: '', CompanyEmail: '', BankDetails: '', StatementNote: '', WhatsAppCountryCode: '', SessionMinutes: 60 };
+    CompanyAddress: '', CompanyPhone: '', CompanyEmail: '', BankDetails: '', StatementNote: '', SessionMinutes: 60 };
   const toAdd = Object.keys(defaults).filter(function (k) {
     return !settings.some(function (s) { return s.key === k; });
   }).map(function (k) { return { key: k, value: defaults[k] }; });
@@ -1252,7 +1252,7 @@ function publicSettings_() {
   const s = getSettings_();
   const out = {};
   ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'BankDetails', 'StatementNote',
-    'WhatsAppCountryCode', 'LocalCurrency', 'ReportCurrency', 'CompanyLogo'].forEach(function (k) { out[k] = s[k] || ''; });
+    'LocalCurrency', 'ReportCurrency', 'CompanyLogo'].forEach(function (k) { out[k] = s[k] || ''; });
   return out;
 }
 
@@ -1285,26 +1285,6 @@ function sendStatementEmail(token, account, o) {
   MailApp.sendEmail(mail);
   withLock_(function () { logContact_(user, account, 'Email', 'Statement sent to ' + to); });
   return { quota: MailApp.getRemainingDailyQuota() };
-}
-
-/** Saves the statement PDF to Drive ("CRM Statements") and returns a view link for WhatsApp. */
-function statementPdfLink(token, account, o) {
-  const user = auth_(token, 'statement');
-  assertCustomerVisible_(user, account);
-  const it = DriveApp.getFoldersByName('CRM Statements');
-  const folder = it.hasNext() ? it.next() : DriveApp.createFolder('CRM Statements');
-  const file = folder.createFile(pdfFromHtml_(o.html, o.fileName || ('Statement_' + account)));
-  let shared = true;
-  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { shared = false; }
-  return { url: file.getUrl(), shared: shared };
-}
-
-/** Logs a WhatsApp (or other) contact in the follow-up log. */
-function logContact(token, account, type, note) {
-  const user = auth_(token, 'statement');
-  assertCustomerVisible_(user, account);
-  withLock_(function () { logContact_(user, account, type, note); });
-  return true;
 }
 
 // ───────────────────────────── Messages & notifications ─────────────────────────────

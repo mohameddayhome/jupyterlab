@@ -2,7 +2,7 @@
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = '10';
+const CLIENT_VERSION = '11';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -129,7 +129,7 @@ const I18N = {
     RECEIPT_PENDING: 'سند تحصيل بانتظار الترحيل', RECEIPT_POSTED: 'تم ترحيل سند التحصيل', PROMISE_DUE: 'موعد وعد بالسداد مستحق',
     msgColleague: 'رسالة لزميل', openCustomer: 'فتح العميل', pickRecipient: 'اختر مستلماً واحداً على الأقل', writeReply: 'اكتب ردك...',
     p_receipts: 'سندات التحصيل', s_receipts: 'تسجيل التحصيل (نقدي / شيك / تحويل بنكي) وربطه بالفواتير المسددة.',
-    p_statement: 'كشف حساب العميل', s_statement: 'كشف حساب رسمي للمطالبة: طباعة A4، إرسال بالبريد أو واتساب.',
+    p_statement: 'كشف حساب العميل', s_statement: 'كشف حساب رسمي للمطالبة: طباعة A4 أو إرسال بالبريد الإلكتروني (PDF مرفق).',
     Cash: 'نقدي', Cheque: 'شيك', Transfer: 'تحويل بنكي', OtherMethod: 'أخرى (Dynamics)',
     f_payMethod: 'طريقة التحصيل', f_chequeNo: 'رقم الشيك', f_chequeDate: 'تاريخ استحقاق الشيك', f_bankName: 'البنك',
     f_payRef: 'رقم الحوالة / المرجع', f_collectedBy: 'المحصّل', allocText: 'الفواتير المسددة',
@@ -145,14 +145,14 @@ const I18N = {
     printedAt: 'تاريخ الطباعة', printedBy: 'بواسطة', filtersLbl: 'الفلاتر', rowsCapped: 'تمت طباعة أول {n} سجل فقط',
     stmtTitle: 'كشف حساب عميل', period: 'الفترة', stmtDate: 'تاريخ الكشف', totalDebit: 'إجمالي المدين', totalCredit: 'إجمالي الدائن',
     amountDue: 'الرصيد المستحق', agingTitle: 'أعمار الديون', current: 'غير مستحق بعد', openInvTitle: 'الفواتير المفتوحة', paid: 'المسدد',
-    sendEmail: 'إرسال بالبريد', sendWhatsApp: 'إرسال واتساب', emailTo: 'إلى', emailCc: 'نسخة (CC)', subject: 'الموضوع', message: 'نص الرسالة',
-    send: 'إرسال', sentOk: 'تم الإرسال', quotaLeft: 'تم الإرسال — المتبقي من حصة البريد اليوم: {n}', attachLink: 'إرفاق رابط PDF للكشف (يُحفظ في Google Drive)',
-    waPhone: 'رقم الواتساب', waHint: 'بالصيغة الدولية بدون + أو 00، مثال: 25377123456 (يمكن ضبط كود الدولة من صفحة المستخدمين ← الإعدادات)', openWhatsApp: 'فتح واتساب', chooseCustomer: 'اختر عميلاً لعرض كشف الحساب',
+    sendEmail: 'إرسال بالبريد', emailTo: 'إلى', emailCc: 'نسخة (CC)', subject: 'الموضوع', message: 'نص الرسالة',
+    send: 'إرسال', sentOk: 'تم الإرسال', quotaLeft: 'تم الإرسال — المتبقي من حصة البريد اليوم: {n}',
+    chooseCustomer: 'اختر عميلاً لعرض كشف الحساب',
     msgDear: 'السادة / {n}', msgGreeting: 'تحية طيبة وبعد،', msgBalance: 'نفيدكم بأن رصيد حسابكم لدينا حتى {d} هو: {a}',
-    msgOverdue: 'منها مبالغ متأخرة: {a}', msgOpen: 'الفواتير المفتوحة:', msgLink: 'كشف الحساب (PDF): {u}', msgThanks: 'نرجو التكرم بالسداد، وشكراً لتعاونكم.',
-    linkNotShared: 'تم حفظ الملف في Drive لكن مشاركته للعامة غير مسموحة في حسابكم', fromStart: 'من البداية',
+    msgOverdue: 'منها مبالغ متأخرة: {a}', msgOpen: 'الفواتير المفتوحة:', msgThanks: 'نرجو التكرم بالسداد، وشكراً لتعاونكم.',
+    fromStart: 'من البداية',
     CompanyAddress: 'عنوان الشركة', CompanyPhone: 'هاتف الشركة', CompanyEmail: 'بريد الشركة (للرد)', BankDetails: 'بيانات التحويل البنكي (تظهر في الكشف)',
-    StatementNote: 'ملاحظة أسفل كشف الحساب', WhatsAppCountryCode: 'كود الدولة للواتساب (مثال 253)', SessionMinutes: 'دقائق الخمول قبل طلب الدخول مجدداً',
+    StatementNote: 'ملاحظة أسفل كشف الحساب', SessionMinutes: 'دقائق الخمول قبل طلب الدخول مجدداً',
   },
   en: {
     app: 'CRM Console', caption: 'Customers & Collections', eyebrow: 'Internal CRM',
@@ -277,7 +277,7 @@ const I18N = {
     RECEIPT_PENDING: 'Receipt awaiting posting', RECEIPT_POSTED: 'Your receipt was posted', PROMISE_DUE: 'Payment promise due',
     msgColleague: 'Message a colleague', openCustomer: 'Open customer', pickRecipient: 'Choose at least one recipient', writeReply: 'Write a reply...',
     p_receipts: 'Collection receipts', s_receipts: 'Record collections (cash / cheque / bank transfer) linked to the invoices they pay.',
-    p_statement: 'Customer statement', s_statement: 'Formal statement for collection: A4 print, email or WhatsApp.',
+    p_statement: 'Customer statement', s_statement: 'Formal statement for collection: A4 print or email (PDF attached).',
     Cash: 'Cash', Cheque: 'Cheque', Transfer: 'Bank transfer', OtherMethod: 'Other (Dynamics)',
     f_payMethod: 'Payment method', f_chequeNo: 'Cheque no.', f_chequeDate: 'Cheque due date', f_bankName: 'Bank',
     f_payRef: 'Transfer / reference no.', f_collectedBy: 'Collected by', allocText: 'Invoices paid',
@@ -293,14 +293,14 @@ const I18N = {
     printedAt: 'Printed on', printedBy: 'By', filtersLbl: 'Filters', rowsCapped: 'Only the first {n} records were printed',
     stmtTitle: 'Statement of account', period: 'Period', stmtDate: 'Statement date', totalDebit: 'Total debit', totalCredit: 'Total credit',
     amountDue: 'Balance due', agingTitle: 'Aging', current: 'Not yet due', openInvTitle: 'Open invoices', paid: 'Paid',
-    sendEmail: 'Send by email', sendWhatsApp: 'Send WhatsApp', emailTo: 'To', emailCc: 'CC', subject: 'Subject', message: 'Message',
-    send: 'Send', sentOk: 'Sent', quotaLeft: 'Sent — emails left today: {n}', attachLink: 'Attach a PDF link (saved to Google Drive)',
-    waPhone: 'WhatsApp number', waHint: 'International format without + or 00, e.g. 25377123456 (set a default country code in Users → settings)', openWhatsApp: 'Open WhatsApp', chooseCustomer: 'Choose a customer to view the statement',
+    sendEmail: 'Send by email', emailTo: 'To', emailCc: 'CC', subject: 'Subject', message: 'Message',
+    send: 'Send', sentOk: 'Sent', quotaLeft: 'Sent — emails left today: {n}',
+    chooseCustomer: 'Choose a customer to view the statement',
     msgDear: 'Dear {n},', msgGreeting: 'Greetings,', msgBalance: 'Your account balance with us as of {d} is: {a}',
-    msgOverdue: 'Overdue amount: {a}', msgOpen: 'Open invoices:', msgLink: 'Statement (PDF): {u}', msgThanks: 'Kindly arrange payment. Thank you.',
-    linkNotShared: 'Saved to Drive, but public sharing is not allowed for your account', fromStart: 'From start',
+    msgOverdue: 'Overdue amount: {a}', msgOpen: 'Open invoices:', msgThanks: 'Kindly arrange payment. Thank you.',
+    fromStart: 'From start',
     CompanyAddress: 'Company address', CompanyPhone: 'Company phone', CompanyEmail: 'Company email (reply-to)', BankDetails: 'Bank transfer details (shown on statement)',
-    StatementNote: 'Statement footer note', WhatsAppCountryCode: 'WhatsApp country code (e.g. 253)', SessionMinutes: 'Idle minutes before sign-in is required',
+    StatementNote: 'Statement footer note', SessionMinutes: 'Idle minutes before sign-in is required',
   }
 };
 
@@ -794,7 +794,7 @@ function permSummary(r) {
   return Object.keys(pm).map(pg => t('p_' + pg) + ': ' + pm[pg].map(a => t('perm_' + a)).join('/')).join(' · ') || '—';
 }
 
-const SETTING_INPUTS = ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'WhatsAppCountryCode', 'SessionMinutes'];
+const SETTING_INPUTS = ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'SessionMinutes'];
 const SETTING_TEXTS = ['BankDetails', 'StatementNote'];
 
 // ───────── Data lists ─────────
@@ -1274,7 +1274,7 @@ const VIEWS = {
   statement() {
     const f = S.rep.statement = S.rep.statement || { dateFrom: yearStart(), dateTo: today(), currency: localCur() };
     setContent(heading('statement', [btn('stmtPrint', '🖨 ' + t('print'), 'button-ghost'), exportBtn(),
-      btn('stmtEmail', '✉ ' + t('sendEmail'), 'button-ghost'), btn('stmtWa', '💬 ' + t('sendWhatsApp'))]) + `
+      btn('stmtEmail', '✉ ' + t('sendEmail'))]) + `
       <div class="panel view-tools" id="repTools">
         <label class="tool" style="flex:2 1 280px">${t('f_account')}<select data-f="account"><option value="">${t('chooseCustomer')}</option>${opts(customerOpts(), f.account)}</select></label>
         ${tool('dateFrom', t('from'), 'date', f.dateFrom)}${tool('dateTo', t('to'), 'date', f.dateTo)}
@@ -2133,15 +2133,7 @@ async function submitReceipt(form) {
 }
 
 // ───────── Statement sending ─────────
-function normPhone(p) {
-  let d = String(p || '').replace(/[^\d+]/g, '');
-  if (d.charAt(0) === '+') return d.slice(1);
-  if (d.indexOf('00') === 0) return d.slice(2);
-  const cc = String(docSettings().WhatsAppCountryCode || S.settings.WhatsAppCountryCode || '').replace(/\D/g, '');
-  if (cc && (d.charAt(0) === '0' || d.length <= 9) && d.indexOf(cc) !== 0) d = cc + d.replace(/^0+/, '');
-  return d;
-}
-function stmtMessage(r, link) {
+function stmtMessage(r) {
   const c = r.customer || {}, cc = r.currency, st = r.settings || docSettings();
   const overdue = ['b1', 'b2', 'b3', 'b4'].reduce((s, k) => s + (r.aging[k] || 0), 0);
   const lines = [t('msgDear', { n: c.name }), t('msgGreeting'), '', t('msgBalance', { d: r.to, a: money(r.closing) + ' ' + cc })];
@@ -2150,7 +2142,6 @@ function stmtMessage(r, link) {
     lines.push('', t('msgOpen'));
     r.openInvoices.slice(0, 12).forEach(i => lines.push('• ' + i.voucher + ' — ' + i.date + ' — ' + money(i.remaining) + (i.days ? ' (' + i.days + ' ' + t('day') + ')' : '')));
   }
-  if (link) lines.push('', t('msgLink', { u: link }));
   if (st.BankDetails) lines.push('', t('BankDetails') + ':', st.BankDetails);
   lines.push('', t('msgThanks'), st.CompanyName || '');
   return lines.join('\n');
@@ -2169,19 +2160,6 @@ function openEmailDialog() {
       <div class="form-actions"><button type="button" class="button-ghost" data-act="closeModal">${t('cancel')}</button><button class="button-primary" type="submit">${t('send')}</button></div>
     </form>`);
 }
-function openWaDialog() {
-  const r = S.lastStmt; if (!r) return;
-  const c = r.customer || {};
-  openModal(`<div class="drawer-head"><h2>💬 ${t('sendWhatsApp')}</h2><button class="icon-button" data-act="closeModal">×</button></div>
-    <form class="form-panel" id="waForm" style="padding:12px 0 0">
-      <label class="field">${t('waPhone')} <span class="req">*</span><input name="phone" type="text" dir="ltr" value="${esc(normPhone(c.phone))}" required>
-        <span class="field-hint">${t('waHint')}</span></label>
-      <label class="check"><input type="checkbox" name="link" checked>${t('attachLink')}</label>
-      <label class="field">${t('message')}<textarea name="message" style="min-height:220px">${esc(stmtMessage(r))}</textarea></label>
-      <div id="waGo"></div>
-      <div class="form-actions"><button type="button" class="button-ghost" data-act="closeModal">${t('cancel')}</button><button class="button-primary" type="submit">${t('send')}</button></div>
-    </form>`);
-}
 async function sendEmail(form) {
   const r = S.lastStmt, E = form.elements;
   const b = form.querySelector('button[type=submit]'); b.disabled = true;
@@ -2193,26 +2171,6 @@ async function sendEmail(form) {
     closeModal(); toast(t('quotaLeft', { n: res.quota }));
   } catch (e) { b.disabled = false; }
 }
-async function sendWhatsApp(form) {
-  const r = S.lastStmt, E = form.elements;
-  const phone = normPhone(E.phone.value);
-  let msg = E.message.value;
-  const b = form.querySelector('button[type=submit]'); b.disabled = true;
-  try {
-    if (E.link.checked) {
-      const l = await call('statementPdfLink', r.customer.account, { html: fullDocHtml(statementDoc(r), 'portrait'), fileName: stmtFileName(r) });
-      if (!l.shared) toast(t('linkNotShared'), 'error');
-      const thanks = msg.lastIndexOf('\n\n' + t('msgThanks'));
-      const add = '\n\n' + t('msgLink', { u: l.url });
-      msg = thanks > -1 ? msg.slice(0, thanks) + add + msg.slice(thanks) : msg + add;
-    }
-    const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
-    call('logContact', r.customer.account, 'WhatsApp', 'Statement sent via WhatsApp to ' + phone).catch(() => {});
-    $('#waGo').innerHTML = `<a class="button-primary link-btn wa-btn" href="${esc(url)}" target="_blank" rel="noopener" data-act="closeModalSoon">💬 ${t('openWhatsApp')} (+${esc(phone)})</a>`;
-    try { window.open(url, '_blank'); } catch (e) {}
-  } finally { b.disabled = false; }
-}
-
 
 // ───────── Messages & notifications ─────────
 function startPolling() {
@@ -2302,10 +2260,8 @@ const ACT = {
   print() { const d = S.exportData; askPrint(buildViewPrint, d && d.cols && d.cols.length > 7 ? 'landscape' : 'portrait'); },
   printGo(el) { printGo(el.dataset.o); },
   closeModal,
-  closeModalSoon() { setTimeout(closeModal, 300); },
   stmtPrint() { if (!S.lastStmt) { toast(t('chooseCustomer'), 'error'); return; } askPrint(() => statementDoc(S.lastStmt), 'portrait'); },
   stmtEmail() { if (!S.lastStmt) { toast(t('chooseCustomer'), 'error'); return; } openEmailDialog(); },
-  stmtWa() { if (!S.lastStmt) { toast(t('chooseCustomer'), 'error'); return; } openWaDialog(); },
   goStatement(el) { closeDrawer(); S.rep.statement = Object.assign(S.rep.statement || { dateFrom: yearStart(), dateTo: today(), currency: localCur() }, { account: el.dataset.acc }); go('statement'); },
   compose(el) { composeForm((el && el.dataset.acc) || ''); },
   msgTab(el) { S.msgBox = el.dataset.tab; VIEWS.messages(); },
@@ -2511,7 +2467,6 @@ document.addEventListener('submit', async e => {
   }
   else if (e.target.id === 'replyForm') submitReply(e.target);
   else if (e.target.id === 'mailForm') sendEmail(e.target);
-  else if (e.target.id === 'waForm') sendWhatsApp(e.target);
   else if (e.target.id === 'settingsForm') {
     const fd = {}; SETTING_INPUTS.concat(SETTING_TEXTS).forEach(k => { fd[k] = e.target.elements[k].value.trim(); });
     S.settings = await call('saveSettings', fd); toast(t('settingsSaved')); renderShell(); go('users');

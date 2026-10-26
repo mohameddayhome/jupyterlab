@@ -323,7 +323,7 @@
   .paper { max-width: 210mm; margin: 0 auto; padding: 12mm 11mm; background: #fff; color: #111; border-radius: 6px; box-shadow: var(--shadow); overflow-x: auto; }
   @media (max-width: 680px) { .paper { padding: 14px 10px; } }
 
-  /* Modal (print orientation, email, WhatsApp) */
+  /* Modal (print orientation, email, password) */
   .modal { position: fixed; inset: 0; z-index: 35; display: grid; place-items: center; padding: 16px; background: #000a; }
   .modal-card { width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 18px; box-shadow: var(--shadow); }
   .modal-card .drawer-head { padding-bottom: 12px; }
@@ -332,7 +332,6 @@
   .orient-btn:hover, .orient-btn.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
   .sheet { display: block; border: 2px solid currentColor; border-radius: 3px; opacity: .8; }
   .sheet.p { width: 42px; height: 58px; } .sheet.l { width: 58px; height: 42px; margin: 8px 0; }
-  .wa-btn { width: 100%; min-height: 40px; margin-top: 4px; background: #16a34a; }
 
   /* Collection form: invoice allocation table */
   .form-panel > .field, .alloc-box { min-width: 0; }

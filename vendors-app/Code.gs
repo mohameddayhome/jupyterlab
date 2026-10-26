@@ -18,7 +18,7 @@ const SCHEMA = {
     ['currency', 'Currency'], ['contactPerson', 'Contact Person'], ['phone', 'Contact Number'],
     ['email', 'Email'], ['address', 'Address'], ['city', 'City'], ['country', 'Country'],
     ['taxNo', 'Tax Number'], ['creditLimit', 'Credit Limit'], ['termsDays', 'Payment Terms Days'],
-    ['collector', 'Vendor manager'], ['status', 'Status'], ['notes', 'Notes'],
+    ['collector', 'Vendor manager'], ['status', 'Status'], ['notes', 'Notes'], ['accNo', 'Account number'],
     ['createdAt', 'Created date and time'], ['updatedBy', 'Updated By'], ['updatedAt', 'Updated At']
   ],
   Transactions: [
@@ -33,7 +33,9 @@ const SCHEMA = {
     ['postedAt', 'posted_at'], ['rowId', 'row_id'],
     // Payment vouchers: method, cheque / transfer details, user who recorded the payment.
     ['payMethod', 'Payment method'], ['chequeNo', 'Cheque number'], ['chequeDate', 'Cheque date'],
-    ['bankName', 'Bank'], ['payRef', 'Payment reference'], ['collectedBy', 'Paid by']
+    ['bankName', 'Bank'], ['payRef', 'Payment reference'], ['collectedBy', 'Paid by'],
+    // Rows created by a document (e.g. "PI:PI-000001") are changed only from that document.
+    ['srcDoc', 'Source document']
   ],
   VendorGroups: [['groupId', 'GroupId'], ['groupName', 'GroupName']],
   Users: [
@@ -68,38 +70,51 @@ const SCHEMA = {
     ['itemGroup', 'Item group'], ['accNo', 'Account number'], ['note', 'Note']
   ],
   ItemGroups: [['igId', 'Item group id'], ['igName', 'Item group name']],
-  Warehouses: [['whId', 'Warehouse id'], ['whName', 'Warehouse name']],
+  Warehouses: [['whId', 'Warehouse id'], ['whName', 'Warehouse name'], ['accNo', 'Account number']],
   Accounts: [['accNo', 'Account number'], ['accName', 'Account name'], ['parentAcc', 'Main account']],
   // Purchase invoices: one header row + its lines (linked by invoice number).
   PurchaseInvoices: [
     ['invNo', 'Invoice number'], ['date', 'Date'], ['account', 'Vendor account'], ['vendorName', 'Vendor name'],
     ['description', 'Description'], ['total', 'Total'], ['createdBy', 'Created By'], ['createdAt', 'Created At'],
-    ['updatedBy', 'Updated By'], ['updatedAt', 'Updated At']
+    ['updatedBy', 'Updated By'], ['updatedAt', 'Updated At'], ['whId', 'Warehouse id'], ['status', 'Status'],
+    ['txRowId', 'Transaction row_id'], ['postedBy', 'Posted By'], ['postedAt', 'Posted At']
   ],
   PurchaseInvoiceLines: [
     ['invNo', 'Invoice number'], ['lineNo', 'Line no.'], ['itemId', 'Item number'], ['itemName', 'Item name'],
     ['quantity', 'Quantity'], ['cost', 'Cost'], ['amount', 'Amount'], ['note', 'Note']
   ],
+  // Vendor evaluation per purchase invoice (scores 1–5 per invoice line; header holds the averages).
+  VendorEvaluations: [
+    ['invNo', 'Invoice number'], ['account', 'Vendor account'], ['vendorName', 'Vendor name'], ['invDate', 'Invoice date'],
+    ['evalDate', 'Evaluation date'], ['expectedDate', 'Agreed delivery date'], ['actualDate', 'Actual delivery date'],
+    ['dScore', 'Delivery dates score'], ['tScore', 'Delivery terms score'], ['qScore', 'Quality score'], ['avgScore', 'Average score'],
+    ['note', 'Note'], ['evaluatedBy', 'Evaluated By'], ['updatedAt', 'Updated At']
+  ],
+  EvaluationLines: [
+    ['invNo', 'Invoice number'], ['lineNo', 'Line no.'], ['itemId', 'Item number'], ['itemName', 'Item name'],
+    ['dScore', 'Delivery dates score'], ['tScore', 'Delivery terms score'], ['qScore', 'Quality score'], ['note', 'Note']
+  ],
   Settings: [['key', 'Key'], ['value', 'Value']]
 };
 
 const ID_FIELD = { Vendors: 'account', Transactions: 'rowId', VendorGroups: 'groupId', Users: 'userId', FollowUps: 'id', Currencies: 'code', Allocations: 'id', Messages: 'id',
-  Items: 'itemId', ItemGroups: 'igId', Warehouses: 'whId', Accounts: 'accNo', PurchaseInvoices: 'invNo' };
-const DATE_FIELDS = ['date', 'dueDate', 'createdAt', 'updatedAt', 'postedAt', 'lastLogin', 'actionDate', 'promiseDate', 'chequeDate'];
+  Items: 'itemId', ItemGroups: 'igId', Warehouses: 'whId', Accounts: 'accNo', PurchaseInvoices: 'invNo', VendorEvaluations: 'invNo' };
+const DATE_FIELDS = ['date', 'dueDate', 'createdAt', 'updatedAt', 'postedAt', 'lastLogin', 'actionDate', 'promiseDate', 'chequeDate',
+  'invDate', 'evalDate', 'expectedDate', 'actualDate'];
 const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'creditLimit', 'termsDays', 'promiseAmount', 'rate', 'amount',
-  'cost', 'quantity', 'total', 'lineNo'];
+  'cost', 'quantity', 'total', 'lineNo', 'dScore', 'tScore', 'qScore', 'avgScore'];
 const BOOL_FIELDS = ['isDeleted', 'canAdd', 'canEdit', 'canDelete', 'canPost', 'isCollector', 'active'];
 
 const ALL_PAGES = ['dashboard', 'customers', 'transactions', 'receipts', 'purchases', 'groups', 'items', 'itemgroups', 'warehouses', 'accounts',
-  'statement', 'balances', 'paid', 'overdue', 'credit', 'followup', 'collection', 'collections', 'performance', 'currencies', 'import', 'users'];
+  'statement', 'balances', 'paid', 'overdue', 'credit', 'evaluation', 'collections', 'performance', 'currencies', 'import', 'users'];
 /** Master-data entities saved through the generic form: [required fields]. */
 const MASTER_REQUIRED = { Items: ['itemId', 'itemName'], ItemGroups: ['igId', 'igName'], Warehouses: ['whId', 'whName'], Accounts: ['accNo', 'accName'] };
 const PAY_METHODS = ['Cash', 'Cheque', 'Transfer'];
 /** Actions that make sense on each page (permissions matrix). */
 const PAGE_ACTIONS = {
   customers: ['add', 'edit', 'delete'], transactions: ['add', 'edit', 'delete', 'post'], receipts: ['add', 'edit', 'delete', 'post'],
-  groups: ['add', 'edit', 'delete'], followup: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete'],
-  purchases: ['add', 'edit', 'delete'], items: ['add', 'edit', 'delete'], itemgroups: ['add', 'edit', 'delete'],
+  groups: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete'],
+  purchases: ['add', 'edit', 'delete', 'post'], evaluation: ['add', 'edit', 'delete'], items: ['add', 'edit', 'delete'], itemgroups: ['add', 'edit', 'delete'],
   warehouses: ['add', 'edit', 'delete'], accounts: ['add', 'edit', 'delete']
 };
 
@@ -108,7 +123,7 @@ const ENTITY_PAGE = { Vendors: 'customers', Transactions: 'transactions', Vendor
   Items: 'items', ItemGroups: 'itemgroups', Warehouses: 'warehouses', Accounts: 'accounts', PurchaseInvoices: 'purchases' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = 'V2';
+const APP_VERSION = 'V3';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -576,6 +591,7 @@ function listRecords(token, entity, opts) {
     }
     totals.localCurrency = getSettings_().LocalCurrency || '';
   }
+  if (entity === 'PurchaseInvoices') rows.forEach(function (r) { r.status = r.status || 'Draft'; });
   if (entity === 'PurchaseInvoices') { totals.total = sum_(rows, 'total'); totals.localCurrency = getSettings_().LocalCurrency || ''; }
   const size = Math.min(Math.max(+opts.pageSize || 25, 5), 500);
   const total = rows.length;
@@ -605,6 +621,7 @@ function saveRecord(token, entity, record, isNew) {
     if (entity === 'Vendors') {
       if (!rec.account || !rec.name) throw new Error('REQUIRED_FIELDS');
       if (user.scope === 'own' && !user.isAdmin) rec.collector = user.username;
+      assertAccountExists_(rec.accNo);
       rec.updatedBy = who; rec.updatedAt = now;
       if (isNew) {
         if (findRow_('Vendors', rec.account) > -1) throw new Error('DUPLICATE_ID');
@@ -625,6 +642,7 @@ function saveRecord(token, entity, record, isNew) {
         rec.postStatus = 'Draft';
       } else {
         const existing = getById_(entity, rec.rowId);
+        if (existing.srcDoc) throw new Error('LINKED_DOC');
         if (existing.postStatus === 'Posted') throw new Error('POSTED_LOCKED');
         if ((allocationsByPayment_()[rec.rowId] || []).length) throw new Error('RECEIPT_LOCKED');
         ['createdById', 'createdByName', 'createdAt', 'userAdd', 'postStatus', 'postedBy', 'postedAt', 'isDeleted']
@@ -658,9 +676,7 @@ function saveRecord(token, entity, record, isNew) {
         if (!rec[k]) throw new Error('REQUIRED_FIELDS');
       });
       if (isNew && findRow_(entity, rec[ID_FIELD[entity]]) > -1) throw new Error('DUPLICATE_ID');
-      if (entity === 'Items' && rec.accNo && !readTable('Accounts').some(function (a) { return a.accNo === String(rec.accNo).trim(); })) {
-        throw new Error('ACCOUNT_NOT_FOUND');
-      }
+      if (entity === 'Items' || entity === 'Warehouses') assertAccountExists_(rec.accNo);
       if (entity === 'Accounts') assertAccountParent_(rec.accNo, String(rec.parentAcc || '').trim());
     } else if (entity === 'PurchaseInvoices') {
       throw new Error('NO_PERMISSION'); // saved with savePurchaseInvoice (header + lines together)
@@ -674,6 +690,12 @@ function saveRecord(token, entity, record, isNew) {
     }
     return true;
   });
+}
+
+/** Optional account link (vendor / item / warehouse) must point to the chart of accounts. */
+function assertAccountExists_(accNo) {
+  accNo = String(accNo || '').trim();
+  if (accNo && !readTable('Accounts').some(function (a) { return a.accNo === accNo; })) throw new Error('ACCOUNT_NOT_FOUND');
 }
 
 /** Main account must exist and must not be the account itself or one of its sub-accounts. */
@@ -738,6 +760,7 @@ function deleteRecord(token, entity, id) {
     if (entity === 'Transactions') {
       const t = getById_(entity, id);
       assertCustomerVisible_(user, t.account);
+      if (t.srcDoc) throw new Error('LINKED_DOC');
       if (t.postStatus === 'Posted' && !user.isAdmin) throw new Error('POSTED_LOCKED');
       updateRow_(entity, t._row, { isDeleted: true, updatedByName: user.fullName || user.username, updatedAt: new Date() });
       return true;
@@ -750,11 +773,19 @@ function deleteRecord(token, entity, id) {
     }
     if (entity === 'ItemGroups' && readTable('Items').some(function (i) { return i.itemGroup === id; })) throw new Error('IN_USE');
     if (entity === 'Items' && readTable('PurchaseInvoiceLines').some(function (l) { return l.itemId === id; })) throw new Error('IN_USE');
+    const usesAcc = function (r) { return r.accNo === id; };
     if (entity === 'Accounts' && (readTable('Accounts').some(function (a) { return a.parentAcc === id; }) ||
-      readTable('Items').some(function (i) { return i.accNo === id; }))) throw new Error('IN_USE');
+      readTable('Items').some(usesAcc) || readTable('Vendors').some(usesAcc) || readTable('Warehouses').some(usesAcc))) throw new Error('IN_USE');
+    if (entity === 'Warehouses' && readTable('PurchaseInvoices').some(function (p) { return p.whId === id; })) throw new Error('IN_USE');
     if (entity === 'PurchaseInvoices') {
-      assertCustomerVisible_(user, getById_(entity, id).account);
+      const h = getById_(entity, id);
+      assertCustomerVisible_(user, h.account);
+      if (h.status === 'Posted') throw new Error('POSTED_LOCKED');
+      const tr = h.txRowId ? findRow_('Transactions', h.txRowId) : -1;
+      if (tr > 0) updateRow_('Transactions', tr, { isDeleted: true, updatedByName: user.fullName || user.username, updatedAt: new Date() });
       deleteWhere_('PurchaseInvoiceLines', 'invNo', id);
+      deleteWhere_('EvaluationLines', 'invNo', id);
+      deleteWhere_('VendorEvaluations', 'invNo', id);
     }
     if (entity === 'VendorGroups' && readTable('Vendors').some(function (c) { return c.group === id; })) {
       throw new Error('IN_USE');
@@ -808,15 +839,34 @@ function getPurchaseInvoice(token, invNo) {
 }
 
 /**
- * Saves a purchase invoice. inv: {invNo, isNew, date, account, description, lines: [{itemId, quantity, cost, note}]}.
+ * Creates / refreshes the vendor transaction of a purchase invoice (credit = total, local currency),
+ * so the invoice feeds the vendor balance, statement, aging and payment vouchers. Returns its rowId.
+ */
+function syncInvoiceTx_(h, user, status) {
+  const now = new Date(), who = user.fullName || user.username, post = status === 'Posted';
+  const tx = { voucher: h.invNo, type: 'Invoice', account: h.account, date: h.date, description: h.description || ('Purchase invoice ' + h.invNo),
+    amountCur: -h.total, currency: String(getSettings_().LocalCurrency || '').toUpperCase(), exchange: 1, creditMST: h.total, debitMST: 0,
+    srcDoc: 'PI:' + h.invNo, isDeleted: false, postStatus: status, postedBy: post ? who : '', postedAt: post ? now : '',
+    updatedByName: who, updatedAt: now };
+  const row = h.txRowId ? findRow_('Transactions', h.txRowId) : -1;
+  if (row > 0) { updateRow_('Transactions', row, tx); return h.txRowId; }
+  tx.rowId = Utilities.getUuid(); tx.createdById = user.userId; tx.createdByName = who; tx.createdAt = now; tx.userAdd = user.username;
+  appendRows('Transactions', [tx]);
+  return tx.rowId;
+}
+
+/**
+ * Saves a purchase invoice (draft unless inv.post and the user may post).
+ * inv: {invNo, isNew, date, account, whId, description, post, lines: [{itemId, quantity, cost, note}]}.
  * Empty number on a new invoice → PI-000001 sequence. Amount = quantity × cost; total = sum of amounts.
  */
 function savePurchaseInvoice(token, inv) {
   const user = auth_(token, 'purchases');
   const isNew = !!inv.isNew;
   requireAction_(user, isNew ? 'add' : 'edit', 'purchases');
-  if (!inv.account || !inv.date) throw new Error('REQUIRED_FIELDS');
+  if (!inv.account || !inv.date || !inv.whId) throw new Error('REQUIRED_FIELDS');
   assertCustomerVisible_(user, inv.account);
+  if (!readTable('Warehouses').some(function (w) { return w.whId === String(inv.whId); })) throw new Error('NOT_FOUND');
   const items = {};
   readTable('Items').forEach(function (i) { items[i.itemId] = i; });
   const lines = (inv.lines || []).map(function (l) {
@@ -830,6 +880,7 @@ function savePurchaseInvoice(token, inv) {
     if (!isNew) {
       existing = getById_('PurchaseInvoices', inv.invNo);
       assertCustomerVisible_(user, existing.account);
+      if (existing.status === 'Posted') throw new Error('POSTED_LOCKED');
     }
     const invNo = existing ? existing.invNo : (String(inv.invNo || '').trim() || nextPurchaseNo_());
     if (!existing && findRow_('PurchaseInvoices', invNo) > -1) throw new Error('DUPLICATE_ID');
@@ -838,9 +889,12 @@ function savePurchaseInvoice(token, inv) {
       return { invNo: invNo, lineNo: i + 1, itemId: l.itemId, itemName: items[l.itemId].itemName, quantity: l.quantity,
         cost: l.cost, amount: round2_(l.quantity * l.cost), note: l.note };
     });
-    const head = { invNo: invNo, date: inv.date, account: inv.account, vendorName: vendor ? vendor.name : '',
+    const status = inv.post && hasAction_(user, 'post', 'purchases') ? 'Posted' : 'Draft';
+    const head = { invNo: invNo, date: inv.date, account: inv.account, vendorName: vendor ? vendor.name : '', whId: String(inv.whId),
       description: inv.description || '', total: round2_(rows.reduce(function (s, r) { return s + r.amount; }, 0)),
-      updatedBy: who, updatedAt: now };
+      updatedBy: who, updatedAt: now, status: status, postedBy: status === 'Posted' ? who : '', postedAt: status === 'Posted' ? now : '',
+      txRowId: existing ? existing.txRowId : '' };
+    head.txRowId = syncInvoiceTx_(head, user, status);
     if (existing) {
       updateRow_('PurchaseInvoices', existing._row, head);
       deleteWhere_('PurchaseInvoiceLines', 'invNo', invNo);
@@ -849,8 +903,170 @@ function savePurchaseInvoice(token, inv) {
       appendRows('PurchaseInvoices', [head]);
     }
     appendRows('PurchaseInvoiceLines', rows);
-    return { invNo: invNo, total: head.total };
+    return { invNo: invNo, total: head.total, status: status };
   });
+}
+
+/** Posts (or, admin only, un-posts) purchase invoices together with their vendor transactions. */
+function postPurchaseInvoices(token, invNos, unpost) {
+  const user = auth_(token, 'purchases');
+  requireAction_(user, 'post', 'purchases');
+  if (unpost && !user.isAdmin) throw new Error('NO_PERMISSION');
+  const target = unpost ? 'Draft' : 'Posted';
+  return withLock_(function () {
+    let n = 0;
+    (invNos || []).forEach(function (no) {
+      const h = readTable('PurchaseInvoices').filter(function (x) { return String(x.invNo) === String(no); })[0];
+      if (!h || (h.status || 'Draft') === target) return;
+      assertCustomerVisible_(user, h.account);
+      if (unpost && readTable('Allocations').some(function (a) { return a.account === h.account && String(a.invoiceVoucher) === String(h.invNo); })) {
+        throw new Error('HAS_PAYMENTS: ' + h.invNo);
+      }
+      const now = new Date(), who = user.fullName || user.username;
+      const txRowId = syncInvoiceTx_(h, user, target);
+      updateRow_('PurchaseInvoices', h._row, { status: target, postedBy: unpost ? '' : who, postedAt: unpost ? '' : now, txRowId: txRowId });
+      n++;
+    });
+    return n;
+  });
+}
+
+// ───────────────────────────── Vendor evaluation ─────────────────────────────
+const SCORE_KEYS = ['dScore', 'tScore', 'qScore']; // delivery dates · delivery terms · quality (1–5)
+const avgOf_ = function (list, k) { return list.length ? round2_(list.reduce(function (s, x) { return s + (+x[k] || 0); }, 0) / list.length) : 0; };
+const pctOf_ = function (avg) { return Math.round(avg / 5 * 100); };
+
+/** Purchase invoices the user may evaluate (with a flag for those already evaluated). */
+function getEvaluableInvoices(token) {
+  const user = auth_(token, 'evaluation');
+  const vis = {};
+  visibleCustomers_(user).forEach(function (c) { vis[c.account] = true; });
+  const done = {};
+  readTable('VendorEvaluations').forEach(function (e) { done[e.invNo] = true; });
+  return readTable('PurchaseInvoices').filter(function (h) { return vis[h.account]; }).map(function (h) {
+    return { invNo: h.invNo, date: h.date, account: h.account, vendorName: h.vendorName, total: h.total, evaluated: !!done[h.invNo] };
+  }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+}
+
+/** Invoice header + lines merged with their saved scores. */
+function getEvaluation(token, invNo) {
+  const user = auth_(token, 'evaluation');
+  const head = getById_('PurchaseInvoices', invNo);
+  assertCustomerVisible_(user, head.account);
+  const saved = {};
+  readTable('EvaluationLines').forEach(function (l) { if (String(l.invNo) === String(invNo)) saved[l.lineNo + '|' + l.itemId] = l; });
+  const lines = readTable('PurchaseInvoiceLines').filter(function (l) { return String(l.invNo) === String(invNo); })
+    .sort(function (a, b) { return a.lineNo - b.lineNo; }).map(function (l) {
+      const s = saved[l.lineNo + '|' + l.itemId] || {};
+      return { lineNo: l.lineNo, itemId: l.itemId, itemName: l.itemName, quantity: l.quantity,
+        dScore: s.dScore || '', tScore: s.tScore || '', qScore: s.qScore || '', note: s.note || '' };
+    });
+  const ev = readTable('VendorEvaluations').filter(function (e) { return String(e.invNo) === String(invNo); })[0] || null;
+  return { head: head, lines: lines, evaluation: ev };
+}
+
+/** e: {invNo, evalDate, expectedDate, actualDate, note, lines: [{lineNo, dScore, tScore, qScore, note}]} — every line rated 1–5. */
+function saveEvaluation(token, e) {
+  const user = auth_(token, 'evaluation');
+  const head = getById_('PurchaseInvoices', e.invNo);
+  assertCustomerVisible_(user, head.account);
+  const existing = readTable('VendorEvaluations').filter(function (x) { return String(x.invNo) === String(head.invNo); })[0];
+  requireAction_(user, existing ? 'edit' : 'add', 'evaluation');
+  const given = {};
+  (e.lines || []).forEach(function (l) { given[+l.lineNo] = l; });
+  const invLines = readTable('PurchaseInvoiceLines').filter(function (l) { return String(l.invNo) === String(head.invNo); });
+  const rows = invLines.sort(function (a, b) { return a.lineNo - b.lineNo; }).map(function (l) {
+    const g = given[l.lineNo] || {};
+    const r = { invNo: head.invNo, lineNo: l.lineNo, itemId: l.itemId, itemName: l.itemName, note: String(g.note || '').trim() };
+    SCORE_KEYS.forEach(function (k) {
+      const v = Math.round(toNum_(g[k]));
+      if (!(v >= 1 && v <= 5)) throw new Error('SCORES_REQUIRED');
+      r[k] = v;
+    });
+    return r;
+  });
+  if (!rows.length) throw new Error('SCORES_REQUIRED');
+  const rec = { invNo: head.invNo, account: head.account, vendorName: head.vendorName, invDate: head.date,
+    evalDate: e.evalDate || today_(), expectedDate: e.expectedDate || '', actualDate: e.actualDate || '',
+    note: String(e.note || '').trim(), evaluatedBy: user.fullName || user.username, updatedAt: new Date() };
+  SCORE_KEYS.forEach(function (k) { rec[k] = avgOf_(rows, k); });
+  rec.avgScore = round2_((rec.dScore + rec.tScore + rec.qScore) / 3);
+  return withLock_(function () {
+    if (existing) updateRow_('VendorEvaluations', existing._row, rec); else appendRows('VendorEvaluations', [rec]);
+    deleteWhere_('EvaluationLines', 'invNo', head.invNo);
+    appendRows('EvaluationLines', rows);
+    return { invNo: head.invNo, avgScore: rec.avgScore, pct: pctOf_(rec.avgScore) };
+  });
+}
+
+function deleteEvaluation(token, invNo) {
+  const user = auth_(token, 'evaluation');
+  requireAction_(user, 'delete', 'evaluation');
+  const ev = getById_('VendorEvaluations', invNo);
+  assertCustomerVisible_(user, ev.account);
+  return withLock_(function () {
+    deleteWhere_('EvaluationLines', 'invNo', invNo);
+    deleteWhere_('VendorEvaluations', 'invNo', invNo);
+    return true;
+  });
+}
+
+/**
+ * Evaluation report by vendor, by invoice and by item. Scores come from the rated lines
+ * (so the item filter narrows every view); late days = actual − agreed delivery date.
+ * f: {dateFrom, dateTo (invoice date), account, itemId, group}
+ */
+function reportEvaluation(token, f) {
+  const user = auth_(token, 'evaluation');
+  f = f || {};
+  const vis = {};
+  visibleCustomers_(user).forEach(function (c) { vis[c.account] = c; });
+  const evals = readTable('VendorEvaluations').filter(function (e) {
+    const c = vis[e.account];
+    return c && (!f.account || e.account === f.account) && (!f.group || c.group === f.group) &&
+      (!f.dateFrom || e.invDate >= f.dateFrom) && (!f.dateTo || e.invDate <= f.dateTo);
+  });
+  const byInv = {};
+  evals.forEach(function (e) { byInv[e.invNo] = e; });
+  const lines = readTable('EvaluationLines').filter(function (l) { return byInv[l.invNo] && (!f.itemId || l.itemId === f.itemId); });
+  const linesOf = {};
+  lines.forEach(function (l) { (linesOf[l.invNo] = linesOf[l.invNo] || []).push(l); });
+  const score = function (list) {
+    const o = {};
+    SCORE_KEYS.forEach(function (k) { o[k] = avgOf_(list, k); });
+    o.avgScore = round2_((o.dScore + o.tScore + o.qScore) / 3);
+    o.pct = pctOf_(o.avgScore);
+    return o;
+  };
+  const late = function (e) { return e.expectedDate && e.actualDate ? Math.max(0, daysBetween_(e.expectedDate, e.actualDate)) : ''; };
+  const rows = evals.filter(function (e) { return linesOf[e.invNo]; }).map(function (e) {
+    return Object.assign({ invNo: e.invNo, invDate: e.invDate, evalDate: e.evalDate, account: e.account, vendorName: e.vendorName || vis[e.account].name,
+      expectedDate: e.expectedDate, actualDate: e.actualDate, lateDays: late(e), items: linesOf[e.invNo].length,
+      evaluatedBy: e.evaluatedBy, note: e.note }, score(linesOf[e.invNo]));
+  }).sort(function (a, b) { return a.invDate < b.invDate ? 1 : -1; });
+  const vend = {};
+  rows.forEach(function (r) {
+    const v = vend[r.account] = vend[r.account] || { account: r.account, name: vis[r.account].name, invoices: 0, lines: [], onTime: 0, lateCount: 0, lateSum: 0 };
+    v.invoices++;
+    Array.prototype.push.apply(v.lines, linesOf[r.invNo]);
+    if (r.lateDays === 0) v.onTime++; else if (r.lateDays > 0) { v.lateCount++; v.lateSum += r.lateDays; }
+  });
+  const vendors = Object.keys(vend).map(function (k) {
+    const v = vend[k];
+    return Object.assign({ account: v.account, name: v.name, invoices: v.invoices, items: v.lines.length, onTime: v.onTime,
+      lateCount: v.lateCount, avgLate: v.lateCount ? Math.round(v.lateSum / v.lateCount) : 0 }, score(v.lines));
+  }).sort(function (a, b) { return b.avgScore - a.avgScore; });
+  const it = {};
+  lines.forEach(function (l) {
+    const e = byInv[l.invNo], key = e.account + '|' + l.itemId;
+    const x = it[key] = it[key] || { itemId: l.itemId, itemName: l.itemName, account: e.account, name: vis[e.account].name, invoices: {}, lines: [] };
+    x.invoices[l.invNo] = true; x.lines.push(l);
+  });
+  const items = Object.keys(it).map(function (k) {
+    const x = it[k];
+    return Object.assign({ itemId: x.itemId, itemName: x.itemName, account: x.account, name: x.name, invoices: Object.keys(x.invoices).length }, score(x.lines));
+  }).sort(function (a, b) { return String(a.itemId).localeCompare(String(b.itemId)) || b.avgScore - a.avgScore; });
+  return { vendors: vendors, rows: rows, items: items, totals: Object.assign({ invoices: rows.length, vendors: vendors.length, lines: lines.length }, score(lines)) };
 }
 
 /** Post (ترحيل) or un-post draft transactions. Only posted rows affect balances & reports. */
@@ -877,6 +1093,7 @@ function postTransactions(token, ids, unpost, page) {
     const told = {};
     values.forEach(function (row) {
       if (!set[String(row[idx.rowId])] || !allowed[String(row[idx.account]).trim()]) return;
+      if (idx.srcDoc !== undefined && String(row[idx.srcDoc] || '')) return; // posted from its purchase invoice
       row[idx.postStatus] = unpost ? 'Draft' : 'Posted';
       row[idx.postedBy] = unpost ? '' : who;
       row[idx.postedAt] = unpost ? '' : now;
@@ -1762,7 +1979,7 @@ function reportBalances(token, f) {
 /** Vendor statement of account with running balance (credit − debit). */
 function customerStatement(token, account, dateFrom, dateTo, currency) {
   const user = auth_(token);
-  const pages = ['customers', 'balances', 'paid', 'overdue', 'followup', 'collection', 'dashboard', 'credit', 'transactions', 'statement', 'receipts'];
+  const pages = ['customers', 'balances', 'paid', 'overdue', 'dashboard', 'credit', 'transactions', 'statement', 'receipts', 'purchases', 'evaluation'];
   if (!pages.some(function (p) { return user.pageList.indexOf(p) > -1; })) throw new Error('NO_PERMISSION');
   assertCustomerVisible_(user, account);
   const from = dateFrom || '1900-01-01', to = dateTo || today_();
@@ -1873,62 +2090,6 @@ function overdue_(user, f, L) {
   });
 }
 
-/** Follow-up page: vendors with late invoices + planned payments due. */
-function getFollowUpBoard(token, f) {
-  const user = auth_(token, 'followup');
-  const od = overdue_(user, f || {});
-  const today = today_();
-  const due = readTable('FollowUps').filter(function (x) { return x.status === 'Open' && x.promiseDate && x.promiseDate <= today; });
-  return Object.assign(fxInfo_(fx_(f && f.currency)), { customers: od.customers, totals: od.totals, promisesDue: due.length });
-}
-
-/** Vendor managers dashboard: per manager → vendors, late invoices, days late, paid this month. */
-function reportCollection(token, f) {
-  const user = auth_(token, 'collection');
-  f = f || {};
-  const asOf = f.asOf || today_();
-  const L = ledger_(user, asOf, f.currency);
-  const od = overdue_(user, { asOf: asOf, group: f.group }, L);
-  const users = {};
-  readTable('Users').forEach(function (u) { users[u.username] = u.fullName || u.username; });
-  const monthStart = asOf.slice(0, 8) + '01';
-  const isPay = paymentTest_(L.tx);
-  const collected = {};
-  L.tx.forEach(function (t) { if (t.date >= monthStart && isPay(t)) collected[t.account] = (collected[t.account] || 0) + t.cr; });
-  const team = {};
-  L.customers.filter(function (c) { return !f.group || c.group === f.group; }).forEach(function (c) {
-    const key = c.collector || '';
-    const m = team[key] = team[key] || {
-      collector: key, name: key ? (users[key] || key) : '', customers: 0, balance: 0, overdue: 0,
-      overdueInvoices: 0, overdueCustomers: 0, maxDays: 0, sumDays: 0, collectedMTD: 0, companies: []
-    };
-    m.customers++;
-    m.balance = round2_(m.balance + (L.balance[c.account] || 0));
-    m.collectedMTD = round2_(m.collectedMTD + (collected[c.account] || 0));
-  });
-  od.customers.forEach(function (oc) {
-    const m = team[oc.collector || ''];
-    if (!m) return;
-    m.overdue = round2_(m.overdue + oc.remaining);
-    m.overdueInvoices += oc.count;
-    m.overdueCustomers++;
-    m.maxDays = Math.max(m.maxDays, oc.maxDays);
-    m.companies.push({ account: oc.account, name: oc.name, remaining: oc.remaining, maxDays: oc.maxDays, count: oc.count,
-      lastFollowUp: oc.lastFollowUp, balance: round2_(L.balance[oc.account] || 0) });
-  });
-  od.rows.forEach(function (r) { const m = team[r.collector || '']; if (m) m.sumDays += r.days; });
-  const rows = Object.keys(team).map(function (k) {
-    const m = team[k];
-    m.avgDays = m.overdueInvoices ? Math.round(m.sumDays / m.overdueInvoices) : 0;
-    m.companies.sort(function (a, b) { return b.maxDays - a.maxDays; });
-    delete m.sumDays;
-    return m;
-  }).filter(function (m) { return !f.collector || m.collector === f.collector; })
-    .sort(function (a, b) { return b.overdue - a.overdue; });
-  return Object.assign(fxInfo_(L.fx), { rows: rows, buckets: od.buckets,
-    totals: { overdue: sum_(rows, 'overdue'), balance: sum_(rows, 'balance'), collectedMTD: sum_(rows, 'collectedMTD') } });
-}
-
 /** Vendors whose balance (in the vendor's own currency) exceeds the credit limit they grant us. */
 function reportCreditLimit(token, f) {
   const user = auth_(token, 'credit');
@@ -2010,7 +2171,7 @@ function collections_(user, f, L) {
 }
 
 /**
- * Vendor-manager performance over a period (vendors grouped by their manager):
+ * Payment performance over a period (vendors grouped by their manager):
  * opening balance + period invoices = due; paid (payments); other debits (notes); remaining = closing balance.
  */
 function reportPerformance(token, f) {
@@ -2141,7 +2302,7 @@ function loadDemoData() {
   appendRows('Users', [{
     userId: Utilities.getUuid(), username: 'buyer1', fullName: 'Ahmed Buyer', email: '',
     passwordHash: hash_('buyer123', salt), salt: salt, role: 'User',
-    pages: 'dashboard,customers,overdue,followup,collection', canAdd: true, canEdit: true,
+    pages: 'dashboard,customers,overdue,purchases,evaluation', canAdd: true, canEdit: true,
     canDelete: false, canPost: false, isCollector: true, scope: 'own', active: true, createdAt: new Date()
   }]);
   const names = ['Al Noor Supplies', 'Gulf Steel Co.', 'Medical Equipment Co.', 'Desert Foods Supply', 'Blue Sea Logistics', 'Najd Building Materials', 'Office Plus', 'Tech Parts Ltd.'];

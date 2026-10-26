@@ -2,7 +2,7 @@
 /* ═══════════════════════════ Vendor Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = 'V2';
+const CLIENT_VERSION = 'V3';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -114,15 +114,15 @@ const I18N = {
     editReceipt: 'تعديل سند الصرف', CompanyLogo: 'شعار الشركة', uploadLogo: 'رفع شعار', removeLogo: 'إزالة الشعار',
     logoHint: 'PNG أو JPG أو SVG — يُصغَّر تلقائياً ويظهر في القائمة وشاشة الدخول وكل المطبوعات وكشوف الحساب',
     logoSaved: 'تم حفظ الشعار', err_LOGO_INVALID: 'الصورة غير مدعومة أو كبيرة جداً، جرّب صورة أبسط',
-    mtdByMethod: 'المدفوعات هذا الشهر حسب الطريقة', mtdPerformance: 'أداء مسؤولي الموردين هذا الشهر',
+    mtdByMethod: 'المدفوعات هذا الشهر حسب الطريقة', mtdPerformance: 'أداء السداد هذا الشهر',
     p_collections: 'تقرير المدفوعات', s_collections: 'المبالغ المدفوعة للموردين خلال الفترة حسب طريقة الدفع والمستخدم.',
-    p_performance: 'أداء مسؤولي الموردين', s_performance: 'لكل مسؤول موردين: عدد الموردين، المبالغ المستحقة، المدفوع، المتبقي ونسبة السداد خلال الفترة.',
+    p_performance: 'أداء السداد', s_performance: 'المبالغ المستحقة للموردين والمدفوع والمتبقي ونسبة السداد خلال الفترة، مجمّعة حسب مسؤول المورد.',
     byCollector: 'حسب المستخدم', receiptDetails: 'تفاصيل السندات', receiptsCount: 'عدد السندات', totalCollected: 'إجمالي المدفوع',
     invoicedPeriod: 'فواتير الفترة', totalDue: 'المبالغ المستحقة', collectedAmt: 'المدفوع', otherCredits: 'إشعارات / تسويات مدينة',
     remainingAmt: 'المتبقي', collectRate: 'نسبة السداد', companiesN: 'عدد الموردين', activeCompanies: 'موردون بهم حركة', openingPeriod: 'رصيد أول الفترة',
     collectorRule: 'صُرف بواسطة = المستخدم الذي سجّل سند الصرف، وللدفعات المستوردة من Dynamics = مسؤول المورد.',
     dueRule: 'المستحق = رصيد أول الفترة + فواتير الفترة · المتبقي = المستحق − المدفوع − الإشعارات المدينة · نسبة السداد = المدفوع ÷ المستحق',
-    p_messages: 'الرسائل والإشعارات', s_messages: 'تواصل بين مستخدمي التطبيق وتنبيهات النظام (سندات صرف بانتظار الترحيل، مدفوعات مخططة مستحقة).',
+    p_messages: 'الرسائل والإشعارات', s_messages: 'تواصل بين مستخدمي التطبيق وتنبيهات النظام (سندات صرف بانتظار الترحيل).',
     inbox: 'الوارد', sentBox: 'المرسل', alerts: 'التنبيهات', compose: 'رسالة جديدة', msgTo: 'إلى', allUsers: 'كل المستخدمين',
     msgSubject: 'الموضوع', msgBody: 'نص الرسالة', reply: 'رد', sendMsg: 'إرسال', msgSent: 'تم إرسال الرسالة', markAllRead: 'تحديد الكل كمقروء',
     noMessages: 'لا توجد رسائل', newMsgToast: 'لديك {n} رسالة جديدة', system: 'النظام', relatedCustomer: 'المورد المرتبط',
@@ -163,6 +163,18 @@ const I18N = {
     f_accNo: 'رقم الحساب', f_accName: 'اسم الحساب', f_parentAcc: 'الحساب الرئيسي', f_igId: 'رمز المجموعة', f_igName: 'اسم المجموعة',
     f_whId: 'رمز المستودع', f_whName: 'اسم المستودع', f_invNo: 'رقم الفاتورة', f_vendorName: 'اسم المورد', f_lineNo: 'م',
     f_quantity: 'الكمية', f_total: 'إجمالي الفاتورة', f_item: 'الصنف',
+    f_warehouse: 'المستودع', postInvNow: 'ترحيل مباشر (تُضاف الفاتورة إلى رصيد المورد)', postedInvHint: 'الفاتورة مرحّلة ولا يمكن تعديلها أو حذفها (يمكن لمدير النظام إلغاء الترحيل)',
+    openInvoice: 'فتح الفاتورة', err_LINKED_DOC: 'هذه الحركة ناتجة عن فاتورة مشتريات: عدّلها أو رحّلها أو احذفها من صفحة فواتير المشتريات',
+    err_HAS_PAYMENTS: 'لا يمكن إلغاء ترحيل فاتورة مرتبطة بسندات صرف',
+    p_evaluation: 'تقييم الموردين', s_evaluation: 'تقييم التزام المورد بمواعيد التسليم وشروط التسليم والجودة لكل صنف في كل فاتورة مشتريات.',
+    newEval: 'تقييم فاتورة', evalTitle: 'تقييم المورد', chooseInvoice: 'اختر فاتورة المشتريات', evaluated: 'مُقيَّمة', notEvaluated: 'غير مُقيَّمة',
+    f_evalDate: 'تاريخ التقييم', f_expectedDate: 'موعد التسليم المتفق عليه', f_actualDate: 'تاريخ التسليم الفعلي', f_invDate: 'تاريخ الفاتورة',
+    f_dScore: 'مواعيد التسليم', f_tScore: 'شروط التسليم', f_qScore: 'الجودة', f_avgScore: 'المتوسط', f_evaluatedBy: 'المُقيِّم',
+    scorePct: 'التقييم العام', evalItems: 'أصناف مقيّمة', evalInvoices: 'فواتير مقيّمة', byVendor: 'حسب المورد', byInv: 'حسب الفاتورة', byItem: 'حسب الصنف',
+    onTimeDel: 'تسليم في الموعد', lateDel: 'تسليم متأخر', deliveryLate: 'تأخير التسليم', avgLateDays: 'متوسط تأخير التسليم',
+    applyAll: 'تطبيق على كل البنود', scaleHint: 'المقياس: 5 ممتاز · 4 جيد جداً · 3 جيد · 2 مقبول · 1 ضعيف',
+    g_excellent: 'ممتاز', g_vgood: 'جيد جداً', g_good: 'جيد', g_fair: 'مقبول', g_poor: 'ضعيف',
+    err_SCORES_REQUIRED: 'قيّم كل البنود في المعايير الثلاثة (من 1 إلى 5)',
     addPurchase: 'فاتورة مشتريات جديدة', addItem: 'صنف جديد', addItemGroup: 'مجموعة أصناف جديدة', addWarehouse: 'مستودع جديد',
     addAccount: 'حساب جديد', addLine: 'إضافة بند', invLines: 'تفاصيل الفاتورة', purchaseTitle: 'فاتورة مشتريات', printInvoice: 'طباعة الفاتورة',
     editPurchase: 'تعديل فاتورة المشتريات', mainAccount: 'حساب رئيسي',
@@ -277,15 +289,15 @@ const I18N = {
     editReceipt: 'Edit payment voucher', CompanyLogo: 'Company logo', uploadLogo: 'Upload logo', removeLogo: 'Remove logo',
     logoHint: 'PNG, JPG or SVG — resized automatically; shown in the menu, sign-in screen, all printouts and statements',
     logoSaved: 'Logo saved', err_LOGO_INVALID: 'Image not supported or too large, try a simpler one',
-    mtdByMethod: 'Payments this month by method', mtdPerformance: 'Vendor managers this month',
+    mtdByMethod: 'Payments this month by method', mtdPerformance: 'Payment performance this month',
     p_collections: 'Payments report', s_collections: 'Amounts paid to vendors in the period by payment method and user.',
-    p_performance: 'Vendor managers performance', s_performance: 'Per vendor manager: vendors, amounts due, paid, remaining and payment rate for the period.',
+    p_performance: 'Payment performance', s_performance: 'Amounts due to vendors, paid, remaining and payment rate for the period, grouped by vendor manager.',
     byCollector: 'By user', receiptDetails: 'Voucher details', receiptsCount: 'Vouchers', totalCollected: 'Total paid',
     invoicedPeriod: 'Period invoices', totalDue: 'Amounts due', collectedAmt: 'Paid', otherCredits: 'Debit notes / adjustments',
     remainingAmt: 'Remaining', collectRate: 'Payment rate', companiesN: 'Vendors', activeCompanies: 'Active vendors', openingPeriod: 'Opening balance',
     collectorRule: 'Paid by = user who recorded the payment voucher; for payments imported from Dynamics = the vendor manager.',
     dueRule: 'Due = opening balance + period invoices · Remaining = due − paid − debit notes · Rate = paid ÷ due',
-    p_messages: 'Messages & notifications', s_messages: 'Messages between app users and system alerts (payment vouchers awaiting posting, planned payments due).',
+    p_messages: 'Messages & notifications', s_messages: 'Messages between app users and system alerts (payment vouchers awaiting posting).',
     inbox: 'Inbox', sentBox: 'Sent', alerts: 'Alerts', compose: 'New message', msgTo: 'To', allUsers: 'All users',
     msgSubject: 'Subject', msgBody: 'Message', reply: 'Reply', sendMsg: 'Send', msgSent: 'Message sent', markAllRead: 'Mark all as read',
     noMessages: 'No messages', newMsgToast: 'You have {n} new message(s)', system: 'System', relatedCustomer: 'Related vendor',
@@ -326,6 +338,18 @@ const I18N = {
     f_accNo: 'Account number', f_accName: 'Account name', f_parentAcc: 'Main account', f_igId: 'Group ID', f_igName: 'Group name',
     f_whId: 'Warehouse ID', f_whName: 'Warehouse name', f_invNo: 'Invoice no.', f_vendorName: 'Vendor name', f_lineNo: '#',
     f_quantity: 'Quantity', f_total: 'Invoice total', f_item: 'Item',
+    f_warehouse: 'Warehouse', postInvNow: 'Post now (adds the invoice to the vendor balance)', postedInvHint: 'Posted invoice: it cannot be changed or deleted (an administrator can unpost it)',
+    openInvoice: 'Open invoice', err_LINKED_DOC: 'This transaction comes from a purchase invoice: change, post or delete it from the Purchase invoices page',
+    err_HAS_PAYMENTS: 'An invoice linked to payment vouchers cannot be unposted',
+    p_evaluation: 'Vendor evaluation', s_evaluation: 'Rate vendor commitment to delivery dates, delivery terms and quality for each item of each purchase invoice.',
+    newEval: 'Evaluate invoice', evalTitle: 'Vendor evaluation', chooseInvoice: 'Choose the purchase invoice', evaluated: 'evaluated', notEvaluated: 'not evaluated',
+    f_evalDate: 'Evaluation date', f_expectedDate: 'Agreed delivery date', f_actualDate: 'Actual delivery date', f_invDate: 'Invoice date',
+    f_dScore: 'Delivery dates', f_tScore: 'Delivery terms', f_qScore: 'Quality', f_avgScore: 'Average', f_evaluatedBy: 'Evaluated by',
+    scorePct: 'Overall rating', evalItems: 'Items rated', evalInvoices: 'Invoices evaluated', byVendor: 'By vendor', byInv: 'By invoice', byItem: 'By item',
+    onTimeDel: 'On-time deliveries', lateDel: 'Late deliveries', deliveryLate: 'Delivery delay', avgLateDays: 'Avg delivery delay',
+    applyAll: 'Apply to all lines', scaleHint: 'Scale: 5 excellent · 4 very good · 3 good · 2 fair · 1 poor',
+    g_excellent: 'Excellent', g_vgood: 'Very good', g_good: 'Good', g_fair: 'Fair', g_poor: 'Poor',
+    err_SCORES_REQUIRED: 'Rate every line on all three criteria (1 to 5)',
     addPurchase: 'New purchase invoice', addItem: 'New item', addItemGroup: 'New item group', addWarehouse: 'New warehouse',
     addAccount: 'New account', addLine: 'Add line', invLines: 'Invoice lines', purchaseTitle: 'Purchase invoice', printInvoice: 'Print invoice',
     editPurchase: 'Edit purchase invoice', mainAccount: 'Main account',
@@ -351,8 +375,7 @@ const PAGES = [
   { id: 'paid', glyph: '✓', sec: 'reports' },
   { id: 'overdue', glyph: '!', sec: 'reports' },
   { id: 'credit', glyph: '⚑', sec: 'reports' },
-  { id: 'followup', glyph: '☎', sec: 'reports' },
-  { id: 'collection', glyph: '◉', sec: 'reports' },
+  { id: 'evaluation', glyph: '✪', sec: 'reports' },
   { id: 'collections', glyph: '∑', sec: 'reports' },
   { id: 'performance', glyph: '★', sec: 'reports' },
   { id: 'currencies', glyph: '¤', sec: 'admin' },
@@ -400,8 +423,8 @@ const yearStart = () => today().slice(0, 5) + '01-01';
 /** Actions available per page in the permissions matrix (same list as PAGE_ACTIONS in Code.gs). */
 const PAGE_ACTS = {
   customers: ['add', 'edit', 'delete'], transactions: ['add', 'edit', 'delete', 'post'], receipts: ['add', 'edit', 'delete', 'post'],
-  groups: ['add', 'edit', 'delete'], followup: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete'],
-  purchases: ['add', 'edit', 'delete'], items: ['add', 'edit', 'delete'], itemgroups: ['add', 'edit', 'delete'],
+  groups: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete'],
+  purchases: ['add', 'edit', 'delete', 'post'], evaluation: ['add', 'edit', 'delete'], items: ['add', 'edit', 'delete'], itemgroups: ['add', 'edit', 'delete'],
   warehouses: ['add', 'edit', 'delete'], accounts: ['add', 'edit', 'delete']
 };
 const ACTIONS = ['add', 'edit', 'delete', 'post'];
@@ -739,6 +762,8 @@ const itemOpts = () => (S.lookups.items || []).map(i => [i.id, i.id + ' — ' + 
 const itemGroupOpts = () => (S.lookups.itemGroups || []).map(g => [g.id, g.id + ' — ' + g.name, g.id, g.name]);
 const accountOpts = () => (S.lookups.accounts || []).map(a => [a.no, a.no + ' — ' + a.name, a.no, a.name]);
 const itemGroupName = id => { const g = (S.lookups.itemGroups || []).find(x => x.id === id); return g ? g.name : (id || ''); };
+const warehouseOpts = () => (S.lookups.warehouses || []).map(w => [w.id, w.id + ' — ' + w.name, w.id, w.name]);
+const warehouseLabel = id => { if (!id) return ''; const w = (S.lookups.warehouses || []).find(x => x.id === id); return w ? id + ' — ' + w.name : id; };
 const accountLabel = no => { if (!no) return ''; const a = (S.lookups.accounts || []).find(x => x.no === no); return a ? no + ' — ' + a.name : no; };
 const collectorOpts = () => S.lookups.collectors.map(c => [c.username, c.name]);
 const statusOpts = () => ['Active', 'Inactive', 'Blocked'].map(s => [s, t(s)]);
@@ -791,7 +816,7 @@ function table(view, cols, rows, o) {
     return `<th class="${c.num ? 'num' : ''} ${sortable && c.k ? 'sortable' : ''}" ${sortable && c.k ? `data-sort="${c.k}"` : ''}>${esc(c.l)}${arrow}</th>`;
   }).join('');
   const body = rows.map((r, i) => `<tr data-i="${i}" class="${o.click ? 'click' : ''}">` +
-    (o.select ? `<td class="actions-cell" data-label="">${o.select(r) ? `<label class="check"><input type="checkbox" data-sel="${esc(r.rowId)}"></label>` : ''}</td>` : '') +
+    (o.select ? `<td class="actions-cell" data-label="">${o.select(r) ? `<label class="check"><input type="checkbox" data-sel="${esc(r.rowId || r.invNo)}"></label>` : ''}</td>` : '') +
     cols.map(c => {
       const v = r[c.k];
       const html = c.f ? c.f(v, r) : c.num ? numCell(v) : bdi(v);
@@ -852,6 +877,7 @@ const LISTS = {
       { k: 'group', l: t('f_group'), f: v => bdi(groupName(v)), x: r => groupName(r.group) }, { k: 'currency', l: t('f_currency') },
       { k: 'creditLimit', l: t('f_creditLimit'), num: true }, { k: 'phone', l: t('f_phone') },
       { k: 'email', l: t('f_email') }, { k: 'city', l: t('f_city') },
+      { k: 'accNo', l: t('f_accNo'), f: v => bdi(accountLabel(v)), x: r => accountLabel(r.accNo) },
       { k: 'collector', l: t('f_collector'), f: v => bdi(collectorName(v)), x: r => collectorName(r.collector) },
       { k: 'status', l: t('f_status'), f: statusPill, x: r => t(r.status || 'Active') }],
     actions: editDel
@@ -874,8 +900,9 @@ const LISTS = {
       { k: 'balance', l: t('runBalance'), num: true, f: (v, r) => r.postStatus === 'Draft' ? '—' : numCell(v) },
       { k: 'payMethod', l: t('f_payMethod'), f: v => v ? pill(t(v), 'info') : '', x: r => r.payMethod ? t(r.payMethod) : '' },
       { k: 'postStatus', l: t('f_postStatus'), f: statusPill, x: r => t(r.postStatus) }],
-    select: r => can('post') && r.postStatus === 'Draft',
+    select: r => can('post') && r.postStatus === 'Draft' && !r.srcDoc,
     actions: r => {
+      if (r.srcDoc) return hasPage('purchases') ? `<button data-act="rowOpenSrc" title="${t('openInvoice')}">▣</button>` : '';
       const draft = r.postStatus === 'Draft';
       return (draft && (r.payMethod ? hasPage('receipts') && can('edit', 'receipts') : can('edit')) ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') +
         (draft && can('post') ? `<button data-act="rowPost" title="${t('post')}">⇪</button>` : '') +
@@ -919,10 +946,19 @@ const LISTS = {
     cols: () => [
       { k: 'invNo', l: t('f_invNo') }, { k: 'date', l: t('f_date') }, { k: 'account', l: t('f_account') },
       { k: 'vendorName', l: t('f_vendorName') }, { k: 'description', l: t('f_description'), cls: 'clip' },
-      { k: 'total', l: t('f_total'), num: true }, { k: 'createdBy', l: t('f_createdBy') }],
-    actions: r => (can('edit') ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') +
-      `<button data-act="rowPrintInv" title="${t('printInvoice')}">🖨</button>` +
-      (can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '')
+      { k: 'whId', l: t('f_warehouse'), f: v => bdi(warehouseLabel(v)), x: r => warehouseLabel(r.whId) },
+      { k: 'total', l: t('f_total'), num: true }, { k: 'status', l: t('f_postStatus'), f: statusPill, x: r => t(r.status) },
+      { k: 'createdBy', l: t('f_createdBy') }],
+    select: r => can('post') && r.status === 'Draft',
+    actions: r => {
+      const draft = r.status === 'Draft';
+      return (draft && can('edit') ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') +
+        `<button data-act="rowPrintInv" title="${t('printInvoice')}">🖨</button>` +
+        (hasPage('evaluation') ? `<button data-act="rowEval" title="${t('p_evaluation')}">✪</button>` : '') +
+        (draft && can('post') ? `<button data-act="rowPost" title="${t('post')}">⇪</button>` : '') +
+        (!draft && S.user.isAdmin ? `<button data-act="rowUnpost" title="${t('unpost')}">↺</button>` : '') +
+        (draft && can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '');
+    }
   },
   items: {
     entity: 'Items', id: 'itemId',
@@ -945,7 +981,8 @@ const LISTS = {
   warehouses: {
     entity: 'Warehouses', id: 'whId',
     tools: s => [tool('q', t('searchLbl'), 'search', s.q)],
-    cols: () => [{ k: 'whId', l: t('f_whId') }, { k: 'whName', l: t('f_whName') }],
+    cols: () => [{ k: 'whId', l: t('f_whId') }, { k: 'whName', l: t('f_whName') },
+      { k: 'accNo', l: t('f_accNo'), f: v => bdi(accountLabel(v)), x: r => accountLabel(r.accNo) }],
     actions: editDel
   },
   accounts: {
@@ -975,18 +1012,6 @@ const LISTS = {
       { k: 'isCollector', l: t('f_isCollector'), f: v => v ? '✓' : '' }, { k: 'scope', l: t('f_scope'), f: v => t('scope_' + (v || 'all')) },
       { k: 'active', l: t('f_active'), f: v => pill(v ? t('Active') : t('Inactive'), v ? 'healthy' : 'neutral') }, { k: 'lastLogin', l: t('f_lastLogin') }],
     actions: () => `<button data-act="rowEdit">✎</button><button data-act="rowDelete">🗑</button>`
-  },
-  followlog: {
-    entity: 'FollowUps', id: 'id',
-    tools: s => [tool('q', t('searchLbl'), 'search', s.q), tool('account', t('f_account'), 'customer', s.filters.account),
-      tool('status', t('f_status'), 'select', s.filters.status, ['Open', 'Done', 'Broken'].map(x => [x, t(x)])),
-      tool('dateFrom', t('from'), 'date', s.dateFrom), tool('dateTo', t('to'), 'date', s.dateTo)],
-    cols: () => [
-      { k: 'actionDate', l: t('f_actionDate') }, { k: 'account', l: t('f_account') }, { k: 'customerName', l: t('f_name') },
-      { k: 'actionType', l: t('f_actionType'), f: v => esc(t(v)), x: r => t(r.actionType) },
-      { k: 'note', l: t('f_note'), cls: 'clip' }, { k: 'promiseDate', l: t('f_promiseDate') }, { k: 'promiseAmount', l: t('f_promiseAmount'), num: true },
-      { k: 'status', l: t('f_status'), f: statusPill, x: r => t(r.status) }, { k: 'createdBy', l: t('f_createdBy') }],
-    actions: editDel
   }
 };
 
@@ -1009,7 +1034,7 @@ async function loadList(view) {
   const sel = can('post') ? cfg.select : null;
   let foot = '';
   if (view === 'purchases' && res.rows.length) {
-    foot = footRow(cols, { total: { html: numCell(res.totals.total) + curTag(res.totals.localCurrency) } }, t('all') + ' (' + NI.format(res.total) + ')', false, true);
+    foot = footRow(cols, { total: { html: numCell(res.totals.total) + curTag(res.totals.localCurrency) } }, t('all') + ' (' + NI.format(res.total) + ')', !!sel, true);
   }
   if (view === 'transactions' && res.rows.length) {
     const lc = res.totals.localCurrency;
@@ -1050,6 +1075,7 @@ const FORMS = {
     { k: 'contactPerson' }, { k: 'phone', type: 'tel' }, { k: 'email', type: 'email' }, { k: 'city' }, { k: 'country' }, { k: 'taxNo' },
     { k: 'creditLimit', type: 'number' }, { k: 'termsDays', type: 'number' },
     { k: 'collector', type: 'select', o: collectorOpts(), hide: !S.user.isAdmin && S.user.scope === 'own' },
+    { k: 'accNo', type: 'select', o: accountOpts() },
     { k: 'status', type: 'select', o: statusOpts(), noAll: 1 }, { k: 'address', type: 'textarea', span: 1 }, { k: 'notes', type: 'textarea', span: 1 }],
   Transactions: () => [
     { k: 'voucher', req: 1 }, { k: 'type', type: 'select', o: S.lookups.transactionTypes.map(x => [x, x]), noAll: 1 },
@@ -1061,16 +1087,11 @@ const FORMS = {
   Items: () => [{ k: 'itemId', req: 1, lock: 1 }, { k: 'itemName', req: 1 }, { k: 'unit' }, { k: 'cost', type: 'number' },
     { k: 'itemGroup', type: 'select', o: itemGroupOpts() }, { k: 'accNo', type: 'select', o: accountOpts() }, { k: 'note', type: 'textarea', span: 1 }],
   ItemGroups: () => [{ k: 'igId', req: 1, lock: 1 }, { k: 'igName', req: 1 }],
-  Warehouses: () => [{ k: 'whId', req: 1, lock: 1 }, { k: 'whName', req: 1 }],
+  Warehouses: () => [{ k: 'whId', req: 1, lock: 1 }, { k: 'whName', req: 1 }, { k: 'accNo', type: 'select', o: accountOpts(), span: 1 }],
   Accounts: () => [{ k: 'accNo', req: 1, lock: 1 }, { k: 'accName', req: 1 },
     { k: 'parentAcc', type: 'select', o: accountOpts().filter(a => a[0] !== (FORM && FORM.rec.accNo)), span: 1 }],
   Currencies: () => [{ k: 'code', req: 1, lock: 1 }, { k: 'name', label: 'f_curName' },
     { k: 'rate', type: 'number', req: 1, hint: t('rateOf', { c: (FORM && FORM.rec.code) || '…', b: baseCur() }) }, { k: 'active', type: 'check' }],
-  FollowUps: () => [
-    { k: 'account', type: 'customer', req: 1, span: 1 }, { k: 'voucher' }, { k: 'actionDate', type: 'date', req: 1 },
-    { k: 'actionType', type: 'select', o: ['Call', 'Email', 'Visit', 'WhatsApp', 'Promise', 'Other'].map(x => [x, t(x)]), noAll: 1 },
-    { k: 'promiseDate', type: 'date' }, { k: 'promiseAmount', type: 'number' },
-    { k: 'status', type: 'select', o: ['Open', 'Done', 'Broken'].map(x => [x, t(x)]), noAll: 1 }, { k: 'note', type: 'textarea', span: 1, req: 1 }],
   Users: () => [
     { k: 'username', req: 1 }, { k: 'fullName', req: 1 }, { k: 'email', type: 'email' }, { k: 'password', type: 'password', hint: t('passwordHint') },
     { k: 'role', type: 'select', o: [['User', t('User')], ['Admin', t('Admin')]], noAll: 1 },
@@ -1202,7 +1223,7 @@ function closeDrawer() { $('#overlay').classList.remove('open'); }
 
 /** Vendor 360: balance owed, overdue, contact data, statement with running balance, follow-ups. */
 async function openCustomer(account, from, to, keep, currency) {
-  if (!['customers', 'balances', 'overdue', 'followup', 'collection', 'dashboard', 'paid', 'credit', 'transactions'].some(hasPage)) return;
+  if (!['customers', 'balances', 'overdue', 'dashboard', 'paid', 'credit', 'transactions', 'purchases', 'evaluation'].some(hasPage)) return;
   if (!keep) openDrawer(`<div class="skeleton">${t('loading')}</div>`, true);
   const r = await call('customerStatement', account, from || '', to || '', currency || '');
   S.lastStmt = r;
@@ -1227,14 +1248,13 @@ async function openCustomer(account, from, to, keep, currency) {
     <div class="panel"><div class="drawer-label" style="margin-bottom:10px">${t('customerInfo')}</div><div class="kv">
       ${kv('f_contactPerson', bdi(c.contactPerson))}${kv('f_phone', c.phone ? `<a style="color:inherit" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : '')}
       ${kv('f_email', c.email ? `<a style="color:inherit" href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}${kv('f_address', bdi([c.address, c.city, c.country].filter(Boolean).join('، ')))}
-      ${kv('f_collector', bdi(collectorName(c.collector)))}${kv('f_currency', esc(c.currency))}
+      ${kv('f_collector', bdi(collectorName(c.collector)))}${kv('f_currency', esc(c.currency))}${kv('f_accNo', c.accNo ? bdi(accountLabel(c.accNo)) : '')}
       ${kv('f_creditLimit', c.creditLimit ? money(c.creditLimit) + curTag(c.currency) : '')}${kv('f_termsDays', esc(c.termsDays))}
       ${kv('f_taxNo', esc(c.taxNo))}${kv('f_createdAt', esc(c.createdAt))}</div>
       ${c.notes ? `<div class="drawer-label">${t('f_notes')}</div><p>${esc(c.notes)}</p>` : ''}
       <div class="card-actions">
         ${hasPage('customers') && can('edit', 'customers') ? btn('custEdit', '✎ ' + t('edit'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
         ${hasPage('receipts') && can('add', 'receipts') ? btn('newReceipt', '⊕ ' + t('collect'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
-        ${hasPage('followup') && can('add', 'followup') ? btn('newFollow', '☎ ' + t('logAction'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
         ${hasPage('statement') ? btn('goStatement', '§ ' + t('p_statement'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
         ${btn('compose', '✉ ' + t('msgColleague'), 'button-ghost', `data-acc="${esc(c.account)}"`)}
         ${exportBtn()}${btn('stmtPrint', '🖨 ' + t('print'), 'button-ghost')}
@@ -1262,7 +1282,7 @@ const VIEWS = {
       hasPage('transactions') && can('add', 'transactions') && btn('newTx', '＋ ' + t('addTransaction'))];
     setContent(heading('dashboard', actions()) + `<div class="skeleton">${t('loading')}</div>`);
     const d = await call('getDashboard', f.currency || '');
-    setBadge('overdue', d.kpi.overdueCustomers); setBadge('followup', d.kpi.overdueCustomers); setBadge('credit', d.kpi.creditOver);
+    setBadge('overdue', d.kpi.overdueCustomers); setBadge('credit', d.kpi.creditOver);
     if (S.view !== 'dashboard') return;
     const cc = d.currency;
     const max = Math.max(1, ...d.months.map(m => Math.max(m.debit, m.credit)));
@@ -1383,7 +1403,7 @@ const VIEWS = {
   },
 
   purchases() {
-    setContent(heading('purchases', [can('add') && btn('newPurchase', '＋ ' + t('addPurchase')), exportBtn(), btn('print', '🖨 ' + t('print'), 'button-ghost')]) + listBlock('purchases'));
+    setContent(heading('purchases', [can('post') && btn('postSelected', '⇪ ' + t('postSelected'), 'button-ghost'), can('add') && btn('newPurchase', '＋ ' + t('addPurchase')), exportBtn(), btn('print', '🖨 ' + t('print'), 'button-ghost')]) + listBlock('purchases'));
     loadList('purchases');
   },
   items() {
@@ -1503,26 +1523,13 @@ const VIEWS = {
     runReport();
   },
 
-  followup() {
-    const f = S.rep.followup = S.rep.followup || { minDays: 1 };
-    setContent(heading('followup', [can('add') && btn('newFollow', '＋ ' + t('newFollowUp'))]) + `
+  evaluation() {
+    const f = S.rep.evaluation = S.rep.evaluation || { dateFrom: yearStart(), dateTo: today(), tab: 'vend' };
+    setContent(heading('evaluation', [can('add') && btn('newEval', '✪ ' + t('newEval'))].concat(reportBtns())) + `
       <div class="panel view-tools" id="repTools">
-        ${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}${tool('group', t('f_group'), 'select', f.group, groupOpts())}
-        ${tool('minDays', t('minDays'), 'number', f.minDays)}${curTool(f)}
-        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
-      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>
-      <section class="section"><div class="section-head panel" style="border-radius:8px 8px 0 0;border-bottom:0"><h2 class="section-title">${t('followLog')}</h2><div class="page-actions">${exportBtn()}${btn('print', '🖨 ' + t('print'), 'button-ghost')}</div></div>
-        ${listBlock('followlog').replace('class="panel view-tools"', 'class="panel view-tools" style="border-radius:0;margin:0;border-bottom:0"')}</section>`);
-    runReport();
-    loadList('followlog');
-  },
-
-  collection() {
-    const f = S.rep.collection = S.rep.collection || { asOf: today() };
-    setContent(heading('collection', reportBtns()) + `
-      <div class="panel view-tools" id="repTools">
-        ${tool('asOf', t('asOf'), 'date', f.asOf)}${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}
-        ${tool('group', t('f_group'), 'select', f.group, groupOpts())}${curTool(f)}
+        ${tool('dateFrom', t('from'), 'date', f.dateFrom)}${tool('dateTo', t('to'), 'date', f.dateTo)}
+        ${tool('account', t('f_account'), 'customer', f.account)}${tool('group', t('f_group'), 'select', f.group, groupOpts())}
+        ${tool('itemId', t('f_item'), 'select', f.itemId, itemOpts())}
         <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
       <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
     runReport();
@@ -1602,6 +1609,42 @@ async function runReport() {
         { k: 'payMethod', l: t('f_payMethod'), x: x => x.payMethod ? t(x.payMethod) : '' }, { k: 'dueDate', l: t('f_dueDate') },
         { k: 'debit', l: t('debit') + ' ' + cc, num: true }, { k: 'credit', l: t('credit') + ' ' + cc, num: true }, { k: 'balance', l: t('balance') + ' ' + cc, num: true }] };
     out().innerHTML = missingNotice(r) + `<div class="paper"><div class="doc" dir="${document.documentElement.dir}">${statementDoc(r)}</div></div>`;
+    return;
+  }
+  if (view === 'evaluation') {
+    const r = await call('reportEvaluation', f);
+    if (S.view !== view) return;
+    const tab = f.tab || 'vend';
+    const scoreCols = [{ k: 'dScore', l: t('f_dScore'), f: scoreCell, x: x => x.dScore, p: x => (+x.dScore).toFixed(1) },
+      { k: 'tScore', l: t('f_tScore'), f: scoreCell, x: x => x.tScore, p: x => (+x.tScore).toFixed(1) },
+      { k: 'qScore', l: t('f_qScore'), f: scoreCell, x: x => x.qScore, p: x => (+x.qScore).toFixed(1) },
+      { k: 'pct', l: t('scorePct'), f: v => gradePill(v), x: x => x.pct / 100, p: x => x.pct + '% · ' + t(gradeKey(x.pct)) }];
+    const cnt = v => NI.format(v || 0);
+    const lateCell = v => v === '' || v == null ? '—' : v ? daysPill(v) : pill(t('onTimeDel'), 'healthy');
+    const vendCols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') },
+      { k: 'invoices', l: t('evalInvoices'), num: true, f: cnt }, { k: 'items', l: t('evalItems'), num: true, f: cnt }].concat(scoreCols,
+      [{ k: 'onTime', l: t('onTimeDel'), num: true, f: cnt }, { k: 'lateCount', l: t('lateDel'), num: true, f: cnt },
+        { k: 'avgLate', l: t('avgLateDays'), f: v => v ? daysPill(v) : '' }]);
+    const invCols = [{ k: 'invNo', l: t('f_invNo') }, { k: 'invDate', l: t('f_invDate') }, { k: 'account', l: t('f_account') }, { k: 'vendorName', l: t('f_name') },
+      { k: 'expectedDate', l: t('f_expectedDate') }, { k: 'actualDate', l: t('f_actualDate') }, { k: 'lateDays', l: t('deliveryLate'), f: lateCell }]
+      .concat(scoreCols, [{ k: 'evaluatedBy', l: t('f_evaluatedBy') }, { k: 'evalDate', l: t('f_evalDate') }]);
+    const itemCols = [{ k: 'itemId', l: t('f_itemId') }, { k: 'itemName', l: t('f_itemName') }, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') },
+      { k: 'invoices', l: t('evalInvoices'), num: true, f: cnt }].concat(scoreCols);
+    const cfg = { vend: ['evalVend', vendCols, r.vendors], inv: ['evalInv', invCols, r.rows], item: ['evalItem', itemCols, r.items] }[tab];
+    S.exportData = { name: 'vendor_evaluation_' + tab, cols: cfg[1], rows: cfg[2],
+      summary: [[t('scorePct'), r.totals.pct + '%'], [t('f_dScore'), (+r.totals.dScore).toFixed(1)], [t('f_tScore'), (+r.totals.tScore).toFixed(1)],
+        [t('f_qScore'), (+r.totals.qScore).toFixed(1)], [t('evalInvoices'), NI.format(r.totals.invoices)]] };
+    const actions = tab === 'inv' ? () => (can('edit') ? `<button data-act="rowEval" title="${t('edit')}">✎</button>` : '') +
+      (can('delete') ? `<button data-act="rowEvalDel" title="${t('del')}">🗑</button>` : '') : null;
+    out().innerHTML = `<section class="stats four">
+        ${stat(t('scorePct'), r.totals.pct + '%', '✪', r.totals.pct >= 75 ? 'green' : r.totals.pct >= 60 ? 'amber' : 'red', r.totals.lines ? `<span>${t(gradeKey(r.totals.pct))}</span><span>· ${NI.format(r.totals.invoices)} ${t('evalInvoices')}</span>` : '')}
+        ${stat(t('f_dScore'), (+r.totals.dScore).toFixed(1) + ' <small>/ 5</small>', '⏱', '')}
+        ${stat(t('f_tScore'), (+r.totals.tScore).toFixed(1) + ' <small>/ 5</small>', '§', '')}
+        ${stat(t('f_qScore'), (+r.totals.qScore).toFixed(1) + ' <small>/ 5</small>', '✓', 'green')}</section>
+      <p class="subtitle" style="margin:-6px 0 12px">${t('scaleHint')}</p>
+      <div class="panel tabs">${[['vend', 'byVendor'], ['inv', 'byInv'], ['item', 'byItem']].map(x =>
+        `<button class="tab ${tab === x[0] ? 'active' : ''}" data-act="repTab" data-tab="${x[0]}">${t(x[1])}</button>`).join('')}</div>
+      <section class="panel">${table(cfg[0], cfg[1], cfg[2], { click: true, sortable: false, actions })}</section>`;
     return;
   }
   if (view === 'collections') {
@@ -1744,60 +1787,6 @@ async function runReport() {
         <div class="card-head"><h3 style="margin:0">${esc(x.currency)}</h3><span class="badge">${NI.format(x.customers)}</span></div>
         <div class="mini-stats"><div><span>${t('f_creditLimit')}</span><b>${money(x.limit)}</b></div><div><span>${t('excess')}</span><b class="neg">${money(x.excess)}</b></div></div></article>`).join('')}</div>` : ''}
       <section class="panel">${table('credit', cols, r.rows, { click: true, sortable: false })}</section>`;
-  } else if (view === 'followup') {
-    const r = await call('getFollowUpBoard', f);
-    if (S.view !== view) return;
-    const cc = r.currency;
-    setBadge('followup', r.totals.customers);
-    out().innerHTML = missingNotice(r) + `<section class="stats">
-        ${stat(t('overdueCustomers'), NI.format(r.totals.customers), '♙', 'red')}${stat(t('overdueAmt'), money(r.totals.remaining) + curTag(cc), '!', 'amber')}
-        ${stat(t('promisesDue'), NI.format(r.promisesDue), '☎', '')}</section>
-      ${r.customers.length ? `<div class="risk-grid">${r.customers.map(c => `
-        <article class="panel risk-item">
-          <div class="card-head">${daysPill(c.maxDays)}<small style="color:var(--subtle)">${esc(c.account)}</small></div>
-          <h3>${bdi(c.name)}</h3>
-          <p>${t('f_collector')}: ${bdi(collectorName(c.collector))}</p>
-          <div class="mini-stats"><div><span>${t('overdueAmt')} ${esc(cc)}</span><b>${money(c.remaining)}</b></div><div><span>${t('invoices')}</span><b>${NI.format(c.count)}</b></div></div>
-          <p>${t('lastFollowUp')}: ${esc(c.lastFollowUp || '—')}${c.promiseDate ? `<br>${t('f_promiseDate')}: <b style="color:var(--text)">${esc(c.promiseDate)}</b>` : ''}</p>
-          <div class="card-actions">
-            ${can('add') ? btn('newFollow', '☎ ' + t('logAction'), 'button-primary', `data-acc="${esc(c.account)}"`) : ''}
-            ${hasPage('receipts') && can('add', 'receipts') ? btn('newReceipt', '⊕ ' + t('collect'), 'button-ghost', `data-acc="${esc(c.account)}"`) : ''}
-            ${btn('openCust', t('statement'), 'button-ghost', `data-acc="${esc(c.account)}"`)}
-            ${c.phone ? `<a class="button-ghost link-btn" href="tel:${esc(c.phone)}">${t('call')}</a>` : ''}
-            ${c.email ? `<a class="button-ghost link-btn" href="mailto:${esc(c.email)}">${t('mail')}</a>` : ''}
-          </div></article>`).join('')}</div>` : `<div class="panel empty">${t('noOverdue')}</div>`}`;
-  } else if (view === 'collection') {
-    const r = await call('reportCollection', f);
-    if (S.view !== view) return;
-    const cc = r.currency;
-    S.rows.collectors = r.rows;
-    const flat = [];
-    r.rows.forEach(m => m.companies.forEach(c => flat.push(Object.assign({ collector: m.collector }, c))));
-    const cols = [collCol, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') },
-      { k: 'balance', l: t('balance') + ' ' + cc, num: true }, { k: 'remaining', l: t('overdueAmt') + ' ' + cc, num: true }, { k: 'count', l: t('invoices'), num: true, f: v => NI.format(v) },
-      { k: 'maxDays', l: t('maxDays'), f: daysPill }, { k: 'lastFollowUp', l: t('lastFollowUp') }];
-    S.exportData = { name: 'vendor_managers', cols, rows: flat,
-      summary: [[t('receivable'), money(r.totals.balance) + ' ' + cc], [t('overdueAmt'), money(r.totals.overdue) + ' ' + cc], [t('collectedMTD'), money(r.totals.collectedMTD) + ' ' + cc]] };
-    out().innerHTML = missingNotice(r) + `<section class="stats">
-        ${stat(t('receivable'), money(r.totals.balance) + curTag(cc), '$', '')}
-        ${stat(t('overdueAmt'), money(r.totals.overdue) + curTag(cc), '!', 'red')}
-        ${stat(t('collectedMTD'), money(r.totals.collectedMTD) + curTag(cc), '✓', 'green')}</section>
-      <div class="section-head" style="padding:0 0 10px;border:0"><h2 class="section-title">${t('team')}</h2></div>
-      <div class="risk-grid">${r.rows.map((m, i) => `
-        <article class="panel risk-item">
-          <div class="card-head"><div style="display:flex;gap:10px;align-items:center"><div class="avatar">${esc((m.name || '?')[0].toUpperCase())}</div>
-            <div><h3 style="margin:0">${bdi(m.name || t('unassigned'))}</h3><p style="margin:0">${NI.format(m.customers)} ${t('companies')}</p></div></div>
-            ${m.maxDays ? daysPill(m.maxDays) : pill('0', 'healthy')}</div>
-          <div class="mini-stats">
-            <div><span>${t('balance')}</span><b>${money(m.balance)}</b></div><div><span>${t('overdueAmt')}</span><b class="neg">${money(m.overdue)}</b></div>
-            <div><span>${t('overdueCustomers')}</span><b>${NI.format(m.overdueCustomers)}</b></div><div><span>${t('avgDays')}</span><b>${NI.format(m.avgDays)}</b></div>
-            <div><span>${t('overdueInvoices')}</span><b>${NI.format(m.overdueInvoices)}</b></div><div><span>${t('collectedMTD')}</span><b class="pos">${money(m.collectedMTD)}</b></div></div>
-          <p>${t('overdueAmt')} ${m.balance > 0 ? Math.round(m.overdue / m.balance * 100) : 0}% ${t('ofBalance')}</p>
-          <div class="meter"><i style="width:${m.balance > 0 ? Math.min(100, m.overdue / m.balance * 100) : 0}%"></i></div>
-          <div class="card-actions">${btn('collCompanies', t('companiesOf'), 'button-ghost', `data-i="${i}"`)}</div>
-        </article>`).join('')}</div>
-      <section class="panel section"><div class="section-head"><h2 class="section-title">${t('allCompanies')}</h2></div>
-        ${table('collFlat', cols, flat, { click: true, sortable: false })}</section>`;
   }
 }
 
@@ -2149,10 +2138,10 @@ function piLineHtml(l) {
 async function openPurchase(invNo) {
   let r = { head: { date: today() }, lines: [{}] };
   if (invNo) { openDrawer(`<div class="skeleton">${t('loading')}</div>`, true); r = await call('getPurchaseInvoice', invNo); }
-  const h = r.head, isNew = !invNo;
+  const h = r.head, isNew = !invNo, posted = h.status === 'Posted';
   S.piEdit = { isNew, invNo: h.invNo };
   openDrawer(`
-    <div class="drawer-head"><h2>${isNew ? '＋ ' + t('purchaseTitle') : '✎ ' + t('editPurchase') + ' — ' + esc(h.invNo)}</h2>
+    <div class="drawer-head"><h2>${isNew ? '＋ ' + t('purchaseTitle') : '✎ ' + t('editPurchase') + ' — ' + esc(h.invNo) + ' ' + statusPill(h.status || 'Draft')}</h2>
       <div style="display:flex;gap:8px">${isNew ? '' : btn('piPrint', '🖨', 'button-ghost', `data-inv="${esc(h.invNo)}"`)}<button class="icon-button" data-act="closeDrawer" aria-label="${t('close')}">×</button></div></div>
     <form class="form-panel" id="piForm" style="padding:16px 0 0">
       <div class="form-grid">
@@ -2160,6 +2149,7 @@ async function openPurchase(invNo) {
         <label class="field">${t('f_date')} <span class="req">*</span><input type="date" name="date" value="${esc(h.date || today())}" required></label>
         <label class="field">${t('f_account')} <span class="req">*</span><select name="account" required><option value=""></option>${opts(customerOpts(), h.account || '')}</select></label>
         <label class="field">${t('f_vendorName')}<input name="vendorName" value="${esc(h.vendorName || custName(h.account) || '')}" readonly></label>
+        <label class="field span2">${t('f_warehouse')} <span class="req">*</span><select name="whId" required><option value=""></option>${opts(warehouseOpts(), h.whId || '')}</select></label>
         <label class="field span2">${t('f_description')}<textarea name="description">${esc(h.description || '')}</textarea></label>
       </div>
       <div class="field">${t('invLines')} <span class="req">*</span><div class="alloc-box">
@@ -2168,8 +2158,15 @@ async function openPurchase(invNo) {
           <tbody id="piLines">${(r.lines.length ? r.lines : [{}]).map(piLineHtml).join('')}</tbody>
           <tfoot><tr><td colspan="4">${t('f_total')}</td><td class="num"><b id="piTotal">0</b> <small class="cur">${esc(localCur())}</small></td><td colspan="2"></td></tr></tfoot></table></div>
         <div style="margin-top:8px">${btn('piAddLine', '＋ ' + t('addLine'), 'button-ghost', 'type="button"')}</div></div></div>
-      <div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button><button class="button-primary" type="submit">${t('save')}</button></div>
+      ${posted ? `<div class="panel notice" style="margin:0">🔒 ${t('postedInvHint')}</div>` : can('post', 'purchases') ? `<label class="check"><input type="checkbox" name="post">${t('postInvNow')}</label>` : ''}
+      <div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button>
+        ${!isNew && hasPage('evaluation') ? btn('piEval', '✪ ' + t('p_evaluation'), 'button-ghost', `type="button" data-inv="${esc(h.invNo)}"`) : ''}
+        ${posted ? '' : `<button class="button-primary" type="submit">${t('save')}</button>`}</div>
     </form>`, true);
+  if (posted) { // read-only view of a posted invoice
+    $$('#piForm input, #piForm select, #piForm textarea').forEach(el => { el.disabled = true; });
+    $$('#piForm [data-act="piAddLine"], #piForm [data-act="piDelLine"]').forEach(el => { el.hidden = true; });
+  }
   piCalc();
 }
 /** Line numbers, line amounts (quantity × cost) and the invoice total. */
@@ -2193,8 +2190,9 @@ async function submitPurchase(form) {
   const b = form.querySelector('button[type=submit]'); b.disabled = true;
   try {
     const r = await call('savePurchaseInvoice', { isNew: S.piEdit.isNew, invNo: S.piEdit.isNew ? E.invNo.value.trim() : S.piEdit.invNo,
-      date: E.date.value, account: E.account.value, description: E.description.value.trim(), lines });
-    toast(t('saved') + ' — ' + r.invNo + ' · ' + money(r.total));
+      date: E.date.value, account: E.account.value, whId: E.whId.value, post: E.post ? E.post.checked : false,
+      description: E.description.value.trim(), lines });
+    toast(t('saved') + ' — ' + r.invNo + ' · ' + money(r.total) + ' · ' + t(r.status));
     closeDrawer();
     if (S.view === 'purchases') reload();
   } catch (e) { b.disabled = false; }
@@ -2202,8 +2200,10 @@ async function submitPurchase(form) {
 function purchaseDoc(r) {
   S.lastSettings = r.settings;
   const h = r.head;
-  return companyHeader(t('purchaseTitle'), [[t('f_invNo'), h.invNo], [t('f_date'), h.date], [t('f_currency'), localCur()]]) +
+  return companyHeader(t('purchaseTitle'), [[t('f_invNo'), h.invNo], [t('f_date'), h.date], [t('f_currency'), localCur()], [t('f_status'), t(h.status || 'Draft')]]) +
+    (h.status !== 'Posted' ? `<p><span class="stamp">${t('Draft')}</span></p>` : '') +
     `<table class="dkv"><tr><td class="k">${t('f_vendorName')}</td><td><b>${esc(h.vendorName || custName(h.account))}</b></td><td class="k">${t('f_account')}</td><td>${esc(h.account)}</td></tr>
+      <tr><td class="k">${t('f_warehouse')}</td><td colspan="3">${esc(warehouseLabel(h.whId))}</td></tr>
       ${h.description ? `<tr><td class="k">${t('f_description')}</td><td colspan="3">${esc(h.description)}</td></tr>` : ''}</table>` +
     `<h2>${t('invLines')}</h2>` + printTableHtml([{ k: 'lineNo', l: t('f_lineNo') }, { k: 'itemId', l: t('f_itemId') }, { k: 'itemName', l: t('f_itemName') },
       { k: 'quantity', l: t('f_quantity'), num: true, p: x => NF6.format(+x.quantity || 0) }, { k: 'cost', l: t('f_cost'), num: true, p: x => NF6.format(+x.cost || 0) },
@@ -2213,6 +2213,83 @@ function purchaseDoc(r) {
 async function printPurchase(invNo) {
   const r = await call('getPurchaseInvoice', invNo);
   askPrint(() => purchaseDoc(r), 'portrait');
+}
+
+// ───────── Vendor evaluation (per invoice line: delivery dates · delivery terms · quality) ─────────
+const SCORE_KEYS = ['dScore', 'tScore', 'qScore'];
+const gradeKey = p => p >= 90 ? 'g_excellent' : p >= 75 ? 'g_vgood' : p >= 60 ? 'g_good' : p >= 40 ? 'g_fair' : 'g_poor';
+const gradePill = p => pill(NI.format(p) + '% · ' + t(gradeKey(p)), p >= 75 ? 'healthy' : p >= 60 ? 'watch' : 'risk');
+const scoreCell = v => { v = +v || 0; const c = v >= 3.75 ? 'green' : v >= 3 ? 'amber' : 'red';
+  return `<div class="rate"><span dir="ltr">${v.toFixed(1)} / 5</span><div class="meter"><i style="width:${v / 5 * 100}%;background:var(--${c})"></i></div></div>`; };
+const SCORE_LABEL = { 5: 'g_excellent', 4: 'g_vgood', 3: 'g_good', 2: 'g_fair', 1: 'g_poor' };
+const scoreSelect = (name, v, all) => `<select ${all ? `data-all="${name}"` : `name="${name}"`} data-plain class="alloc-amt" style="width:120px !important">
+  <option value="">—</option>${[5, 4, 3, 2, 1].map(n => `<option value="${n}" ${String(v) === String(n) ? 'selected' : ''}>${n} · ${t(SCORE_LABEL[n])}</option>`).join('')}</select>`;
+
+/** Without invNo: pick an invoice first; with invNo: the rating form for every line of that invoice. */
+async function openEvaluation(invNo) {
+  openDrawer(`<div class="skeleton">${t('loading')}</div>`, true);
+  if (!invNo) {
+    const list = await call('getEvaluableInvoices');
+    openDrawer(`<div class="drawer-head"><h2>✪ ${t('newEval')}</h2><button class="icon-button" data-act="closeDrawer" aria-label="${t('close')}">×</button></div>
+      <form class="form-panel" id="evPick" style="padding:16px 0 0"><label class="field">${t('chooseInvoice')}<select name="invNo"><option value=""></option>${opts(list.map(i =>
+        [i.invNo, i.invNo + ' — ' + i.vendorName + ' — ' + i.date + ' · ' + t(i.evaluated ? 'evaluated' : 'notEvaluated'), i.invNo, i.vendorName + ' · ' + i.date + ' · ' + t(i.evaluated ? 'evaluated' : 'notEvaluated')]), '')}</select></label></form>`, true);
+    return;
+  }
+  const r = await call('getEvaluation', invNo);
+  const h = r.head, ev = r.evaluation || {};
+  S.evEdit = { invNo: h.invNo, exists: !!r.evaluation };
+  const kv = (k, v) => `<div><div class="drawer-label">${t(k)}</div><p>${v || '—'}</p></div>`;
+  openDrawer(`
+    <div class="drawer-head"><h2>✪ ${t('evalTitle')} — ${esc(h.invNo)}</h2><button class="icon-button" data-act="closeDrawer" aria-label="${t('close')}">×</button></div>
+    <div class="panel"><div class="kv">${kv('f_vendorName', bdi(h.vendorName) + ' (' + esc(h.account) + ')')}${kv('f_invDate', esc(h.date))}
+      ${kv('f_warehouse', bdi(warehouseLabel(h.whId)))}${kv('f_total', money(h.total) + curTag(localCur()))}</div></div>
+    <form class="form-panel" id="evForm" style="padding:16px 0 0">
+      <div class="form-grid">
+        <label class="field">${t('f_evalDate')}<input type="date" name="evalDate" value="${esc(ev.evalDate || today())}"></label>
+        <div class="field">${t('scorePct')}<div id="evAvg" style="min-height:34px;display:flex;align-items:center"></div></div>
+        <label class="field">${t('f_expectedDate')}<input type="date" name="expectedDate" value="${esc(ev.expectedDate || '')}"></label>
+        <label class="field">${t('f_actualDate')}<input type="date" name="actualDate" value="${esc(ev.actualDate || '')}"><span class="field-hint" id="evLate"></span></label>
+      </div>
+      <div class="field">${t('invLines')} <span class="req">*</span><div class="alloc-box"><div class="table-wrap"><table class="alloc" style="min-width:760px">
+        <thead><tr><th>${t('f_lineNo')}</th><th>${t('f_item')}</th><th>${t('f_quantity')}</th><th>${t('f_dScore')}</th><th>${t('f_tScore')}</th><th>${t('f_qScore')}</th><th>${t('f_note')}</th></tr></thead>
+        <tbody>
+          <tr><td></td><td colspan="2"><small class="cur">${t('applyAll')}</small></td>${SCORE_KEYS.map(k => `<td>${scoreSelect(k, '', true)}</td>`).join('')}<td></td></tr>
+          ${r.lines.map(l => `<tr data-ev="${l.lineNo}"><td>${l.lineNo}</td><td><b>${esc(l.itemId)}</b> ${bdi(l.itemName)}</td><td>${NF6.format(+l.quantity || 0)}</td>
+            ${SCORE_KEYS.map(k => `<td>${scoreSelect(k, l[k])}</td>`).join('')}
+            <td><input class="alloc-amt" name="note" value="${esc(l.note)}" style="width:130px !important"></td></tr>`).join('')}</tbody></table></div>
+        <span class="field-hint">${t('scaleHint')}</span></div></div>
+      <label class="field">${t('f_note')}<textarea name="evNote">${esc(ev.note || '')}</textarea></label>
+      <div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button>
+        ${S.evEdit.exists && can('delete', 'evaluation') ? btn('evDelete', '🗑 ' + t('del'), 'button-danger', `type="button" data-inv="${esc(h.invNo)}"`) : ''}
+        ${can(S.evEdit.exists ? 'edit' : 'add', 'evaluation') ? `<button class="button-primary" type="submit">${t('save')}</button>` : ''}</div>
+    </form>`, true);
+  evCalc();
+}
+/** Live average of the chosen scores + delivery delay from the two dates. */
+function evCalc() {
+  const f = $('#evForm'); if (!f) return;
+  const v = $$('tr[data-ev] select', f).map(s => +s.value).filter(Boolean);
+  const avg = v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+  $('#evAvg').innerHTML = v.length ? gradePill(Math.round(avg / 5 * 100)) : '—';
+  const e = f.elements.expectedDate.value, a = f.elements.actualDate.value;
+  const late = e && a ? Math.round((new Date(a) - new Date(e)) / 86400000) : null;
+  $('#evLate').innerHTML = late === null ? '' : late > 0 ? t('deliveryLate') + ': ' + daysPill(late) : pill(t('onTimeDel'), 'healthy');
+}
+async function submitEvaluation(form) {
+  const lines = $$('tr[data-ev]', form).map(tr => {
+    const o = { lineNo: +tr.dataset.ev, note: $('[name=note]', tr).value.trim() };
+    SCORE_KEYS.forEach(k => { o[k] = +$(`[name=${k}]`, tr).value || 0; });
+    return o;
+  });
+  if (!lines.length || lines.some(l => SCORE_KEYS.some(k => !l[k]))) { toast(t('err_SCORES_REQUIRED'), 'error'); return; }
+  const E = form.elements, b = form.querySelector('button[type=submit]'); b.disabled = true;
+  try {
+    const r = await call('saveEvaluation', { invNo: S.evEdit.invNo, evalDate: E.evalDate.value, expectedDate: E.expectedDate.value,
+      actualDate: E.actualDate.value, note: E.evNote.value.trim(), lines });
+    toast(t('saved') + ' — ' + r.invNo + ' · ' + r.pct + '% ' + t(gradeKey(r.pct)));
+    closeDrawer();
+    if (S.view === 'evaluation') runReport();
+  } catch (e) { b.disabled = false; }
 }
 
 // ───────── Modal ─────────
@@ -2530,6 +2607,12 @@ const ACT = {
   piAddLine() { const tb = $('#piLines'); tb.insertAdjacentHTML('beforeend', piLineHtml()); enhance(tb.lastElementChild); piCalc(); },
   piDelLine(el) { const tb = $('#piLines'); el.closest('tr').remove(); if (!tb.children.length) ACT.piAddLine(); piCalc(); },
   piPrint(el) { printPurchase(el.dataset.inv); },
+  piEval(el) { openEvaluation(el.dataset.inv); },
+  newEval() { openEvaluation(''); },
+  rowEval(el) { openEvaluation(rowOf(el).row.invNo); },
+  async rowEvalDel(el) { if (!confirm(t('confirmDelete'))) return; await call('deleteEvaluation', rowOf(el).row.invNo); toast(t('deleted')); runReport(); },
+  async evDelete(el) { if (!confirm(t('confirmDelete'))) return; await call('deleteEvaluation', el.dataset.inv); closeDrawer(); toast(t('deleted')); if (S.view === 'evaluation') runReport(); },
+  rowOpenSrc(el) { const r = rowOf(el).row; openPurchase(String(r.srcDoc).replace(/^PI:/, '')); },
   rowPrintInv(el) { printPurchase(rowOf(el).row.invNo); },
   newCurrency(el) { openForm('Currencies', { code: (el && el.dataset.code) || '', active: true }, true); },
   changePw() {
@@ -2542,7 +2625,6 @@ const ACT = {
       </form>`);
   },
   newUser() { openForm('Users', { role: 'User', scope: 'all', active: true, pages: 'dashboard,customers' }, true); },
-  newFollow(el) { openForm('FollowUps', { account: el.dataset.acc || '', actionDate: today(), actionType: 'Call', status: 'Open' }, true); },
   openCust(el) { openCustomer(el.dataset.acc); },
   custEdit(el) {
     call('listRecords', 'Vendors', { filters: { account: el.dataset.acc }, pageSize: 5 }).then(r => r.rows[0] && openForm('Vendors', r.rows[0], false));
@@ -2562,12 +2644,12 @@ const ACT = {
     if (LOOKUP_ENTITIES.indexOf(LISTS[view].entity) > -1) await refreshLookups();
     loadList(view);
   },
-  async rowPost(el) { const { view, row } = rowOf(el); const n = await call('postTransactions', [row.rowId], false, S.view); toast(t('postedN', { n })); loadList(view); },
-  async rowUnpost(el) { const { view, row } = rowOf(el); const n = await call('postTransactions', [row.rowId], true, S.view); toast(t('unpostedN', { n })); loadList(view); },
+  async rowPost(el) { const { view, row } = rowOf(el); const n = await postRows(view, [view === 'purchases' ? row.invNo : row.rowId], false); toast(t('postedN', { n })); loadList(view); },
+  async rowUnpost(el) { const { view, row } = rowOf(el); const n = await postRows(view, [view === 'purchases' ? row.invNo : row.rowId], true); toast(t('unpostedN', { n })); loadList(view); },
   async postSelected() {
     const ids = $$('[data-sel]:checked').map(i => i.dataset.sel);
     if (!ids.length) { toast(t('selectDraft'), 'error'); return; }
-    const n = await call('postTransactions', ids, false, S.view);
+    const n = await postRows(S.view, ids, false);
     toast(t('postedN', { n })); loadList(S.view);
   },
   odTab(el) { S.rep.overdue.tab = el.dataset.tab; runReport(); },
@@ -2582,14 +2664,6 @@ const ACT = {
     openDrawer(`<div class="drawer-head"><h2>${bdi(m.name || t('unassigned'))} — ${t('companies')} (${NI.format(m.companies)})</h2>
       <div style="display:flex;gap:8px">${exportBtn()}${btn('print', '🖨', 'button-ghost')}<button class="icon-button" data-act="closeDrawer">×</button></div></div>
       <div class="panel flush">${table('perfDrawer', cols, m.list, { click: true, sortable: false })}</div>`, true);
-  },
-  collCompanies(el) {
-    const m = S.rows.collectors[+el.dataset.i];
-    const cols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'balance', l: t('balance'), num: true },
-      { k: 'remaining', l: t('overdueAmt'), num: true }, { k: 'count', l: t('invoices'), num: true, f: v => NI.format(v) }, { k: 'maxDays', l: t('maxDays'), f: daysPill }, { k: 'lastFollowUp', l: t('lastFollowUp') }];
-    S.exportData = { name: 'manager_' + (m.collector || 'unassigned'), cols, rows: m.companies };
-    openDrawer(`<div class="drawer-head"><h2>${bdi(m.name || t('unassigned'))} — ${t('companies')}</h2><div style="display:flex;gap:8px">${exportBtn()}<button class="icon-button" data-act="closeDrawer">×</button></div></div>
-      <div class="panel flush">${table('collDrawer', cols, m.companies, { click: true, sortable: false })}</div>`, true);
   },
   impTemplate() {
     const entity = $('#impEntity').value;
@@ -2608,6 +2682,9 @@ const ACT = {
   }
 };
 
+/** Purchase invoices post with their vendor transaction; everything else posts transactions directly. */
+const postRows = (view, ids, unpost) => view === 'purchases' ? call('postPurchaseInvoices', ids, unpost) : call('postTransactions', ids, unpost, view);
+
 function rowOf(el) {
   const tbl = el.closest('table'), tr = el.closest('tr');
   const view = tbl.dataset.view;
@@ -2615,7 +2692,7 @@ function rowOf(el) {
 }
 
 // Rows that open the vendor 360 drawer when clicked.
-const ROW_CUSTOMER_VIEWS = ['collectionsDet', 'perfDrawer', 'receipts', 'customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'credit', 'collFlat', 'collDrawer'];
+const ROW_CUSTOMER_VIEWS = ['collectionsDet', 'perfDrawer', 'receipts', 'customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'credit', 'evalVend', 'evalItem'];
 
 document.addEventListener('click', e => {
   const goEl = e.target.closest('[data-go]');
@@ -2639,6 +2716,7 @@ document.addEventListener('click', e => {
     const view = tr.closest('table').dataset.view;
     const row = (S.rows[view] || [])[+tr.dataset.i];
     if (row && view === 'purchases') openPurchase(row.invNo);
+    else if (row && view === 'evalInv') openEvaluation(row.invNo);
     else if (row && ROW_CUSTOMER_VIEWS.indexOf(view) > -1) openCustomer(row.account);
   }
   if (e.target.id === 'overlay') closeDrawer();
@@ -2676,6 +2754,12 @@ document.addEventListener('change', e => {
   if (e.target.matches('input[data-permcol]')) {
     const c = e.target.dataset.permcol, on = e.target.checked;
     $$(`table.perm input[data-perm="${c}"]`).forEach(i => { i.checked = on; i.dispatchEvent(new Event('change', { bubbles: true })); });
+    return;
+  }
+  if (e.target.form && e.target.form.id === 'evPick') { if (e.target.value) openEvaluation(e.target.value); return; }
+  if (e.target.form && e.target.form.id === 'evForm') {
+    if (e.target.dataset.all) { $$(`tr[data-ev] select[name=${e.target.dataset.all}]`, e.target.form).forEach(s => { s.value = e.target.value; }); }
+    evCalc();
     return;
   }
   if (e.target.form && e.target.form.id === 'piForm') {
@@ -2726,6 +2810,7 @@ document.addEventListener('submit', async e => {
   else if (e.target.id === 'recForm') submitForm(e.target);
   else if (e.target.id === 'rcForm') submitReceipt(e.target);
   else if (e.target.id === 'piForm') submitPurchase(e.target);
+  else if (e.target.id === 'evForm') submitEvaluation(e.target);
   else if (e.target.id === 'msgForm') submitMessage(e.target);
   else if (e.target.id === 'pwForm') {
     const E = e.target.elements;

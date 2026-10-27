@@ -9,7 +9,7 @@ const I18N = {
   ar: {
     app: 'CRM Console', caption: 'إدارة العملاء والتحصيل', eyebrow: 'نظام إدارة العملاء',
     workspace: 'مساحة العمل', reports: 'التقارير والمتابعة', admin: 'الإدارة',
-    p_dashboard: 'لوحة التحكم', p_customers: 'العملاء', p_transactions: 'حركات العملاء', p_groups: 'مجموعات العملاء',
+    p_dashboard: 'لوحة التحكم', p_customers: 'العملاء', p_transactions: 'معاملات العملاء', p_groups: 'مجموعات العملاء',
     p_balances: 'تقرير الأرصدة', p_paid: 'الفواتير المسددة', p_overdue: 'تقرير المتأخرات', p_credit: 'تجاوز حد الائتمان',
     p_followup: 'متابعة المتأخرات', p_collection: 'لوحة فريق التحصيل', p_currencies: 'العملات وأسعار الصرف',
     p_import: 'استيراد البيانات', p_users: 'المستخدمون والصلاحيات',
@@ -1975,8 +1975,6 @@ function statementDoc(r) {
       ${r.lines.map(l => `<tr><td>${esc(l.date)}</td><td>${esc(l.voucher)}</td><td>${esc(l.type)}</td><td>${esc(lineDesc(l))}</td><td>${esc(l.dueDate || '')}</td>
         <td class="n">${l.debit ? money(l.debit) : ''}</td><td class="n">${l.credit ? money(l.credit) : ''}</td><td class="n">${money(l.balance)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="5">${t('closing')}</td><td class="n">${money(r.periodDebit)}</td><td class="n">${money(r.periodCredit)}</td><td class="n">${money(r.closing)}</td></tr></tfoot></table>` +
-    `<h2>${t('agingTitle')}</h2><table class="grid"><thead><tr><th class="n">${t('current')}</th>${['b1', 'b2', 'b3', 'b4'].map(b => `<th class="n">${t(b)}</th>`).join('')}<th class="n">${t('all')}</th></tr></thead>
-      <tbody><tr><td class="n">${money(r.aging.current)}</td>${['b1', 'b2', 'b3', 'b4'].map(b => `<td class="n">${money(r.aging[b])}</td>`).join('')}<td class="n"><b>${money(r.openAmount)}</b></td></tr></tbody></table>` +
     (r.openInvoices.length ? `<h2>${t('openInvTitle')}</h2><table class="grid"><thead><tr><th>${t('f_voucher')}</th><th>${t('f_date')}</th><th>${t('f_dueDate')}</th>
       <th class="n">${t('amount')}</th><th class="n">${t('paid')}</th><th class="n">${t('remaining')}</th><th class="n">${t('days')}</th></tr></thead>
       <tbody>${r.openInvoices.map(i => `<tr><td>${esc(i.voucher)}</td><td>${esc(i.date)}</td><td>${esc(i.dueDate)}</td><td class="n">${money(i.amount)}</td>

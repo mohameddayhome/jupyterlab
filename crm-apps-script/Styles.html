@@ -363,6 +363,24 @@
   table.perm td input { width: 15px; height: 15px; accent-color: var(--accent); }
   table.perm td.na { color: var(--subtle); opacity: .5; }
   table.perm tbody tr:hover { background: var(--surface-raised); }
+  /* Customer account adjustments */
+  .adj-lines { display: grid; gap: 6px; }
+  .adj-line { display: grid; grid-template-columns: 22px minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, .9fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 30px;
+    gap: 7px; align-items: end; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--page); }
+  .adj-line .field { gap: 4px; min-width: 0; }
+  .adj-lbl { font-size: 9px; color: var(--subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .adj-line + .adj-line .adj-lbl { display: none; }
+  .adj-no { align-self: center; text-align: center; font-weight: 750; color: var(--subtle); padding-top: 14px; }
+  .adj-line + .adj-line .adj-no { padding-top: 0; }
+  .adj-del { align-self: end; min-width: 30px; padding: 0; }
+  .adj-name input { opacity: .75; }
+  @media (max-width: 680px) { /* phone: each line becomes a small card */
+    .adj-line { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .adj-line .adj-lbl, .adj-line + .adj-line .adj-lbl { display: block; }
+    .adj-no { grid-column: 1 / -1; text-align: start; padding: 0 !important; }
+    .adj-cust, .adj-name, .adj-desc { grid-column: 1 / -1; }
+    .adj-del { grid-column: 1 / -1; justify-self: end; }
+  }
   .method-bars { display: grid; gap: 10px; padding: 16px; border-bottom: 1px solid var(--border); }
   .mrow { display: grid; grid-template-columns: 110px minmax(0, 1fr) 110px 40px; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
   .mrow .meter { margin-top: 0; height: 8px; }

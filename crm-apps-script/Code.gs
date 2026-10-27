@@ -30,7 +30,9 @@ const SCHEMA = {
     ['postedAt', 'posted_at'], ['rowId', 'row_id'],
     // Collection receipts (added in v3): method, cheque / transfer details, collector.
     ['payMethod', 'Payment method'], ['chequeNo', 'Cheque number'], ['chequeDate', 'Cheque date'],
-    ['bankName', 'Bank'], ['payRef', 'Payment reference'], ['collectedBy', 'Collected by']
+    ['bankName', 'Bank'], ['payRef', 'Payment reference'], ['collectedBy', 'Collected by'],
+    // Lines of a customer-accounts adjustment (v12): adjustment number + line number.
+    ['batchId', 'Adjustment no'], ['lineNo', 'Line no']
   ],
   CustomerGroups: [['groupId', 'GroupId'], ['groupName', 'GroupName']],
   Users: [
@@ -48,6 +50,12 @@ const SCHEMA = {
     ['createdBy', 'Created By'], ['createdAt', 'Created At']
   ],
   // Links a collection receipt (payment row) to the invoices it pays.
+  // Customer-accounts adjustment header; its lines live in Transactions (type Adjustment, batchId = id).
+  Adjustments: [
+    ['id', 'AdjustmentNo'], ['date', 'Date'], ['description', 'Description'], ['status', 'Status'], ['lines', 'Lines'],
+    ['debit', 'Total Debit (local)'], ['credit', 'Total Credit (local)'], ['createdBy', 'Created By'], ['createdAt', 'Created At'],
+    ['updatedBy', 'Updated By'], ['updatedAt', 'Updated At'], ['postedBy', 'Posted By'], ['postedAt', 'Posted At']
+  ],
   Allocations: [
     ['id', 'AllocationId'], ['paymentRowId', 'Payment row_id'], ['paymentVoucher', 'Payment voucher'],
     ['account', 'Customer account'], ['invoiceVoucher', 'Invoice voucher'], ['amount', 'Amount (local)'],
@@ -62,25 +70,26 @@ const SCHEMA = {
   Settings: [['key', 'Key'], ['value', 'Value']]
 };
 
-const ID_FIELD = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', Users: 'userId', FollowUps: 'id', Currencies: 'code', Allocations: 'id', Messages: 'id' };
+const ID_FIELD = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', Users: 'userId', FollowUps: 'id', Currencies: 'code', Allocations: 'id', Messages: 'id', Adjustments: 'id' };
 const DATE_FIELDS = ['date', 'dueDate', 'createdAt', 'updatedAt', 'postedAt', 'lastLogin', 'actionDate', 'promiseDate', 'chequeDate'];
-const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'creditLimit', 'termsDays', 'promiseAmount', 'rate', 'amount'];
+const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'creditLimit', 'termsDays', 'promiseAmount', 'rate', 'amount', 'lines', 'debit', 'credit', 'lineNo'];
 const BOOL_FIELDS = ['isDeleted', 'canAdd', 'canEdit', 'canDelete', 'canPost', 'isCollector', 'active'];
 
-const ALL_PAGES = ['dashboard', 'customers', 'transactions', 'receipts', 'groups', 'statement', 'balances', 'paid',
+const ALL_PAGES = ['dashboard', 'customers', 'transactions', 'receipts', 'adjustments', 'groups', 'statement', 'balances', 'paid',
   'overdue', 'credit', 'followup', 'collection', 'collections', 'performance', 'currencies', 'import', 'users'];
 const PAY_METHODS = ['Cash', 'Cheque', 'Transfer'];
 /** Actions that make sense on each page (permissions matrix). */
 const PAGE_ACTIONS = {
   customers: ['add', 'edit', 'delete'], transactions: ['add', 'edit', 'delete', 'post'], receipts: ['add', 'edit', 'delete', 'post'],
-  groups: ['add', 'edit', 'delete'], followup: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete']
+  groups: ['add', 'edit', 'delete'], followup: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete'],
+  adjustments: ['add', 'edit', 'delete', 'post']
 };
 
 // Which entity each page edits (used for permission checks on writes).
-const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies' };
+const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies', Adjustments: 'adjustments' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = '11';
+const APP_VERSION = '12';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -443,7 +452,7 @@ function lookups_(user) {
     groups: readTable('CustomerGroups').map(function (g) { return { id: g.groupId, name: g.groupName }; }),
     collectors: users.filter(function (u) { return u.isCollector && u.active; })
       .map(function (u) { return { username: u.username, name: u.fullName || u.username }; }),
-    customers: visibleCustomers_(user).map(function (c) { return { account: c.account, name: c.name }; }),
+    customers: visibleCustomers_(user).map(function (c) { return { account: c.account, name: c.name, currency: c.currency }; }),
     currencies: readTable('Currencies').map(function (c) { return { code: String(c.code).toUpperCase(), name: c.name, rate: c.rate }; }),
     users: users.filter(function (u) { return u.active; }).map(function (u) { return { username: u.username, name: u.fullName || u.username }; }),
     payMethods: PAY_METHODS,
@@ -521,8 +530,8 @@ function listRecords(token, entity, opts) {
   if (opts.dateFrom) rows = rows.filter(function (r) { return r[dateKey] && r[dateKey] >= opts.dateFrom; });
   if (opts.dateTo) rows = rows.filter(function (r) { return r[dateKey] && r[dateKey] <= opts.dateTo; });
 
-  const sortKey = opts.sort || (entity === 'Transactions' ? 'date' : entity === 'FollowUps' ? 'actionDate' : ID_FIELD[entity]);
-  const desc = opts.desc !== undefined ? opts.desc : (entity === 'Transactions' || entity === 'FollowUps');
+  const sortKey = opts.sort || (entity === 'Transactions' || entity === 'Adjustments' ? 'date' : entity === 'FollowUps' ? 'actionDate' : ID_FIELD[entity]);
+  const desc = opts.desc !== undefined ? opts.desc : (entity === 'Transactions' || entity === 'FollowUps' || entity === 'Adjustments');
   rows.sort(function (a, b) {
     const x = a[sortKey], y = b[sortKey];
     const c = (typeof x === 'number' && typeof y === 'number') ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
@@ -559,7 +568,7 @@ function fmtInt_(n) { return String(Math.round(+n || 0) || 0).replace(/\B(?=(\d{
 // ───────────────────────────── Save / delete / post ─────────────────────────────
 function saveRecord(token, entity, record, isNew) {
   const page = ENTITY_PAGE[entity];
-  if (!page) throw new Error('Unknown entity');
+  if (!page || entity === 'Adjustments') throw new Error('Unknown entity');
   const user = auth_(token, page);
   requireAction_(user, isNew ? 'add' : 'edit', page);
   return withLock_(function () {
@@ -593,6 +602,7 @@ function saveRecord(token, entity, record, isNew) {
         const existing = getById_(entity, rec.rowId);
         if (existing.postStatus === 'Posted') throw new Error('POSTED_LOCKED');
         if ((allocationsByPayment_()[rec.rowId] || []).length) throw new Error('RECEIPT_LOCKED');
+        if (existing.batchId) throw new Error('BATCH_LOCKED');
         ['createdById', 'createdByName', 'createdAt', 'userAdd', 'postStatus', 'postedBy', 'postedAt', 'isDeleted']
           .forEach(function (k) { delete rec[k]; });
       }
@@ -676,6 +686,7 @@ function saveUser_(rec, isNew) {
 }
 
 function deleteRecord(token, entity, id) {
+  if (entity === 'Adjustments') return deleteAdjustment(token, id); // removes its lines too
   const page = ENTITY_PAGE[entity];
   const user = auth_(token, page);
   requireAction_(user, 'delete', page);
@@ -684,6 +695,7 @@ function deleteRecord(token, entity, id) {
       const t = getById_(entity, id);
       assertCustomerVisible_(user, t.account);
       if (t.postStatus === 'Posted' && !user.isAdmin) throw new Error('POSTED_LOCKED');
+      if (t.batchId) throw new Error('BATCH_LOCKED');
       updateRow_(entity, t._row, { isDeleted: true, updatedByName: user.fullName || user.username, updatedAt: new Date() });
       return true;
     }
@@ -734,6 +746,7 @@ function postTransactions(token, ids, unpost, page) {
     const told = {};
     values.forEach(function (row) {
       if (!set[String(row[idx.rowId])] || !allowed[String(row[idx.account]).trim()]) return;
+      if (idx.batchId !== undefined && String(row[idx.batchId] || '')) return; // posted with its adjustment
       row[idx.postStatus] = unpost ? 'Draft' : 'Posted';
       row[idx.postedBy] = unpost ? '' : who;
       row[idx.postedAt] = unpost ? '' : now;
@@ -1254,6 +1267,145 @@ function publicSettings_() {
   ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'BankDetails', 'StatementNote',
     'LocalCurrency', 'ReportCurrency', 'CompanyLogo'].forEach(function (k) { out[k] = s[k] || ''; });
   return out;
+}
+
+// ───────────────────────────── Customer-accounts adjustments ─────────────────────────────
+function nextAdjNo_() {
+  const r = readTable('Settings').filter(function (x) { return x.key === 'AdjSeq'; })[0];
+  const n = (r ? +r.value || 0 : 0) + 1;
+  if (r) updateRow_('Settings', r._row, { value: n }); else appendRows('Settings', [{ key: 'AdjSeq', value: n }]);
+  return 'ADJ-' + ('00000' + n).slice(-6);
+}
+
+/** Removes (hard) the transaction rows of an adjustment — only used while it is a draft. */
+function deleteAdjLines_(id) {
+  const sh = sheet_('Transactions');
+  const last = sh.getLastRow();
+  if (last < 2) return;
+  const hm = headerMap_(sh), idx = fieldIndex_('Transactions', hm);
+  const range = sh.getRange(2, 1, last - 1, hm.headers.length);
+  const values = range.getValues();
+  const keep = values.filter(function (row) { return String(row[idx.batchId] || '') !== String(id); });
+  if (keep.length === values.length) return;
+  invalidate_();
+  range.clearContent();
+  if (keep.length) sh.getRange(2, 1, keep.length, hm.headers.length).setValues(keep);
+}
+
+function adjLines_(id) {
+  const names = {};
+  readTable('Customers').forEach(function (c) { names[c.account] = c.name; });
+  return readTable('Transactions').filter(function (t) { return String(t.batchId) === String(id) && !t.isDeleted; })
+    .sort(function (a, b) { return (+a.lineNo || 0) - (+b.lineNo || 0); })
+    .map(function (t) {
+      const ex = toNum_(t.exchange) || 1;
+      return { lineNo: t.lineNo, account: t.account, name: names[t.account] || '', currency: t.currency, description: t.description,
+        debit: round2_((+t.debitMST || 0) / ex), credit: round2_((+t.creditMST || 0) / ex),
+        debitLocal: +t.debitMST || 0, creditLocal: +t.creditMST || 0, exchange: ex, rowId: t.rowId };
+    });
+}
+
+function getAdjustment(token, id) {
+  const user = auth_(token, 'adjustments');
+  const h = getById_('Adjustments', id);
+  const lines = adjLines_(id);
+  lines.forEach(function (l) { assertCustomerVisible_(user, l.account); });
+  return { header: h, lines: lines, settings: publicSettings_() };
+}
+
+/**
+ * Saves an adjustment (new or draft edit).
+ * a: { id?, date, description, post, lines: [{account, currency, description, debit, credit}] } — amounts in the line currency.
+ */
+function saveAdjustment(token, a) {
+  const user = auth_(token, 'adjustments');
+  const editing = !!a.id && a.existing;
+  requireAction_(user, editing ? 'edit' : 'add', 'adjustments');
+  if (!a.date) throw new Error('REQUIRED_FIELDS');
+  const fx = fx_();
+  const local = fx.local;
+  const lines = (a.lines || []).map(function (l) {
+    return { account: String(l.account || '').trim(), currency: String(l.currency || '').trim().toUpperCase(), description: String(l.description || '').trim(),
+      debit: round2_(Math.max(0, toNum_(l.debit))), credit: round2_(Math.max(0, toNum_(l.credit))) };
+  }).filter(function (l) { return l.account || l.debit || l.credit; });
+  if (!lines.length) throw new Error('LINES_REQUIRED');
+  lines.forEach(function (l, i) {
+    if (!l.account) throw new Error('LINE_ACCOUNT: ' + (i + 1));
+    if ((l.debit > 0) === (l.credit > 0)) throw new Error('LINE_AMOUNT: ' + (i + 1)); // exactly one side
+    assertCustomerVisible_(user, l.account);
+  });
+  return withLock_(function () {
+    let existing = null;
+    if (editing) {
+      existing = getById_('Adjustments', a.id);
+      if (existing.status !== 'Draft') throw new Error('POSTED_LOCKED');
+    }
+    const id = existing ? existing.id : (String(a.id || '').trim() || nextAdjNo_());
+    if (!existing && readTable('Adjustments').some(function (x) { return String(x.id) === id; })) throw new Error('DUPLICATE_ID');
+    const custCur = {};
+    readTable('Customers').forEach(function (c) { custCur[c.account] = String(c.currency || '').toUpperCase(); });
+    const now = new Date(), who = user.fullName || user.username;
+    const post = !!a.post && hasAction_(user, 'post', 'adjustments');
+    const status = post ? 'Posted' : 'Draft';
+    let tDr = 0, tCr = 0;
+    const rows = lines.map(function (l, i) {
+      const cur = l.currency || custCur[l.account] || local;
+      const ex = cur === local ? 1 : (fx.rate(cur) / fx.rate(local)) || 1; // line currency → local
+      const dr = round2_(l.debit * ex), cr = round2_(l.credit * ex);
+      tDr += dr; tCr += cr;
+      return { voucher: id, type: 'Adjustment', account: l.account, date: a.date, description: l.description || a.description || '',
+        currency: cur, exchange: ex, amountCur: round2_(l.credit - l.debit), debitMST: dr, creditMST: cr,
+        userAdd: user.username, createdById: user.userId, createdByName: who, createdAt: existing ? existing.createdAt : now,
+        updatedByName: who, updatedAt: now, isDeleted: false, postStatus: status, postedBy: post ? who : '', postedAt: post ? now : '',
+        rowId: Utilities.getUuid(), batchId: id, lineNo: i + 1 };
+    });
+    if (existing) deleteAdjLines_(id);
+    appendRows('Transactions', rows);
+    const head = { id: id, date: a.date, description: a.description || '', status: status, lines: rows.length,
+      debit: round2_(tDr), credit: round2_(tCr), updatedBy: who, updatedAt: now, postedBy: post ? who : '', postedAt: post ? now : '' };
+    if (existing) updateRow_('Adjustments', existing._row, head);
+    else appendRows('Adjustments', [Object.assign(head, { createdBy: who, createdAt: now })]);
+    return { id: id, status: status, lines: rows.length, missingRates: Object.keys(fx.missing) };
+  });
+}
+
+/** Posts (or, for admins, un-posts) an adjustment with all its lines. */
+function postAdjustment(token, id, unpost) {
+  const user = auth_(token, 'adjustments');
+  requireAction_(user, 'post', 'adjustments');
+  if (unpost && !user.isAdmin) throw new Error('NO_PERMISSION');
+  return withLock_(function () {
+    const h = getById_('Adjustments', id);
+    if (!unpost && h.status !== 'Draft') throw new Error('POSTED_LOCKED');
+    const now = new Date(), who = user.fullName || user.username;
+    const sh = sheet_('Transactions');
+    const hm = headerMap_(sh), idx = fieldIndex_('Transactions', hm);
+    const range = sh.getRange(2, 1, sh.getLastRow() - 1, hm.headers.length);
+    const values = range.getValues();
+    values.forEach(function (row) {
+      if (String(row[idx.batchId] || '') !== String(id)) return;
+      row[idx.postStatus] = unpost ? 'Draft' : 'Posted';
+      row[idx.postedBy] = unpost ? '' : who;
+      row[idx.postedAt] = unpost ? '' : now;
+    });
+    range.setValues(values);
+    updateRow_('Adjustments', h._row, { status: unpost ? 'Draft' : 'Posted', postedBy: unpost ? '' : who, postedAt: unpost ? '' : now });
+    return true;
+  });
+}
+
+/** Deletes a draft adjustment and its lines. */
+function deleteAdjustment(token, id) {
+  const user = auth_(token, 'adjustments');
+  requireAction_(user, 'delete', 'adjustments');
+  return withLock_(function () {
+    const h = getById_('Adjustments', id);
+    if (h.status !== 'Draft') throw new Error('POSTED_LOCKED');
+    deleteAdjLines_(id);
+    const rn = findRow_('Adjustments', id);
+    if (rn > 0) { invalidate_(); sheet_('Adjustments').deleteRow(rn); }
+    return true;
+  });
 }
 
 // ───────────────────────────── Statement sending ─────────────────────────────

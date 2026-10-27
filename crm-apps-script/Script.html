@@ -2,7 +2,7 @@
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = '11';
+const CLIENT_VERSION = '12';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -128,6 +128,13 @@ const I18N = {
     noMessages: 'لا توجد رسائل', newMsgToast: 'لديك {n} رسالة جديدة', system: 'النظام', relatedCustomer: 'العميل المرتبط',
     RECEIPT_PENDING: 'سند تحصيل بانتظار الترحيل', RECEIPT_POSTED: 'تم ترحيل سند التحصيل', PROMISE_DUE: 'موعد وعد بالسداد مستحق',
     msgColleague: 'رسالة لزميل', openCustomer: 'فتح العميل', pickRecipient: 'اختر مستلماً واحداً على الأقل', writeReply: 'اكتب ردك...',
+    p_adjustments: 'تسوية حسابات العملاء', s_adjustments: 'قيود تسوية جماعية على حسابات العملاء: رأس (رقم، تاريخ، بيان) وسطور مدين/دائن لكل عميل.',
+    postedBy: 'رحّلها', adjNo: 'رقم الحركة', adjDate: 'تاريخ الحركة', adjDesc: 'البيان', adjLines: 'السطور', lineNo: 'م', newAdj: 'تسوية جديدة',
+    addLine: 'إضافة سطر', editAdj: 'تعديل التسوية', viewAdj: 'عرض التسوية', adjTotals: 'الإجمالي', adjDiff: 'الفرق (مدين − دائن)',
+    linesCount: 'عدد السطور', preparedBy: 'أعده', approvedBy: 'اعتمده', adjSaved: 'تم حفظ التسوية {n}', adjPosted: 'تم ترحيل التسوية',
+    adjLineHint: 'اكتب مبلغاً في المدين أو الدائن فقط لكل سطر. البيان الفارغ يأخذ بيان الرأس.', openAdj: 'فتح التسوية',
+    err_LINES_REQUIRED: 'أضف سطراً واحداً على الأقل', err_LINE_ACCOUNT: 'اختر العميل في السطر', err_LINE_AMOUNT: 'أدخل مبلغاً في المدين أو الدائن فقط في السطر',
+    err_BATCH_LOCKED: 'هذا السطر جزء من تسوية حسابات العملاء — عدّله من صفحة التسويات',
     p_receipts: 'سندات التحصيل', s_receipts: 'تسجيل التحصيل (نقدي / شيك / تحويل بنكي) وربطه بالفواتير المسددة.',
     p_statement: 'كشف حساب العميل', s_statement: 'كشف حساب رسمي للمطالبة: طباعة A4 أو إرسال بالبريد الإلكتروني (PDF مرفق).',
     Cash: 'نقدي', Cheque: 'شيك', Transfer: 'تحويل بنكي', OtherMethod: 'أخرى (Dynamics)',
@@ -276,6 +283,13 @@ const I18N = {
     noMessages: 'No messages', newMsgToast: 'You have {n} new message(s)', system: 'System', relatedCustomer: 'Related customer',
     RECEIPT_PENDING: 'Receipt awaiting posting', RECEIPT_POSTED: 'Your receipt was posted', PROMISE_DUE: 'Payment promise due',
     msgColleague: 'Message a colleague', openCustomer: 'Open customer', pickRecipient: 'Choose at least one recipient', writeReply: 'Write a reply...',
+    p_adjustments: 'Customer account adjustments', s_adjustments: 'Bulk adjustment entries on customer accounts: header (number, date, description) and debit/credit lines per customer.',
+    postedBy: 'Posted by', adjNo: 'Entry no.', adjDate: 'Entry date', adjDesc: 'Description', adjLines: 'Lines', lineNo: '#', newAdj: 'New adjustment',
+    addLine: 'Add line', editAdj: 'Edit adjustment', viewAdj: 'View adjustment', adjTotals: 'Total', adjDiff: 'Difference (debit − credit)',
+    linesCount: 'Lines', preparedBy: 'Prepared by', approvedBy: 'Approved by', adjSaved: 'Adjustment {n} saved', adjPosted: 'Adjustment posted',
+    adjLineHint: 'Enter an amount in either debit or credit on each line. An empty line description uses the header description.', openAdj: 'Open adjustment',
+    err_LINES_REQUIRED: 'Add at least one line', err_LINE_ACCOUNT: 'Choose the customer on line', err_LINE_AMOUNT: 'Enter an amount in debit or credit only on line',
+    err_BATCH_LOCKED: 'This line belongs to a customer account adjustment — change it from the adjustments page',
     p_receipts: 'Collection receipts', s_receipts: 'Record collections (cash / cheque / bank transfer) linked to the invoices they pay.',
     p_statement: 'Customer statement', s_statement: 'Formal statement for collection: A4 print or email (PDF attached).',
     Cash: 'Cash', Cheque: 'Cheque', Transfer: 'Bank transfer', OtherMethod: 'Other (Dynamics)',
@@ -310,6 +324,7 @@ const PAGES = [
   { id: 'customers', glyph: '♙', sec: 'workspace' },
   { id: 'transactions', glyph: '⇄', sec: 'workspace' },
   { id: 'receipts', glyph: '⊕', sec: 'workspace' },
+  { id: 'adjustments', glyph: '⚖', sec: 'workspace' },
   { id: 'groups', glyph: '▤', sec: 'workspace' },
   { id: 'statement', glyph: '§', sec: 'reports' },
   { id: 'balances', glyph: '≡', sec: 'reports' },
@@ -365,7 +380,8 @@ const yearStart = () => today().slice(0, 5) + '01-01';
 /** Actions available per page in the permissions matrix (same list as PAGE_ACTIONS in Code.gs). */
 const PAGE_ACTS = {
   customers: ['add', 'edit', 'delete'], transactions: ['add', 'edit', 'delete', 'post'], receipts: ['add', 'edit', 'delete', 'post'],
-  groups: ['add', 'edit', 'delete'], followup: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete']
+  groups: ['add', 'edit', 'delete'], followup: ['add', 'edit', 'delete'], currencies: ['add', 'edit', 'delete'], import: ['add', 'delete'],
+  adjustments: ['add', 'edit', 'delete', 'post']
 };
 const ACTIONS = ['add', 'edit', 'delete', 'post'];
 /** Can the user do `a` (add/edit/delete/post) on `page` (default: the page on screen)? */
@@ -407,6 +423,8 @@ function run(fn, ...args) {
 function errText(e) {
   const msg = String((e && e.message) || e);
   if (/is not a function/.test(msg)) return t('err_OUTDATED');
+  const line = msg.match(/\b(LINE_ACCOUNT|LINE_AMOUNT): (\d+)/);
+  if (line) return t('err_' + line[1]) + ' ' + line[2];
   const code = (msg.match(/\b[A-Z][A-Z_]{4,}\b/) || [])[0];
   return code && I18N.en['err_' + code] ? t('err_' + code) : msg.replace(/^(Exception|Error):\s*/, '');
 }
@@ -832,8 +850,9 @@ const LISTS = {
       { k: 'balance', l: t('runBalance'), num: true, f: (v, r) => r.postStatus === 'Draft' ? '—' : numCell(v) },
       { k: 'payMethod', l: t('f_payMethod'), f: v => v ? pill(t(v), 'info') : '', x: r => r.payMethod ? t(r.payMethod) : '' },
       { k: 'postStatus', l: t('f_postStatus'), f: statusPill, x: r => t(r.postStatus) }],
-    select: r => can('post') && r.postStatus === 'Draft',
+    select: r => can('post') && r.postStatus === 'Draft' && !r.batchId,
     actions: r => {
+      if (r.batchId) return hasPage('adjustments') ? `<button data-act="openAdj" data-id="${esc(r.batchId)}" title="${t('openAdj')}">⚖</button>` : '';
       const draft = r.postStatus === 'Draft';
       return (draft && (r.payMethod ? hasPage('receipts') && can('edit', 'receipts') : can('edit')) ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') +
         (draft && can('post') ? `<button data-act="rowPost" title="${t('post')}">⇪</button>` : '') +
@@ -862,6 +881,24 @@ const LISTS = {
         (draft && can('post') ? `<button data-act="rowPost" title="${t('post')}">⇪</button>` : '') +
         (!draft && S.user.isAdmin ? `<button data-act="rowUnpost" title="${t('unpost')}">↺</button>` : '') +
         ((draft || S.user.isAdmin) && can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '');
+    }
+  },
+  adjustments: {
+    entity: 'Adjustments', id: 'id',
+    tools: s => [tool('q', t('searchLbl'), 'search', s.q), tool('status', t('f_status'), 'select', s.filters.status, [['Draft', t('Draft')], ['Posted', t('Posted')]]),
+      tool('dateFrom', t('from'), 'date', s.dateFrom), tool('dateTo', t('to'), 'date', s.dateTo)],
+    cols: () => [
+      { k: 'id', l: t('adjNo') }, { k: 'date', l: t('adjDate') }, { k: 'description', l: t('adjDesc'), cls: 'clip' },
+      { k: 'lines', l: t('linesCount'), num: true, f: v => NI.format(v || 0) },
+      { k: 'debit', l: t('debit') + ' ' + localCur(), num: true }, { k: 'credit', l: t('credit') + ' ' + localCur(), num: true },
+      { k: 'status', l: t('f_status'), f: statusPill, x: r => t(r.status) }, { k: 'createdBy', l: t('f_createdBy') }, { k: 'postedBy', l: t('postedBy') }],
+    actions: r => {
+      const draft = r.status === 'Draft';
+      return `<button data-act="openAdj" data-id="${esc(r.id)}" title="${draft && can('edit') ? t('edit') : t('viewAdj')}">${draft && can('edit') ? '✎' : '👁'}</button>` +
+        (draft && can('post') ? `<button data-act="adjPost" data-id="${esc(r.id)}" title="${t('post')}">⇪</button>` : '') +
+        (!draft && S.user.isAdmin ? `<button data-act="adjUnpost" data-id="${esc(r.id)}" title="${t('unpost')}">↺</button>` : '') +
+        `<button data-act="adjPrint" data-id="${esc(r.id)}" title="${t('print')}">🖨</button>` +
+        (draft && can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '');
     }
   },
   groups: {
@@ -1262,6 +1299,11 @@ const VIEWS = {
     setContent(heading('transactions', [can('post') && btn('postSelected', '⇪ ' + t('postSelected'), 'button-ghost'),
       can('add') && btn('newTx', '＋ ' + t('addTransaction')), exportBtn(), btn('print', '🖨 ' + t('print'), 'button-ghost')]) + listBlock('transactions'));
     loadList('transactions');
+  },
+
+  adjustments() {
+    setContent(heading('adjustments', [can('add') && btn('newAdj', '＋ ' + t('newAdj')), exportBtn(), btn('print', '🖨 ' + t('print'), 'button-ghost')]) + listBlock('adjustments'));
+    loadList('adjustments');
   },
 
   receipts() {
@@ -2243,6 +2285,101 @@ async function submitReply(form) {
   } catch (e) { b.disabled = false; }
 }
 
+
+// ───────── Customer account adjustments (header + lines) ─────────
+function adjLineHtml(l, i, ro) {
+  const dis = ro ? 'disabled' : '';
+  return `<div class="adj-line" data-li="${i}">
+    <span class="adj-no">${i + 1}</span>
+    <label class="field adj-cust"><span class="adj-lbl">${t('f_account')}</span><select name="acc" ${dis}><option value=""></option>${opts(customerOpts(), l.account || '')}</select></label>
+    <label class="field adj-name"><span class="adj-lbl">${t('f_name')}</span><input name="nm" value="${esc(l.name || custName(l.account) || '')}" readonly tabindex="-1"></label>
+    <label class="field adj-cur"><span class="adj-lbl">${t('f_currency')}</span><select name="cur" ${dis}>${opts(currencyOpts(l.currency ? [String(l.currency).toUpperCase()] : []), String(l.currency || localCur()).toUpperCase())}</select></label>
+    <label class="field adj-desc"><span class="adj-lbl">${t('f_description')}</span><input name="ds" value="${esc(l.description || '')}" ${dis}></label>
+    <label class="field adj-amt"><span class="adj-lbl">${t('debit')}</span><input name="dr" type="text" inputmode="decimal" data-num value="${l.debit ? esc(fmtInputNum(l.debit)) : ''}" ${dis}></label>
+    <label class="field adj-amt"><span class="adj-lbl">${t('credit')}</span><input name="cr" type="text" inputmode="decimal" data-num value="${l.credit ? esc(fmtInputNum(l.credit)) : ''}" ${dis}></label>
+    ${ro ? '<span></span>' : `<button type="button" class="icon-button adj-del" data-act="adjDelLine" title="${t('del')}">×</button>`}
+  </div>`;
+}
+
+/** Opens a new adjustment, or an existing one (editable while draft). */
+async function openAdj(id) {
+  let data = { header: { date: today(), description: '', status: 'Draft' }, lines: [{}, {}] };
+  if (id) data = await call('getAdjustment', id);
+  const h = data.header, isNew = !id;
+  const ro = !isNew && (h.status !== 'Draft' || !can('edit', 'adjustments'));
+  S.adj = { id: id || '', ro };
+  openDrawer(`
+    <div class="drawer-head"><h2>⚖ ${isNew ? t('newAdj') : (ro ? t('viewAdj') : t('editAdj')) + ' — ' + esc(h.id)} ${!isNew ? statusPill(h.status) : ''}</h2>
+      <div style="display:flex;gap:8px">${!isNew ? btn('adjPrint', '🖨', 'button-ghost', `data-id="${esc(h.id)}"`) : ''}<button class="icon-button" data-act="closeDrawer">×</button></div></div>
+    <form class="form-panel" id="adjForm" style="padding:16px 0 0">
+      <div class="form-grid adj-head">
+        <label class="field">${t('adjNo')}<input name="adjNo" value="${esc(h.id || '')}" placeholder="${t('autoNo')}" ${isNew ? '' : 'readonly'}></label>
+        <label class="field">${t('adjDate')} <span class="req">*</span><input type="date" name="date" value="${esc(h.date || today())}" required ${ro ? 'disabled' : ''}></label>
+        <label class="field span2">${t('adjDesc')}<input name="description" value="${esc(h.description || '')}" ${ro ? 'disabled' : ''}></label>
+      </div>
+      <div class="field">${t('adjLines')} ${ro ? '' : `<span class="field-hint">${t('adjLineHint')}</span>`}
+        <div class="adj-lines" id="adjLines">${data.lines.map((l, i) => adjLineHtml(l, i, ro)).join('')}</div>
+        ${ro ? '' : `<div>${btn('adjAddLine', '＋ ' + t('addLine'), 'button-ghost')}</div>`}
+      </div>
+      <div class="adj-totals" id="adjTotals"></div>
+      ${!ro && can('post', 'adjustments') ? `<label class="check"><input type="checkbox" name="post">${t('postNow')}</label>` : ''}
+      ${ro ? '' : `<div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button><button class="button-primary" type="submit">${t('save')}</button></div>`}
+    </form>`, true);
+  adjTotals();
+}
+function adjRenumber() { $$('#adjLines .adj-line').forEach((el, i) => { el.dataset.li = i; $('.adj-no', el).textContent = i + 1; }); }
+function adjTotals() {
+  const by = {};
+  let lines = 0;
+  $$('#adjLines .adj-line').forEach(el => {
+    const dr = parseNum($('[name=dr]', el).value), cr = parseNum($('[name=cr]', el).value);
+    if (!dr && !cr) return;
+    lines++;
+    const c = $('[name=cur]', el).value || localCur();
+    const x = by[c] = by[c] || { dr: 0, cr: 0 };
+    x.dr += dr; x.cr += cr;
+  });
+  const box = $('#adjTotals'); if (!box) return;
+  box.innerHTML = `<div class="mini-stats" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:0">
+    <div class="mini-stat"><span>${t('linesCount')}</span><b>${NI.format(lines)}</b></div>
+    ${Object.keys(by).map(c => `<div class="mini-stat"><span>${t('debit')} ${esc(c)}</span><b dir="ltr">${money(by[c].dr)}</b></div>
+      <div class="mini-stat"><span>${t('credit')} ${esc(c)}</span><b dir="ltr">${money(by[c].cr)}</b></div>
+      <div class="mini-stat"><span>${t('adjDiff')} ${esc(c)}</span><b dir="ltr">${money(by[c].dr - by[c].cr)}</b></div>`).join('')}</div>`;
+}
+async function submitAdj(form) {
+  const E = form.elements;
+  const lines = $$('#adjLines .adj-line').map(el => ({
+    account: $('[name=acc]', el).value, currency: $('[name=cur]', el).value, description: $('[name=ds]', el).value.trim(),
+    debit: parseNum($('[name=dr]', el).value), credit: parseNum($('[name=cr]', el).value)
+  })).filter(l => l.account || l.debit || l.credit);
+  if (!lines.length) { toast(t('err_LINES_REQUIRED'), 'error'); return; }
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].account) { toast(t('err_LINE_ACCOUNT') + ' ' + (i + 1), 'error'); return; }
+    if ((lines[i].debit > 0) === (lines[i].credit > 0)) { toast(t('err_LINE_AMOUNT') + ' ' + (i + 1), 'error'); return; }
+  }
+  const b = form.querySelector('button[type=submit]'); b.disabled = true;
+  try {
+    const r = await call('saveAdjustment', { id: E.adjNo.value.trim(), existing: !!S.adj.id, date: E.date.value, description: E.description.value.trim(),
+      post: E.post ? E.post.checked : false, lines: lines });
+    toast(t('adjSaved', { n: r.id }));
+    closeDrawer();
+    if (S.view === 'adjustments') loadList('adjustments');
+  } catch (e) { b.disabled = false; }
+}
+function adjDoc(d) {
+  const h = d.header;
+  S.lastSettings = d.settings;
+  const cols = [{ k: 'lineNo', l: t('lineNo') }, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'currency', l: t('f_currency') },
+    { k: 'description', l: t('f_description') }, { k: 'debit', l: t('debit'), num: true }, { k: 'credit', l: t('credit'), num: true }];
+  const tot = d.lines.reduce((s, l) => { s.debit += l.debit; s.credit += l.credit; return s; }, { debit: 0, credit: 0 });
+  const mixed = new Set(d.lines.map(l => l.currency)).size > 1;
+  return companyHeader(t('p_adjustments'), [[t('adjNo'), h.id], [t('adjDate'), h.date], [t('f_status'), t(h.status)]]) +
+    (h.description ? `<table class="dkv"><tr><td class="k">${t('adjDesc')}</td><td>${esc(h.description)}</td></tr></table>` : '') +
+    printTableHtml(cols, d.lines, mixed ? null : tot) +
+    (mixed ? `<p class="muted">${t('adjTotals')} (${esc(localCur())}): ${t('debit')} ${money(h.debit)} · ${t('credit')} ${money(h.credit)}</p>` : '') +
+    `<table class="sign"><tr><td><span>${t('preparedBy')}: ${esc(h.createdBy || '')}</span></td><td><span>${t('approvedBy')}${h.postedBy ? ': ' + esc(h.postedBy) : ''}</span></td></tr></table>`;
+}
+
 // ───────── Events ─────────
 const ACT = {
   menu() {
@@ -2267,6 +2404,17 @@ const ACT = {
   async msgDelete(el) { if (!confirm(t('confirmDelete'))) return; await call('deleteMessage', el.dataset.id); closeDrawer(); toast(t('deleted')); VIEWS.messages(); },
   removeLogo() { if (confirm(t('confirmDelete'))) saveLogo(''); },
   newReceipt(el) { openCollect((el && el.dataset.acc) || ''); },
+  newAdj() { openAdj(''); },
+  openAdj(el) { openAdj(el.dataset.id); },
+  adjAddLine() {
+    const box = $('#adjLines');
+    box.insertAdjacentHTML('beforeend', adjLineHtml({}, box.children.length, false));
+    enhance(box.lastElementChild);
+  },
+  adjDelLine(el) { el.closest('.adj-line').remove(); if (!$$('#adjLines .adj-line').length) ACT.adjAddLine(); adjRenumber(); adjTotals(); },
+  async adjPost(el) { await call('postAdjustment', el.dataset.id, false); toast(t('adjPosted')); loadList('adjustments'); },
+  async adjUnpost(el) { await call('postAdjustment', el.dataset.id, true); toast(t('unpostedN', { n: el.dataset.id })); loadList('adjustments'); },
+  async adjPrint(el) { const d = await call('getAdjustment', el.dataset.id); askPrint(() => adjDoc(d), 'portrait'); },
   rowReceipt(el) { printReceipt(rowOf(el).row.rowId); },
   runReport,
   page(el) { const v = el.closest('.pager').dataset.view; listState(v).page = +el.dataset.p; loadList(v); },
@@ -2390,6 +2538,12 @@ let searchTimer;
 document.addEventListener('input', e => {
   if (e.target.matches('input[data-num]')) {
     formatNumInput(e.target);
+    if (e.target.closest('#adjLines')) { // one side per line
+      const other = $(`[name=${e.target.name === 'dr' ? 'cr' : 'dr'}]`, e.target.closest('.adj-line'));
+      if (parseNum(e.target.value)) other.value = '';
+      adjTotals();
+      return;
+    }
     if (e.target.id === 'rcTotal') rcDistribute(parseNum(e.target.value));
     else if (e.target.dataset.aamt !== undefined) rcSum();
     if (FORM && FORM.entity === 'Transactions' && e.target.form && e.target.form.id === 'recForm') txFormCalc(e.target.form, e.target.name);
@@ -2406,6 +2560,16 @@ document.addEventListener('change', e => {
   if (e.target.form && e.target.form.id === 'recForm' && FORM && FORM.entity === 'Transactions' && e.target.name === 'currency') { txFormCalc(e.target.form, 'currency'); return; }
   if (e.target.form && e.target.form.id === 'recForm' && FORM && FORM.entity === 'Currencies' && e.target.name === 'code') {
     const h = $('[data-hint="rate"]'); if (h) h.textContent = t('rateOf', { c: e.target.value.toUpperCase(), b: baseCur() }); return;
+  }
+  if (e.target.closest && e.target.closest('#adjLines')) {
+    const line = e.target.closest('.adj-line');
+    if (e.target.name === 'acc') {
+      $('[name=nm]', line).value = custName(e.target.value);
+      const c = (S.lookups.customers.find(x => x.account === e.target.value) || {}).currency;
+      if (c) setComboValue($('[name=cur]', line), String(c).toUpperCase());
+    }
+    adjTotals();
+    return;
   }
   if (e.target.matches('input[data-perm]')) {
     const tr = e.target.closest('tr');
@@ -2456,6 +2620,7 @@ document.addEventListener('submit', async e => {
   if (e.target.id === 'loginForm') doLogin(e.target);
   else if (e.target.id === 'recForm') submitForm(e.target);
   else if (e.target.id === 'rcForm') submitReceipt(e.target);
+  else if (e.target.id === 'adjForm') submitAdj(e.target);
   else if (e.target.id === 'msgForm') submitMessage(e.target);
   else if (e.target.id === 'pwForm') {
     const E = e.target.elements;

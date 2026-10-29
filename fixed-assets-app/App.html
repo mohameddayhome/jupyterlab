@@ -175,8 +175,11 @@
     else if (key === '@purchitems') l = r.purchitems || [];
     else if (key === '@openinvoices') {
       l = (r.invoices || []).filter(function (x) {
-        return all || ((!rec.PARTYID || low(x.p) === low(rec.PARTYID)) && (!rec.VOUCHERTYPE || x.t === (rec.VOUCHERTYPE === 'Receipt' ? 'Sales' : 'Purchase')));
+        return all || (x.rem > 0.0005 && (!rec.PARTYID || low(x.p) === low(rec.PARTYID)) && (!rec.VOUCHERTYPE || x.t === (rec.VOUCHERTYPE === 'Receipt' ? 'Sales' : 'Purchase')));
       });
+    } else if (key === '@noteinvoices') {
+      var side = (KIND[rec.INVOICETYPE] || {}).side;
+      l = (r.invoices || []).filter(function (x) { return all || ((!side || x.t === side) && (!rec.PARTYID || low(x.p) === low(rec.PARTYID))); });
     }
     else if (key === '@accounts') l = r.accounts.filter(function (x) { return !x.h; });
     else if (key === '@accountHeaders') l = r.accounts.filter(function (x) { return x.h; });
@@ -340,7 +343,8 @@
 
     if (e === 'cashvouchers') cashChange(form, k, el);
     if (e === 'invoices' && k === 'PARTYID') {
-      var ip = refFind(readForm(form).INVOICETYPE === 'Purchase' ? S.b.refs.vendors : S.b.refs.customers, el.value);
+      var ip = refFind((KIND[readForm(form).INVOICETYPE] || {}).side === 'Purchase' ? S.b.refs.vendors : S.b.refs.customers, el.value);
+      setVal(form, 'ORIGINVOICE', ''); rebuildList(form, 'ORIGINVOICE');
       var icur = (ip && ip.cur) || localCur();
       setVal(form, 'PARTYNAME', ip ? ip.n : '');
       setVal(form, 'CURRENCYCODE', icur);
@@ -696,10 +700,12 @@
     { h: 1, ar: 'العملاء', en: 'Customers' },
     { id: 'customers', icon: 'users', ar: 'العملاء', en: 'Customers', perm: 'customers' },
     { id: 'salesinv', icon: 'journal', ar: 'فواتير المبيعات', en: 'Sales invoices', perm: 'invoices' },
+    { id: 'custnotes', icon: 'undo', ar: 'إشعارات العملاء (دائن / مدين)', en: 'Customer credit/debit notes', perm: 'invoices' },
     { id: 'custreports', icon: 'chart', ar: 'تقارير العملاء', en: 'Customer reports', perm: 'customers' },
     { h: 1, ar: 'الموردون', en: 'Vendors' },
     { id: 'vendors', icon: 'truck', ar: 'الموردون', en: 'Vendors', perm: 'vendors' },
     { id: 'purchinv', icon: 'journal', ar: 'فواتير المشتريات', en: 'Purchase invoices', perm: 'invoices' },
+    { id: 'vendnotes', icon: 'undo', ar: 'إشعارات الموردين (مدين / دائن)', en: 'Vendor debit/credit notes', perm: 'invoices' },
     { id: 'vendreports', icon: 'chart', ar: 'تقارير الموردين', en: 'Vendor reports', perm: 'vendors' },
     { h: 1, ar: 'الصناديق والبنوك', en: 'Cash & banks' },
     { id: 'banks', icon: 'book', ar: 'الصناديق والبنوك', en: 'Cash & bank accounts', perm: 'banks' },
@@ -715,6 +721,7 @@
     { id: 'groups', icon: 'folder', ar: 'مجموعات الأصول', en: 'Fixed asset groups', perm: 'masterdata' },
     { id: 'accounts', icon: 'list', ar: 'دليل الحسابات', en: 'Chart of accounts', perm: 'masterdata' },
     { h: 1, ar: 'الإدارة', en: 'Administration' },
+    { id: 'account', icon: 'key', ar: 'حسابي وكلمة المرور', en: 'My account & password' },
     { id: 'users', icon: 'users', ar: 'المستخدمون والصلاحيات', en: 'Users & permissions', perm: 'users' },
     { id: 'settings', icon: 'gear', ar: 'الإعدادات', en: 'Settings', perm: 'settings' }
   ];
@@ -735,6 +742,7 @@
     }).join('');
     var role = S.b.roles[S.b.user.role];
     $('#userMenu').innerHTML = '<div class="who"><b>' + esc(S.b.user.fullName) + '</b><span style="color:#605e5c">' + esc(S.b.user.username) + ' · ' + esc(L(role)) + '</span></div>' +
+      '<button onclick="FA.go(\'account\');document.getElementById(\'userMenu\').classList.add(\'hidden\')">' + icon('users') + T('حسابي', 'My account') + '</button>' +
       '<button onclick="FA.changePasswordDlg()">' + icon('key') + T('تغيير كلمة المرور', 'Change password') + '</button>' +
       '<button onclick="FA.logout()">' + icon('logout') + T('تسجيل الخروج', 'Sign out') + '</button>';
   }
@@ -776,7 +784,8 @@
         case 'gl': return await (S.view.voucher ? pageGLVoucher() : pageGL());
         case 'reports': return await pageReports();
         case 'budgets': return await (S.view.id ? pageBudgetDoc() : pageBudgetList());
-        case 'salesinv': case 'purchinv': return await (S.view.id ? pageInvDoc() : pageInvList());
+        case 'account': return pageAccount();
+        case 'salesinv': case 'purchinv': case 'custnotes': case 'vendnotes': return await (S.view.id ? pageInvDoc() : pageInvList());
         case 'cashvouchers': return await (S.view.no ? pageCashDoc() : pageCashList());
         case 'customers': case 'banks': case 'salesitems': case 'purchitems': case 'itemgroups':
           return await (S.view.key !== undefined || S.view.isNew ? pageRecord(S.page) : pageList(S.page));
@@ -3109,7 +3118,7 @@
       (rep.unposted ? '<div class="note">' + T('* رصيد افتتاحي مسجّل في بطاقة الطرف ولم يُرحَّل بعد في القيود — أنشئ قيد الأرصدة الافتتاحية من صفحة ', '* Opening balance on the card not yet posted to the ledger — create the opening voucher from the ') +
         '<a onclick="FA.go(\'' + P.entity + '\')">' + esc(T(P.ar, P.en)) + '</a>.</div>' : '') + '</div>';
     $$('.stmt a[data-v]').forEach(function (a) { a.onclick = function () { go('gl', { voucher: a.getAttribute('data-v') }); }; });
-    $$('.stmt a[data-inv]').forEach(function (a) { a.onclick = function () { go(type === 'Vendor' ? 'purchinv' : 'salesinv', { id: a.getAttribute('data-inv') }); }; });
+    $$('.stmt a[data-inv]').forEach(function (a) { a.onclick = function () { go(a.getAttribute('data-pg') || (type === 'Vendor' ? 'purchinv' : 'salesinv'), { id: a.getAttribute('data-inv') }); }; });
   }
 
   /** مبلغ السطر بعملة الطرف. */
@@ -3633,25 +3642,48 @@
   }
 
   /* ======================= Sales & purchase invoices ======================= */
-  function invType() { return S.page === 'purchinv' ? 'Purchase' : 'Sales'; }
-  function invRem(r) { return Math.round(((Number(r.TOTALAMOUNT) || 0) - (Number(r.PAIDAMOUNT) || 0)) * 1000) / 1000; }
+  var KIND = {
+    Sales: { side: 'Sales', credit: 0, page: 'salesinv', ar: 'فاتورة مبيعات', en: 'Sales invoice' },
+    Purchase: { side: 'Purchase', credit: 0, page: 'purchinv', ar: 'فاتورة مشتريات', en: 'Purchase invoice' },
+    SalesCredit: { side: 'Sales', credit: 1, page: 'custnotes', ar: 'إشعار دائن للعميل', en: 'Customer credit note',
+      hint: ['مرتجع مبيعات أو خصم: يخفض رصيد العميل ويُخصم من الفاتورة الأصلية.', 'Sales return or discount: reduces the customer balance and the original invoice.'] },
+    SalesDebit: { side: 'Sales', credit: 0, page: 'custnotes', ar: 'إشعار مدين للعميل', en: 'Customer debit note',
+      hint: ['مبلغ إضافي على العميل (فرق سعر، مصاريف): يزيد رصيده ويُحصَّل مثل الفاتورة.', 'Extra charge to the customer: increases the balance and is collected like an invoice.'] },
+    PurchaseDebit: { side: 'Purchase', credit: 1, page: 'vendnotes', ar: 'إشعار مدين للمورد', en: 'Vendor debit note',
+      hint: ['مرتجع مشتريات أو خصم من المورد: يخفض رصيد المورد ويُخصم من فاتورته الأصلية.', 'Purchase return or discount: reduces the vendor balance and the original invoice.'] },
+    PurchaseCredit: { side: 'Purchase', credit: 0, page: 'vendnotes', ar: 'إشعار دائن من المورد', en: 'Vendor credit note',
+      hint: ['مبلغ إضافي لصالح المورد: يزيد رصيده ويُسدَّد مثل الفاتورة.', 'Extra amount owed to the vendor: increases the balance and is paid like an invoice.'] }
+  };
+  function invSide() { return S.page === 'purchinv' || S.page === 'vendnotes' ? 'Purchase' : 'Sales'; }
+  function notesPage() { return S.page === 'custnotes' || S.page === 'vendnotes'; }
+  function invType() { return S.invHead && S.view.id ? S.invHead.INVOICETYPE : invSide(); }
+  function invRem(r) { return Math.round(((Number(r.TOTALAMOUNT) || 0) - (Number(r.PAIDAMOUNT) || 0) - (Number(r.CREDITAMOUNT) || 0)) * 1000) / 1000; }
   function payBadge(r) {
     if (r.STATUS !== 'Posted') return '';
+    if ((KIND[r.INVOICETYPE] || {}).credit) return '<span class="badge b-info">' + T('مخصوم من الفاتورة', 'Applied to invoice') + '</span>';
     var rem = invRem(r), paid = Number(r.PAIDAMOUNT) || 0;
     if (rem <= 0.0005) return '<span class="badge b-ok">' + T('مسددة', 'Paid') + '</span>';
     var over = r.DUEDATE && r.DUEDATE < today();
     return '<span class="badge ' + (over ? 'b-err' : paid ? 'b-warn' : 'b-gray') + '">' + (paid ? T('مسددة جزئياً', 'Partly paid') : T('غير مسددة', 'Unpaid')) + (over ? T(' — متأخرة', ' — overdue') : '') + '</span>';
   }
 
+  function invListTitle() {
+    var sales = invSide() === 'Sales';
+    if (notesPage()) return sales ? T('إشعارات العملاء (دائن / مدين)', 'Customer credit/debit notes') : T('إشعارات الموردين (مدين / دائن)', 'Vendor debit/credit notes');
+    return sales ? T('فواتير المبيعات', 'Sales invoices') : T('فواتير المشتريات', 'Purchase invoices');
+  }
   async function pageInvList() {
-    var ty = invType(), sales = ty === 'Sales';
-    var title = sales ? T('فواتير المبيعات', 'Sales invoices') : T('فواتير المشتريات', 'Purchase invoices');
+    var ty = invSide(), sales = ty === 'Sales', notes = notesPage();
+    var title = invListTitle();
+    var nk = sales ? ['SalesCredit', 'SalesDebit'] : ['PurchaseDebit', 'PurchaseCredit'];
     crumbs([S.b.settings.ORGNAME, title]);
     await load('invoices');
     var f = S.view.f || '';
     var segs = [['', T('الكل', 'All')], ['open', T('غير مسددة', 'Unpaid')], ['overdue', T('متأخرة', 'Overdue')], ['paid', T('مسددة', 'Paid')], ['draft', T('مسودات', 'Drafts')]];
     $('#main').innerHTML = apane([
-      can('invoices', 'add') && { icon: 'plus', ar: sales ? 'فاتورة مبيعات جديدة' : 'فاتورة مشتريات جديدة', en: 'New invoice', on: "FA.go('" + S.page + "',{id:'@new'})" },
+      !notes && can('invoices', 'add') && { icon: 'plus', ar: sales ? 'فاتورة مبيعات جديدة' : 'فاتورة مشتريات جديدة', en: 'New invoice', on: "FA.go('" + S.page + "',{id:'@new'})" },
+      notes && can('invoices', 'add') && { icon: 'plus', ar: KIND[nk[0]].ar + ' جديد', en: 'New ' + KIND[nk[0]].en, on: "FA.go('" + S.page + "',{id:'@new',t:'" + nk[0] + "'})" },
+      notes && can('invoices', 'add') && { icon: 'plus', ar: KIND[nk[1]].ar + ' جديد', en: 'New ' + KIND[nk[1]].en, on: "FA.go('" + S.page + "',{id:'@new',t:'" + nk[1] + "'})" },
       '|',
       { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.invReload()' },
       { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: "FA.exportGrid('invoices','invl')" }
@@ -3661,14 +3693,14 @@
       }).join('') + '</div><div class="card">' + grid('invl', {
         rows: function () {
           return (S.data.invoices || []).filter(function (r) {
-            if (r.INVOICETYPE !== ty) return false;
+            if (notes ? (KIND[r.INVOICETYPE] || {}).page !== S.page : r.INVOICETYPE !== ty) return false;
             var rem = invRem(r), posted = r.STATUS === 'Posted';
             return !f || (f === 'open' && posted && rem > 0.0005) || (f === 'paid' && posted && rem <= 0.0005) || (f === 'draft' && r.STATUS === 'Draft') ||
               (f === 'overdue' && posted && rem > 0.0005 && r.DUEDATE < today());
           }).sort(function (a, b) { return String(b.INVOICEDATE).localeCompare(String(a.INVOICEDATE)) || String(b.INVOICEID).localeCompare(String(a.INVOICEID)); });
         },
         key: function (r) { return r.INVOICEID; }, open: function (r) { go(S.page, { id: r.INVOICEID }); },
-        cols: schemaCols('invoices').filter(function (c) { return c.k !== 'INVOICETYPE'; }).map(function (c) {
+        cols: schemaCols('invoices').filter(function (c) { return notes ? c.k !== 'DUEDATE' : c.k !== 'INVOICETYPE' && c.k !== 'ORIGINVOICE'; }).map(function (c) {
           if (c.k === 'STATUS') c.html = function (r) { return stBadge('invoices', r.STATUS); };
           if (/AMOUNT|SUBTOTAL/.test(c.k)) c.total = true;
           return c;
@@ -3680,40 +3712,48 @@
   async function invReload() { await Promise.all([load('invoices', true), load('invlines', true)]); await refreshRefs(); render(); }
 
   async function pageInvDoc() {
-    var ty = invType(), sales = ty === 'Sales';
     var s = sch('invoices');
     await Promise.all([load('invoices'), load('invlines'), can('cashvouchers', 'view') ? load('cashvouchers') : null]);
     var id = S.view.id, isNew = id === '@new';
     var st = S.b.settings;
-    var head = isNew ? { INVOICETYPE: ty, INVOICEDATE: today(), DUEDATE: '', CURRENCYCODE: localCur(), EXCHANGERATE: 1, STATUS: 'Draft' }
+    var pre = isNew && S.view.preset || {};
+    var ty = isNew ? (notesPage() ? S.view.t || (invSide() === 'Sales' ? 'SalesCredit' : 'PurchaseDebit') : invSide()) : null;
+    var head = isNew ? Object.assign({ INVOICETYPE: ty, INVOICEDATE: today(), DUEDATE: '', CURRENCYCODE: localCur(), EXCHANGERATE: 1, STATUS: 'Draft' }, pre.head || {})
       : (S.data.invoices || []).filter(function (h) { return h.INVOICEID === id; })[0];
     if (!head) { go(S.page); return; }
+    ty = head.INVOICETYPE;
+    var K = KIND[ty] || KIND.Sales, sales = K.side === 'Sales', isNote = ty !== K.side;
     var defAcc = sales ? st.SALESACCOUNT : st.PURCHASEACCOUNT, defTax = Number(st.DEFAULTTAXPERCENT) || 0;
-    var lines = isNew ? [{ QTY: 1, MAINACCOUNTID: '', TAXPERCENT: defTax }] : (S.data.invlines || []).filter(function (l) { return l.INVOICEID === id; })
+    var lines = isNew ? (pre.lines || [{ QTY: 1, MAINACCOUNTID: '', TAXPERCENT: defTax }]) : (S.data.invlines || []).filter(function (l) { return l.INVOICEID === id; })
       .sort(function (a, b) { return (Number(a.LINENUM) || 0) - (Number(b.LINENUM) || 0); });
     var ed = head.STATUS === 'Draft' && can('invoices', isNew ? 'add' : 'edit');
     S.invLines = lines.map(function (l) { return { ITEMID: l.ITEMID || '', UNIT: l.UNIT || '', ITEMDESCRIPTION: l.ITEMDESCRIPTION || '', MAINACCOUNTID: l.MAINACCOUNTID || '',
       QTY: l.QTY === undefined ? 1 : l.QTY, UNITPRICE: l.UNITPRICE === undefined ? '' : l.UNITPRICE, TAXPERCENT: l.TAXPERCENT === undefined ? defTax : l.TAXPERCENT }; });
     S.invEd = ed; S.invHead = head;
-    var title = sales ? T('فاتورة مبيعات', 'Sales invoice') : T('فاتورة مشتريات', 'Purchase invoice');
-    var listT = sales ? T('فواتير المبيعات', 'Sales invoices') : T('فواتير المشتريات', 'Purchase invoices');
+    var title = T(K.ar, K.en);
+    var listT = invListTitle();
     var rem = invRem(head);
     var pays = (S.data.cashvouchers || []).filter(function (c) { return !isNew && c.INVOICEID === id; });
+    var notes = (S.data.invoices || []).filter(function (n) { return !isNew && n.ORIGINVOICE === id; });
+    var baseOk = !isNote && head.STATUS === 'Posted' && can('invoices', 'add');
     crumbs([S.b.settings.ORGNAME, listT, isNew ? T('جديد', 'New') : id]);
     $('#main').innerHTML = apane([
       { icon: 'back', ar: 'رجوع', en: 'Back', on: "FA.go('" + S.page + "')", cls: 'back' },
       ed && can('invoices', 'post') && { icon: 'send', ar: 'حفظ وترحيل', en: 'Save & post', on: 'FA.invSave(' + (isNew ? 1 : 0) + ',1)', cls: 'pri' },
       ed && { icon: 'save', ar: 'حفظ كمسودة', en: 'Save draft', on: 'FA.invSave(' + (isNew ? 1 : 0) + ',0)' },
       ed && { icon: 'plus', ar: 'إضافة سطر', en: 'Add line', on: 'FA.invAddLine()' },
-      head.STATUS === 'Posted' && rem > 0.0005 && can('cashvouchers', 'add') && { icon: 'send', ar: sales ? 'تحصيل (سند قبض)' : 'سداد (سند صرف)', en: sales ? 'Receive payment' : 'Pay', on: 'FA.invPay()', cls: 'pri' },
+      !K.credit && head.STATUS === 'Posted' && rem > 0.0005 && can('cashvouchers', 'add') && { icon: 'send', ar: sales ? 'تحصيل (سند قبض)' : 'سداد (سند صرف)', en: sales ? 'Receive payment' : 'Pay', on: 'FA.invPay()', cls: 'pri' },
+      baseOk && { icon: 'undo', ar: sales ? 'مرتجع / إشعار دائن' : 'مرتجع / إشعار مدين', en: sales ? 'Return / credit note' : 'Return / debit note', on: "FA.invNote('" + (sales ? 'SalesCredit' : 'PurchaseDebit') + "')" },
+      baseOk && { icon: 'plus', ar: sales ? 'إشعار مدين' : 'إشعار دائن', en: sales ? 'Debit note' : 'Credit note', on: "FA.invNote('" + (sales ? 'SalesDebit' : 'PurchaseCredit') + "')" },
       '|',
-      !isNew && head.STATUS === 'Posted' && can('invoices', 'post') && { icon: 'undo', ar: 'إلغاء الفاتورة', en: 'Cancel invoice', on: 'FA.invCancelDlg()', cls: 'danger' },
-      !isNew && { icon: 'list', ar: 'طباعة الفاتورة', en: 'Print invoice', on: 'FA.invPrint()' },
+      !isNew && head.STATUS === 'Posted' && can('invoices', 'post') && { icon: 'undo', ar: isNote ? 'إلغاء الإشعار' : 'إلغاء الفاتورة', en: 'Cancel', on: 'FA.invCancelDlg()', cls: 'danger' },
+      !isNew && { icon: 'list', ar: 'طباعة', en: 'Print', on: 'FA.invPrint()' },
+      !isNew && head.ORIGINVOICE && { icon: 'journal', ar: 'الفاتورة الأصلية', en: 'Original invoice', on: "FA.go('" + (sales ? 'salesinv' : 'purchinv') + "',{id:'" + String(head.ORIGINVOICE).replace(/[^\w-]/g, '') + "'})" },
       !isNew && head.GLVOUCHER && can('gl', 'view') && { icon: 'book', ar: 'عرض القيد', en: 'View journal entry', on: "FA.go('gl',{voucher:'" + String(head.GLVOUCHER).replace(/[^\w-]/g, '') + "'})" },
       !isNew && head.STATUS === 'Draft' && can('invoices', 'delete') && { icon: 'trash', ar: 'حذف', en: 'Delete', on: 'FA.invDelete()', cls: 'danger' }
-    ]) + phead('<a onclick="FA.go(\'' + S.page + '\')">' + esc(listT) + '</a>', esc(title) + ' ' + (isNew ? T('جديدة', 'new') : esc(id)) + ' ' + stBadge('invoices', head.STATUS) + ' ' + payBadge(head)) +
-      '<div class="content compact">' + formHtml('invoices', head, isNew, !ed, { flat: true,
-        hide: ['INVOICETYPE', 'SUBTOTAL', 'TAXAMOUNT', 'TOTALAMOUNT', 'PAIDAMOUNT'].concat(isNew ? ['INVOICEID', 'STATUS', 'GLVOUCHER', 'REVERSALVOUCHER', 'POSTEDBY', 'POSTEDON'] : (head.STATUS === 'Cancelled' ? [] : ['REVERSALVOUCHER'])) }) +
+    ]) + phead('<a onclick="FA.go(\'' + S.page + '\')">' + esc(listT) + '</a>', esc(title) + ' ' + (isNew ? T('جديد', 'new') : esc(id)) + ' ' + stBadge('invoices', head.STATUS) + ' ' + payBadge(head)) +
+      '<div class="content compact">' + (K.hint ? '<div class="note" style="margin:0 0 10px">' + esc(T(K.hint[0], K.hint[1])) + '</div>' : '') + formHtml('invoices', head, isNew, !ed, { flat: true,
+        hide: ['INVOICETYPE', 'SUBTOTAL', 'TAXAMOUNT', 'TOTALAMOUNT', 'PAIDAMOUNT', 'CREDITAMOUNT'].concat(isNote ? (K.credit ? ['DUEDATE'] : []) : ['ORIGINVOICE']).concat(isNew ? ['INVOICEID', 'STATUS', 'GLVOUCHER', 'REVERSALVOUCHER', 'POSTEDBY', 'POSTEDON'] : (head.STATUS === 'Cancelled' ? [] : ['REVERSALVOUCHER'])) }) +
       '<div class="card"><div class="ftab-h" style="cursor:default;padding:6px 12px"><h3>' + T('سطور الفاتورة', 'Invoice lines') + '</h3>' +
       (ed ? '<div class="sum"><button class="btn sm" onclick="FA.invAddLine()">' + icon('plus') + T('سطر', 'Line') + '</button></div>' : '') + '</div><div class="gl-wrap">' +
       '<table class="gl-grid inv-grid"><thead id="invHead"></thead><tbody id="invBody"></tbody><tfoot id="invFoot"></tfoot></table></div></div>' +
@@ -3722,6 +3762,12 @@
         pays.map(function (c) {
           return '<tr class="r-acc"><td><a onclick="FA.go(\'cashvouchers\',{no:\'' + String(c.VOUCHERNO).replace(/[^\w-]/g, '') + '\'})"><bdi>' + esc(c.VOUCHERNO) + '</bdi></a></td><td>' + esc(c.TRANSDATE) + '</td><td>' + esc(c.BANKACCOUNTID) +
             '</td><td class="n">' + fmtNum(c.AMOUNT, 3) + ' ' + esc(c.CURRENCYCODE) + '</td><td>' + stBadge('cashvouchers', c.STATUS) + '</td></tr>';
+        }).join('') + '</tbody></table></div>' : '') +
+      (notes.length ? '<div class="card"><div class="ftab-h" style="cursor:default;padding:6px 12px"><h3>' + T('الإشعارات المرتبطة', 'Linked notes') + '</h3></div>' +
+        '<table class="stmt"><thead><tr><th>' + T('الرقم', 'Number') + '</th><th>' + T('النوع', 'Type') + '</th><th>' + T('التاريخ', 'Date') + '</th><th class="n">' + T('المبلغ', 'Amount') + '</th><th>' + T('الحالة', 'Status') + '</th></tr></thead><tbody>' +
+        notes.map(function (n) {
+          return '<tr class="r-acc"><td><a onclick="FA.go(\'' + KIND[n.INVOICETYPE].page + '\',{id:\'' + String(n.INVOICEID).replace(/[^\w-]/g, '') + '\'})"><bdi>' + esc(n.INVOICEID) + '</bdi></a></td><td>' +
+            esc(T(KIND[n.INVOICETYPE].ar, KIND[n.INVOICETYPE].en)) + '</td><td>' + esc(n.INVOICEDATE) + '</td><td class="n">' + fmtNum(n.TOTALAMOUNT, 3) + ' ' + esc(n.CURRENCYCODE) + '</td><td>' + stBadge('invoices', n.STATUS) + '</td></tr>';
         }).join('') + '</tbody></table></div>' : '') +
       '<datalist id="dl_invacc">' + datalistOpts('@accounts', null, {}) + '</datalist><datalist id="dl_invitem">' + datalistOpts(sales ? '@salesitems' : '@purchitems', null, {}) + '</datalist>' +
       '<datalist id="dl_invunit">' + datalistOpts('ItemUnit', null, {}) + '</datalist></div>';
@@ -3762,8 +3808,11 @@
     var cur = (($('[data-form="invoices"] [data-k="CURRENCYCODE"]') || {}).value || h.CURRENCYCODE || localCur());
     var tot = sub + tax, cols = S.invEd ? 12 : 11;
     var row = function (label, v, cls) { return '<tr class="' + (cls || '') + '"><td colspan="8" class="ft-l">' + label + '</td><td class="n" colspan="3">' + fmtNum(v, 3) + ' ' + esc(cur) + '</td>' + (S.invEd ? '<td></td>' : '') + '</tr>'; };
-    $('#invFoot').innerHTML = row(T('الإجمالي قبل الضريبة', 'Subtotal'), sub) + row(T('الضريبة', 'Tax'), tax) + row('<b>' + T('إجمالي الفاتورة', 'Invoice total') + '</b>', tot, 'ft-tot') +
-      (h.STATUS === 'Posted' || h.STATUS === 'Cancelled' ? row(T('المسدد', 'Paid'), Number(h.PAIDAMOUNT) || 0) + row('<b>' + T('المتبقي', 'Balance due') + '</b>', invRem(h), 'ft-tot') : '') +
+    var isCr = (KIND[h.INVOICETYPE] || {}).credit;
+    $('#invFoot').innerHTML = row(T('الإجمالي قبل الضريبة', 'Subtotal'), sub) + row(T('الضريبة', 'Tax'), tax) + row('<b>' + T('الإجمالي', 'Total') + '</b>', tot, 'ft-tot') +
+      (!isCr && (h.STATUS === 'Posted' || h.STATUS === 'Cancelled') ? row(T('المسدد', 'Paid'), Number(h.PAIDAMOUNT) || 0) +
+        (Number(h.CREDITAMOUNT) ? row(T('المخصوم بإشعارات (مرتجعات / خصومات)', 'Credited by notes'), Number(h.CREDITAMOUNT)) : '') +
+        row('<b>' + (invRem(h) < -0.0005 ? T('رصيد دائن للطرف (يُرد)', 'Credit balance (refund due)') : T('المتبقي', 'Balance due')) + '</b>', Math.abs(invRem(h)), 'ft-tot') : '') +
       '<tr><td colspan="' + cols + '" class="ft-words">' + esc(tot ? tafqeet(tot, cur) : '') + '</td></tr>';
   }
   function invCell(el) {
@@ -3777,7 +3826,7 @@
       if (it) {
         var g = refFind(S.b.refs.itemgroups, it.g) || {};
         l.ITEMID = it.c; l.ITEMDESCRIPTION = it.n; l.UNIT = it.u; l.UNITPRICE = it.pr;
-        l.MAINACCOUNTID = (invType() === 'Purchase' ? g.pa : g.sa) || l.MAINACCOUNTID;
+        l.MAINACCOUNTID = (invSide() === 'Purchase' ? g.pa : g.sa) || l.MAINACCOUNTID;
         // إعادة الرسم بعد انتهاء حدث الخروج من الخلية حتى لا يتعارض مع المتصفح
         setTimeout(function () {
           drawInvLines();
@@ -3803,16 +3852,17 @@
     var form = $('[data-form="invoices"]');
     if (!validateForm(form)) return;
     var head = readForm(form);
-    head.INVOICETYPE = invType();
+    head.INVOICETYPE = S.invHead.INVOICETYPE;
     if (!isNew) head.INVOICEID = S.view.id;
-    var st = S.b.settings, defAcc = invType() === 'Sales' ? st.SALESACCOUNT : st.PURCHASEACCOUNT;
+    var st = S.b.settings, defAcc = invSide() === 'Sales' ? st.SALESACCOUNT : st.PURCHASEACCOUNT;
     var lines = S.invLines.filter(function (l) { return l.ITEMID || l.ITEMDESCRIPTION || Number(parseNum(l.UNITPRICE)); })
       .map(function (l) { return { ITEMID: l.ITEMID, ITEMDESCRIPTION: l.ITEMDESCRIPTION, UNIT: l.UNIT, MAINACCOUNTID: l.MAINACCOUNTID || (l.ITEMID ? '' : defAcc || ''),
         QTY: parseNum(l.QTY), UNITPRICE: parseNum(l.UNITPRICE), TAXPERCENT: parseNum(l.TAXPERCENT) }; });
-    if (post && !(await confirmBox(T('حفظ الفاتورة وترحيل قيدها الآن؟', 'Save the invoice and post its journal entry now?')))) return;
+    var KL = KIND[head.INVOICETYPE] || KIND.Sales;
+    if (post && !(await confirmBox(T('حفظ ' + KL.ar + ' وترحيل قيده الآن؟', 'Save the ' + KL.en + ' and post its journal entry now?')))) return;
     try {
       var r = await api('saveInvoice', S.token, head, lines, !!isNew, !!post);
-      toast((post ? T('تم ترحيل الفاتورة ', 'Posted invoice ') + r.id + T(' — القيد ', ' — entry ') + r.gl : T('تم حفظ الفاتورة ', 'Saved invoice ') + r.id), 'ok');
+      toast((post ? T('تم ترحيل ', 'Posted ') + r.id + T(' — القيد ', ' — entry ') + r.gl : T('تم حفظ ', 'Saved ') + r.id), 'ok');
       await Promise.all([load('invoices', true), load('invlines', true)]);
       await refreshRefs();
       S.party = {}; delete S.data.glheaders; delete S.data.gllines;
@@ -3820,7 +3870,7 @@
     } catch (e) { fail(e); }
   }
   function invCancelDlg() {
-    modal(T('إلغاء الفاتورة', 'Cancel invoice'),
+    modal(T('إلغاء المستند', 'Cancel document'),
       '<p style="margin-top:0">' + T('يُنشأ قيد عكسي مُرحّل يلغي أثر الفاتورة، وتبقى الفاتورة في السجل بحالة "ملغى". الفاتورة المسدد عليها شيء لا تُلغى قبل إلغاء سنداتها.',
         'A posted reversing entry is created; the invoice stays on record as "Cancelled". Cancel its receipts/payments first.') + '</p>' +
       '<div class="fld"><label>' + T('تاريخ الإلغاء', 'Cancellation date') + '</label><input class="inp" type="date" id="cxDate" value="' + today() + '"></div>',
@@ -3851,14 +3901,14 @@
       DESCRIPTION: (sales ? T('تحصيل الفاتورة ', 'Receipt for invoice ') : T('سداد الفاتورة ', 'Payment of invoice ')) + h.INVOICEID } });
   }
   function invPrint() {
-    var h = S.invHead, sales = h.INVOICETYPE === 'Sales';
+    var h = S.invHead, sales = KIND[h.INVOICETYPE].side === 'Sales';
     var p = refFind(sales ? S.b.refs.customers : S.b.refs.vendors, h.PARTYID) || {};
     var sub = 0, tax = 0;
-    var html = '<div class="doc invdoc" dir="' + document.documentElement.dir + '">' + printHeader(sales ? T('فاتورة مبيعات', 'Sales invoice') : T('فاتورة مشتريات', 'Purchase invoice')) +
+    var html = '<div class="doc invdoc" dir="' + document.documentElement.dir + '">' + printHeader(T(KIND[h.INVOICETYPE].ar, KIND[h.INVOICETYPE].en)) +
       (h.STATUS === 'Cancelled' ? '<div class="cd-void">' + T('ملغاة', 'CANCELLED') + '</div>' : h.STATUS === 'Draft' ? '<div class="cd-void" style="color:#605e5c;border-color:#605e5c">' + T('مسودة', 'DRAFT') + '</div>' : '') +
       '<div class="inv-top"><div><b>' + (sales ? T('العميل', 'Customer') : T('المورد', 'Vendor')) + '</b><div>' + esc(h.PARTYNAME || p.n || '') + ' <bdi>(' + esc(h.PARTYID) + ')</bdi></div>' +
       (p.ad ? '<div>' + esc(p.ad) + '</div>' : '') + (p.ph ? '<div dir="ltr">' + esc(p.ph) + '</div>' : '') + (p.em ? '<div dir="ltr">' + esc(p.em) + '</div>' : '') + '</div>' +
-      '<table class="meta"><tr><td>' + T('رقم الفاتورة: ', 'Invoice no.: ') + '<b>' + esc(h.INVOICEID) + '</b></td></tr><tr><td>' + T('التاريخ: ', 'Date: ') + '<b>' + esc(h.INVOICEDATE) + '</b></td></tr>' +
+      '<table class="meta"><tr><td>' + T('الرقم: ', 'No.: ') + '<b>' + esc(h.INVOICEID) + '</b></td></tr>' + (h.ORIGINVOICE ? '<tr><td>' + T('الفاتورة الأصلية: ', 'Original invoice: ') + '<b>' + esc(h.ORIGINVOICE) + '</b></td></tr>' : '') + '<tr><td>' + T('التاريخ: ', 'Date: ') + '<b>' + esc(h.INVOICEDATE) + '</b></td></tr>' +
       '<tr><td>' + T('تاريخ الاستحقاق: ', 'Due date: ') + esc(h.DUEDATE || '') + '</td></tr>' + (h.PARTYREF ? '<tr><td>' + T('مرجع: ', 'Reference: ') + esc(h.PARTYREF) + '</td></tr>' : '') +
       '<tr><td>' + T('العملة: ', 'Currency: ') + esc(h.CURRENCYCODE) + '</td></tr><tr><td>' + T('الوحدة: ', 'Unit: ') + esc(unitText(h.OPERATINGUNIT, h.SUB1_OPERATINGUNIT, h.SUB2_OPERATINGUNIT)) + '</td></tr></table></div>' +
       (h.DESCRIPTION ? '<p style="margin:6px 0">' + esc(h.DESCRIPTION) + '</p>' : '') +
@@ -3870,7 +3920,9 @@
       }).join('') + '</tbody></table>' +
       '<table class="inv-tot"><tr><th>' + T('الإجمالي قبل الضريبة', 'Subtotal') + '</th><td>' + fmtNum(sub, 2) + '</td></tr><tr><th>' + T('الضريبة', 'Tax') + '</th><td>' + fmtNum(tax, 2) + '</td></tr>' +
       '<tr class="g"><th>' + T('إجمالي الفاتورة', 'Total') + ' (' + esc(h.CURRENCYCODE) + ')</th><td>' + fmtNum(sub + tax, 2) + '</td></tr>' +
-      (h.STATUS === 'Posted' ? '<tr><th>' + T('المسدد', 'Paid') + '</th><td>' + fmtNum(h.PAIDAMOUNT || 0, 2) + '</td></tr><tr class="g"><th>' + T('المتبقي', 'Balance due') + '</th><td>' + fmtNum(invRem(h), 2) + '</td></tr>' : '') + '</table>' +
+      (h.STATUS === 'Posted' && !KIND[h.INVOICETYPE].credit ? '<tr><th>' + T('المسدد', 'Paid') + '</th><td>' + fmtNum(h.PAIDAMOUNT || 0, 2) + '</td></tr>' +
+        (Number(h.CREDITAMOUNT) ? '<tr><th>' + T('المخصوم بإشعارات', 'Credited') + '</th><td>' + fmtNum(h.CREDITAMOUNT, 2) + '</td></tr>' : '') +
+        '<tr class="g"><th>' + T('المتبقي', 'Balance due') + '</th><td>' + fmtNum(invRem(h), 2) + '</td></tr>' : '') + '</table>' +
       '<p class="inv-words">' + esc(tafqeet(sub + tax, h.CURRENCYCODE)) + '</p>' +
       '<div class="signs">' + [T('أعدّه', 'Prepared by'), T('المحاسب', 'Accountant'), sales ? T('استلمه العميل', 'Received by customer') : T('المعتمد', 'Approved by')].map(function (x) {
         return '<div><b>' + esc(x) + '</b><span>' + T('الاسم:', 'Name:') + '</span><span>' + T('التوقيع:', 'Signature:') + '</span></div>';
@@ -3907,7 +3959,7 @@
       body.push('<tr class="r-acc ag-p"><td><bdi>' + esc(p.c) + '</bdi></td><td>' + esc(p.n) + '</td><td>' + esc(p.cur) + '</td>' + AGE_B.map(function (b) { return cell(b[0], p.s[b[0]]); }).join('') + '<td class="n"><b>' + fmtNum(p.s.t, 2) + '</b></td></tr>');
       aoa.push([p.c, p.n, p.cur].concat(AGE_B.map(function (b) { return r3(p.s[b[0]]); })).concat([r3(p.s.t)]));
       if (F.detail) p.inv.sort(function (a, b) { return a.due < b.due ? -1 : 1; }).forEach(function (x) {
-        body.push('<tr class="ag-inv"><td><a data-inv="' + esc(x.id) + '"><bdi>' + esc(x.id) + '</bdi></a></td><td>' + T('تاريخ ', 'Date ') + esc(x.date) + T(' — استحقاق ', ' — due ') + esc(x.due) +
+        body.push('<tr class="ag-inv"><td><a data-inv="' + esc(x.id) + '" data-pg="' + ((KIND[x.type] || {}).page || '') + '"><bdi>' + esc(x.id) + '</bdi></a></td><td>' + T('تاريخ ', 'Date ') + esc(x.date) + T(' — استحقاق ', ' — due ') + esc(x.due) +
           (x.days > 0 ? ' — <b>' + T('متأخرة ', 'overdue ') + x.days + T(' يوماً', ' days') + '</b>' : '') + '</td><td>' + esc(x.cur) + '</td>' +
           AGE_B.map(function (b) { return b[0] === x.b ? cell(b[0], x.rem) : '<td class="n"></td>'; }).join('') + '<td class="n">' + fmtNum(x.rem, 2) + '</td></tr>');
         aoa.push(['  ' + x.id, x.date + ' / ' + x.due + ' (' + x.days + ')', x.cur].concat(AGE_B.map(function (b) { return b[0] === x.b ? r3(x.rem) : ''; })).concat([r3(x.rem)]));
@@ -3930,7 +3982,16 @@
   }
 
   /* ======================= Items in invoices ======================= */
-  function invItems() { return (invType() === 'Purchase' ? S.b.refs.purchitems : S.b.refs.salesitems) || []; }
+  function invItems() { return (invSide() === 'Purchase' ? S.b.refs.purchitems : S.b.refs.salesitems) || []; }
+  /** إنشاء إشعار من فاتورة مُرحّلة: نفس الطرف والوحدة، وسطور الفاتورة كبداية للمرتجع. */
+  function invNote(kind) {
+    var h = S.invHead, K = KIND[kind];
+    go(K.page, { id: '@new', t: kind, preset: {
+      head: { PARTYID: h.PARTYID, PARTYNAME: h.PARTYNAME, CURRENCYCODE: h.CURRENCYCODE, EXCHANGERATE: h.EXCHANGERATE, ORIGINVOICE: h.INVOICEID,
+        SUB2_OPERATINGUNIT: h.SUB2_OPERATINGUNIT, SUB1_OPERATINGUNIT: h.SUB1_OPERATINGUNIT, OPERATINGUNIT: h.OPERATINGUNIT,
+        DESCRIPTION: (K.credit ? T('مرتجع من الفاتورة ', 'Return on invoice ') : T('إضافة على الفاتورة ', 'Charge on invoice ')) + h.INVOICEID },
+      lines: K.credit ? S.invLines.map(function (l) { return Object.assign({}, l); }) : [{ QTY: 1, TAXPERCENT: Number(S.b.settings.DEFAULTTAXPERCENT) || 0 }] } });
+  }
 
   /* ======================= Budget control ======================= */
   async function pageBudgetCtl(force) {
@@ -4355,12 +4416,40 @@
       (forced ? '<button class="btn" onclick="FA.logout()">' + T('تسجيل الخروج', 'Sign out') + '</button>' : '<button class="btn" onclick="FA.closeModal()">' + T('إلغاء', 'Cancel') + '</button>'),
       { locked: forced });
   }
-  async function changePw() {
+  /* ======================= My account ======================= */
+  function pageAccount() {
+    var u = S.b.user, role = S.b.roles[u.role];
+    crumbs([S.b.settings.ORGNAME, T('حسابي وكلمة المرور', 'My account & password')]);
+    var row = function (a, b) { return '<div class="fld"><label>' + esc(a) + '</label><input class="inp" readonly value="' + esc(b || '') + '"></div>'; };
+    $('#main').innerHTML = apane([]) + phead(T('الإدارة', 'Administration'), T('حسابي وكلمة المرور', 'My account & password')) +
+      '<div class="content"><div class="acc-grid"><div class="card ftab"><div class="ftab-h"><h3>' + T('بيانات المستخدم', 'User details') + '</h3></div><div class="ftab-b"><div class="fgroup">' +
+      '<div class="acc-who"><span class="avatar">' + esc(initials(u.fullName || u.username)) + '</span><div><b>' + esc(u.fullName || u.username) + '</b><span>' + esc(L(role)) + '</span></div></div>' +
+      row(T('اسم المستخدم', 'User name'), u.username) + row(T('الاسم الكامل', 'Full name'), u.fullName) + row(T('البريد الإلكتروني', 'Email'), u.email) + row(T('الدور', 'Role'), L(role)) +
+      '</div></div></div>' +
+      '<div class="card ftab"><div class="ftab-h"><h3>' + T('تغيير كلمة المرور', 'Change password') + '</h3></div><div class="ftab-b"><div class="fgroup">' +
+      '<div class="fld"><label for="cp0">' + T('كلمة المرور الحالية', 'Current password') + '</label><input class="inp" id="cp0" type="password" dir="ltr" autocomplete="current-password"></div>' +
+      '<div class="fld"><label for="cp1">' + T('كلمة المرور الجديدة', 'New password') + '</label><input class="inp" id="cp1" type="password" dir="ltr" autocomplete="new-password" oninput="FA.pwHint()"></div>' +
+      '<div class="fld"><label for="cp2">' + T('تأكيد كلمة المرور الجديدة', 'Confirm new password') + '</label><input class="inp" id="cp2" type="password" dir="ltr" autocomplete="new-password" oninput="FA.pwHint()"></div>' +
+      '<label class="ck"><input type="checkbox" onchange="FA.pwShow(this.checked)"> ' + T('إظهار كلمات المرور', 'Show passwords') + '</label>' +
+      '<ul class="pw-rules" id="pwRules"></ul>' +
+      '<button class="btn pri" onclick="FA.changePw(0, 1)">' + icon('key') + T('حفظ كلمة المرور الجديدة', 'Save new password') + '</button></div></div></div></div></div>';
+    pwHint();
+  }
+  function pwHint() {
+    var v = ($('#cp1') || {}).value || '', c = ($('#cp2') || {}).value || '';
+    var rules = [[v.length >= 8, T('8 أحرف على الأقل', 'At least 8 characters')], [/[A-Za-z\u0600-\u06FF]/.test(v), T('تحتوي على حروف', 'Contains letters')],
+      [/\d/.test(v), T('تحتوي على أرقام', 'Contains digits')], [v !== '' && v === c, T('التأكيد مطابق', 'Confirmation matches')]];
+    var el = $('#pwRules');
+    if (el) el.innerHTML = rules.map(function (r) { return '<li class="' + (r[0] ? 'ok' : '') + '">' + (r[0] ? '✓ ' : '• ') + esc(r[1]) + '</li>'; }).join('');
+  }
+  function pwShow(on) { ['cp0', 'cp1', 'cp2'].forEach(function (k) { var el = $('#' + k); if (el) el.type = on ? 'text' : 'password'; }); }
+
+  async function changePw(forced, inPage) {
     if ($('#cp1').value !== $('#cp2').value) return toast(T('كلمتا المرور غير متطابقتين', 'Passwords do not match'), 'err');
     try {
       await api('changePassword', S.token, $('#cp0').value, $('#cp1').value);
       S.b.user.mustChange = false;
-      closeModal();
+      if (inPage) { ['cp0', 'cp1', 'cp2'].forEach(function (k) { $('#' + k).value = ''; }); pwHint(); } else closeModal();
       toast(T('تم تغيير كلمة المرور', 'Password changed'), 'ok');
     } catch (e) { fail(e); }
   }
@@ -4529,7 +4618,7 @@
     accSearch: accSearch, accToggle: accToggle, accAll: accAll, exportRowsAcc: exportRowsAcc,
     openingDlg: openingDlg, openingGo: openingGo, partySet: partySet, partyRefresh: partyRefresh, partyExport: partyExport, partyPrint: partyPrint,
     invReload: invReload, invCell: invCell, invAddLine: invAddLine, invDelLine: invDelLine, invSave: invSave, invCancelDlg: invCancelDlg,
-    invAct: invAct, invDelete: invDelete, invPay: invPay, invPrint: invPrint,
+    invAct: invAct, invNote: invNote, pwHint: pwHint, pwShow: pwShow, invDelete: invDelete, invPay: invPay, invPrint: invPrint,
     cashReload: cashReload, cashSave: cashSave, cashCancelDlg: cashCancelDlg, cashAct: cashAct, cashDelete: cashDelete, cashPrint: cashPrint,
     bgReload: bgReload, bgDeleteSelected: bgDeleteSelected, bgExportAll: bgExportAll, bgCell: bgCell, bgAddLine: bgAddLine, bgDelLine: bgDelLine,
     bgSave: bgSave, bgAct: bgAct, bgExport: bgExport, bgImport: bgImport, bgImportFile: bgImportFile, bgPrint: bgPrint,

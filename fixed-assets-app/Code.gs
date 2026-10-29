@@ -10,8 +10,8 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '11.0.0';
-const SETUP_VERSION = '11';
+const APP_VERSION = '12.0.0';
+const SETUP_VERSION = '12';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
@@ -23,7 +23,8 @@ const USER_COLS = ['USERNAME', 'FULLNAME', 'EMAIL', 'PASSWORDHASH', 'SALT', 'ROL
 const SESSION_COLS = ['SESSIONID', 'USERNAME', 'CREATEDON', 'LASTSEEN', 'ACTIVE', 'CLIENT'];
 const SETTING_DEFAULTS = {
   ORGNAME: 'الإدارة المالية', ORGEMAIL: '', CURRENCY: 'DJF', SESSIONTIMEOUT: '60',
-  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ', RETAINEDEARNINGSACCOUNT: '', CLOSINGJOURNALNAME: 'YE', OPENINGBALANCEACCOUNT: '', BUDGETPREFIX: 'BG-', BUDGETSEQ: '0', RVPREFIX: 'RV-', RVSEQ: '0', PVPREFIX: 'PV-', PVSEQ: '0', SIPREFIX: 'SI-', SISEQ: '0', PIPREFIX: 'PI-', PISEQ: '0',
+  MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ', RETAINEDEARNINGSACCOUNT: '', CLOSINGJOURNALNAME: 'YE', OPENINGBALANCEACCOUNT: '', BUDGETPREFIX: 'BG-', BUDGETSEQ: '0', RVPREFIX: 'RV-', RVSEQ: '0', PVPREFIX: 'PV-', PVSEQ: '0', SIPREFIX: 'SI-', SISEQ: '0', PIPREFIX: 'PI-', PISEQ: '0', SCNPREFIX: 'SCN-', SCNSEQ: '0', SDNPREFIX: 'SDN-', SDNSEQ: '0',
+  PDNPREFIX: 'PDN-', PDNSEQ: '0', PCNPREFIX: 'PCN-', PCNSEQ: '0',
   SALESACCOUNT: '', PURCHASEACCOUNT: '', SALESTAXACCOUNT: '', PURCHTAXACCOUNT: '', DEFAULTTAXPERCENT: '0',
   DEPJOURNALNAME: 'FADEP', DEPOFFSETACCOUNT: '', DEPMONTHS: '3'
 };
@@ -61,7 +62,18 @@ const TRANS_TYPES = [
 const JOURNAL_STATUS = [o('Draft', 'مسودة'), o('Approved', 'معتمد'), o('Posted', 'مُرحّل')];
 const GL_SOURCES = [o('Manual', 'يدوي', 'Manual'), o('FAJournal', 'يومية الأصول', 'Fixed asset journal'), o('Transfer', 'نقل أصول', 'Asset transfer'),
   o('YearEnd', 'إقفال السنة', 'Year-end closing'), o('CashVoucher', 'سند قبض / صرف', 'Receipt / payment'), o('Invoice', 'فاتورة', 'Invoice')];
-const INVOICE_TYPES = [o('Sales', 'فاتورة مبيعات', 'Sales invoice'), o('Purchase', 'فاتورة مشتريات', 'Purchase invoice')];
+const INVOICE_TYPES = [o('Sales', 'فاتورة مبيعات', 'Sales invoice'), o('Purchase', 'فاتورة مشتريات', 'Purchase invoice'),
+  o('SalesCredit', 'إشعار دائن للعميل (مرتجع مبيعات / خصم)', 'Customer credit note'), o('SalesDebit', 'إشعار مدين للعميل', 'Customer debit note'),
+  o('PurchaseDebit', 'إشعار مدين للمورد (مرتجع مشتريات)', 'Vendor debit note'), o('PurchaseCredit', 'إشعار دائن من المورد', 'Vendor credit note')];
+/** خصائص كل نوع: الجانب (مبيعات/مشتريات)، هل يخفّض رصيد الطرف، الترقيم، اليومية، الاسم. */
+const INV_KIND = {
+  Sales: { side: 'Sales', credit: 0, seq: ['SISEQ', 'SIPREFIX', 'SI-'], jn: 'SI', ar: 'فاتورة مبيعات' },
+  Purchase: { side: 'Purchase', credit: 0, seq: ['PISEQ', 'PIPREFIX', 'PI-'], jn: 'PI', ar: 'فاتورة مشتريات' },
+  SalesCredit: { side: 'Sales', credit: 1, seq: ['SCNSEQ', 'SCNPREFIX', 'SCN-'], jn: 'CN', ar: 'إشعار دائن للعميل' },
+  SalesDebit: { side: 'Sales', credit: 0, seq: ['SDNSEQ', 'SDNPREFIX', 'SDN-'], jn: 'DN', ar: 'إشعار مدين للعميل' },
+  PurchaseDebit: { side: 'Purchase', credit: 1, seq: ['PDNSEQ', 'PDNPREFIX', 'PDN-'], jn: 'DN', ar: 'إشعار مدين للمورد' },
+  PurchaseCredit: { side: 'Purchase', credit: 0, seq: ['PCNSEQ', 'PCNPREFIX', 'PCN-'], jn: 'CN', ar: 'إشعار دائن من المورد' }
+};
 const BUDGET_TYPES = [o('Expense', 'مصروفات', 'Expense'), o('Revenue', 'إيرادات', 'Revenue')];
 const BUDGET_STATUS = [o('Draft', 'مسودة', 'Draft'), o('Approved', 'معتمدة', 'Approved'), o('Posted', 'مُرحّلة', 'Posted')];
 const CASH_TYPES = [o('Receipt', 'سند قبض', 'Receipt'), o('Payment', 'سند صرف', 'Payment')];
@@ -458,8 +470,9 @@ const SCHEMAS = {
       F('INVOICETYPE', 'نوع الفاتورة', 'Invoice type', 'select', { opts: INVOICE_TYPES, req: 1, sec: 'h', grp: 'h1', list: 1 }),
       F('INVOICEDATE', 'تاريخ الفاتورة', 'Invoice date', 'date', { req: 1, dflt: '@today', sec: 'h', grp: 'h1', list: 1 }),
       F('DUEDATE', 'تاريخ الاستحقاق', 'Due date', 'date', { sec: 'h', grp: 'h1', list: 1 }),
-      F('PARTYID', 'العميل / المورد', 'Customer / vendor', 'lookup', { lkBy: 'INVOICETYPE', lkMap: { Sales: '@customers', Purchase: '@vendors', Ledger: '@customers' }, req: 1, sec: 'h', grp: 'h2', list: 1 }),
+      F('PARTYID', 'العميل / المورد', 'Customer / vendor', 'lookup', { lkBy: 'INVOICETYPE', lkMap: { Sales: '@customers', Purchase: '@vendors', SalesCredit: '@customers', SalesDebit: '@customers', PurchaseDebit: '@vendors', PurchaseCredit: '@vendors', Ledger: '@customers' }, req: 1, sec: 'h', grp: 'h2', list: 1 }),
       F('PARTYNAME', 'اسم العميل / المورد', 'Party name', 'text', { calc: 1, sec: 'h', grp: 'h2', list: 1 }),
+      F('ORIGINVOICE', 'الفاتورة الأصلية', 'Original invoice', 'lookup', { lk: '@noteinvoices', sec: 'h', grp: 'h2', list: 1 }),
       F('PARTYREF', 'مرجع الطرف (رقم فاتورة المورد / أمر الشراء)', 'Party reference', 'text', { sec: 'h', grp: 'h2', list: 1 }),
       F('SUB2_OPERATINGUNIT', 'الوحدة الفرعية 2', 'A_Sub2_OperatingUnit', 'lookup', { lk: 'Sub2_OperatingUnit', up: 'SUB1_OPERATINGUNIT', req: 1, sec: 'h', grp: 'h1', list: 1 }),
       F('SUB1_OPERATINGUNIT', 'الوحدة الفرعية 1', 'A_Sub1_OperatingUnit', 'lookup', { lk: 'Sub1_OperatingUnit', up: 'OPERATINGUNIT', calc: 1, sec: 'h', grp: 'h1' }),
@@ -471,6 +484,7 @@ const SCHEMAS = {
       F('TAXAMOUNT', 'الضريبة', 'Tax', 'number', { dec: 3, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
       F('TOTALAMOUNT', 'إجمالي الفاتورة', 'Invoice total', 'number', { dec: 3, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
       F('PAIDAMOUNT', 'المسدد', 'Paid', 'number', { dec: 3, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
+      F('CREDITAMOUNT', 'المخصوم بإشعارات', 'Credited', 'number', { dec: 3, sys: 1, sec: 'h', grp: 'h3', list: 1 }),
       F('STATUS', 'الحالة', 'Status', 'select', { opts: CASH_STATUS, sys: 1, sec: 'h', grp: 'h4', list: 1 }),
       F('GLVOUCHER', 'رقم القيد', 'Journal voucher', 'text', { sys: 1, sec: 'h', grp: 'h4', list: 1 }),
       F('REVERSALVOUCHER', 'قيد الإلغاء', 'Reversal voucher', 'text', { sys: 1, sec: 'h', grp: 'h4' }),
@@ -715,6 +729,7 @@ function setup() {
     migrateV9_();
     migrateV10_();
     migrateV11_();
+    migrateV12_();
 
     const def = ss.getSheetByName('Sheet1') || ss.getSheetByName('ورقة1');
     if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
@@ -1004,6 +1019,16 @@ function migrateV11_() {
   it.rows.forEach(function (h, i) {
     const l = h.INVOICEID && !h.SUB2_OPERATINGUNIT && first[low_(h.INVOICEID)];
     if (l) { h.SUB2_OPERATINGUNIT = l.SUB2_OPERATINGUNIT; h.SUB1_OPERATINGUNIT = l.SUB1_OPERATINGUNIT; h.OPERATINGUNIT = l.OPERATINGUNIT; writeRow_(it, i, h); }
+  });
+}
+
+/** الإصدار 12: يوميتا الإشعارات الدائنة والمدينة. */
+function migrateV12_() {
+  const jt = readTable_('JournalNames');
+  const have = {};
+  jt.rows.forEach(function (r) { have[low_(r.CODE)] = 1; });
+  [['CN', 'إشعارات دائنة - Credit notes'], ['DN', 'إشعارات مدينة - Debit notes']].forEach(function (x) {
+    if (!have[low_(x[0])]) appendRow_(jt, { CODE: x[0], NAME: x[1], CREATEDBY: 'setup', CREATEDON: stamp_() });
   });
 }
 
@@ -1419,9 +1444,11 @@ function refs_(s) {
       .map(function (r) { return { c: String(r.BANKACCOUNTID), n: String(r.NAME || ''), acc: r.LEDGERACCOUNT || '', cur: r.CURRENCYCODE || '' }; });
   }
   if (['invoices', 'cashvouchers'].some(function (pg) { return can_(s, pg, 'view'); })) {
-    out.invoices = readTable_('Invoices').rows.filter(function (r) { return r.INVOICEID && r.STATUS === 'Posted' && num_(r.TOTALAMOUNT) - num_(r.PAIDAMOUNT) > 0.0005; })
-      .map(function (r) { return { c: String(r.INVOICEID), n: String(r.INVOICEDATE) + ' — ' + round_(num_(r.TOTALAMOUNT) - num_(r.PAIDAMOUNT), 3) + ' ' + r.CURRENCYCODE,
-        t: r.INVOICETYPE, p: String(r.PARTYID), rem: round_(num_(r.TOTALAMOUNT) - num_(r.PAIDAMOUNT), 3), cur: r.CURRENCYCODE, rate: num_(r.EXCHANGERATE) || 1 }; });
+    out.invoices = readTable_('Invoices').rows.filter(function (r) {
+      return r.INVOICEID && r.STATUS === 'Posted' && INV_KIND[r.INVOICETYPE] && !INV_KIND[r.INVOICETYPE].credit && num_(r.TOTALAMOUNT) - num_(r.CREDITAMOUNT) > 0.0005;
+    }).map(function (r) { return { c: String(r.INVOICEID), n: String(r.INVOICEDATE) + ' — ' + Math.max(0, invRem_(r)) + ' ' + r.CURRENCYCODE,
+        t: INV_KIND[r.INVOICETYPE].side, k: r.INVOICETYPE, p: String(r.PARTYID), rem: invRem_(r), cap: round_(num_(r.TOTALAMOUNT) - num_(r.CREDITAMOUNT), 3),
+        cur: r.CURRENCYCODE, rate: num_(r.EXCHANGERATE) || 1 }; });
   }
   if (['items', 'invoices'].some(function (pg) { return can_(s, pg, 'view'); })) {
     out.itemgroups = readTable_('ItemGroups').rows.filter(function (r) { return r.ITEMGROUPID; })
@@ -2786,15 +2813,20 @@ function fiscalReopen(token, year) {
 
 /* ============================== Sales & purchase invoices ============================== */
 
-function invParty_(type) { return PARTY[type === 'Purchase' ? 'Vendor' : 'Customer']; }
+function invKind_(type) { const k = INV_KIND[type]; if (!k) throw new Error('نوع غير معروف: ' + type); return k; }
+function invParty_(type) { return PARTY[(INV_KIND[type] || INV_KIND.Sales).side === 'Purchase' ? 'Vendor' : 'Customer']; }
+/** المتبقي على الفاتورة = الإجمالي − المسدد − المخصوم بإشعارات دائنة. */
+function invRem_(h) { return round_(num_(h.TOTALAMOUNT) - num_(h.PAIDAMOUNT) - num_(h.CREDITAMOUNT), 3); }
 
 /** قيد الفاتورة: المبيعات = من حـ/ العميل إلى حـ/ الإيرادات + الضريبة، والمشتريات عكسها. */
 function invoiceLegs_(ctx, h, lines, reverse) {
   const st = getSettings_();
-  const sales = h.INVOICETYPE === 'Sales';
+  const K = invKind_(h.INVOICETYPE);
+  const sales = K.side === 'Sales';
   const cur = h.CURRENCYCODE, rate = num_(h.EXCHANGERATE) || 1;
-  const partyDr = sales !== !!reverse;     // المبيعات: العميل مدين
-  const note = (sales ? 'فاتورة مبيعات ' : 'فاتورة مشتريات ') + h.INVOICEID;
+  // المبيعات: العميل مدين، والإشعار الدائن (مرتجع) يعكس ذلك، والإلغاء يعكسه مرة أخرى
+  const partyDr = (sales !== !!K.credit) !== !!reverse;
+  const note = K.ar + ' ' + h.INVOICEID + (h.ORIGINVOICE ? ' (للفاتورة ' + h.ORIGINVOICE + ')' : '');
   const legs = [{ pt: sales ? 'Customer' : 'Vendor', pid: h.PARTYID, cur: cur, rate: rate, curDebit: partyDr ? num_(h.TOTALAMOUNT) : 0,
     curCredit: partyDr ? 0 : num_(h.TOTALAMOUNT), note: h.DESCRIPTION || note, ref: h.PARTYREF || h.INVOICEID, s2: h.SUB2_OPERATINGUNIT || '' }];
   lines.forEach(function (l) {
@@ -2813,8 +2845,9 @@ function invoiceLegs_(ctx, h, lines, reverse) {
 }
 
 function postInvoice_(ctx, h, lines, reverse, date) {
-  const v = autoVoucher_(ctx, { TRANSDATE: date || h.INVOICEDATE, JOURNALNAME: h.INVOICETYPE === 'Sales' ? 'SI' : 'PI',
-    DESCRIPTION: (reverse ? 'إلغاء ' : '') + (h.INVOICETYPE === 'Sales' ? 'فاتورة مبيعات ' : 'فاتورة مشتريات ') + h.INVOICEID + ' — ' + (h.PARTYNAME || h.PARTYID),
+  const K = invKind_(h.INVOICETYPE);
+  const v = autoVoucher_(ctx, { TRANSDATE: date || h.INVOICEDATE, JOURNALNAME: K.jn,
+    DESCRIPTION: (reverse ? 'إلغاء ' : '') + K.ar + ' ' + h.INVOICEID + (h.ORIGINVOICE ? ' (للفاتورة ' + h.ORIGINVOICE + ')' : '') + ' — ' + (h.PARTYNAME || h.PARTYID),
     REFERENCE: h.PARTYREF || h.INVOICEID, SOURCE: 'Invoice', SOURCEREF: h.INVOICEID }, invoiceLegs_(ctx, h, lines, reverse));
   writeVoucher_(ctx, v);
   return v.head.rec.VOUCHER;
@@ -2823,6 +2856,39 @@ function postInvoice_(ctx, h, lines, reverse, date) {
 function invLines_(ctx, id) {
   return ctx.table('invlines').rows.filter(function (l) { return low_(l.INVOICEID) === low_(id); })
     .sort(function (a, b) { return num_(a.LINENUM) - num_(b.LINENUM); });
+}
+
+/** ربط الإشعار بالفاتورة الأصلية: نفس الطرف والجانب، والإشعار الدائن لا يتجاوز المتبقي. يرجع المبلغ بعملة الفاتورة الأصلية. */
+function checkNoteLink_(ctx, h) {
+  const K = invKind_(h.INVOICETYPE);
+  if (!h.ORIGINVOICE) {
+    if (K.credit) throw new Error('حدد الفاتورة الأصلية التي يخصم منها الإشعار');
+    return 0;
+  }
+  const o = ctx.find('invoices', h.ORIGINVOICE);
+  if (!o) throw new Error('الفاتورة الأصلية غير موجودة "' + h.ORIGINVOICE + '"');
+  h.ORIGINVOICE = o.INVOICEID;
+  const OK = INV_KIND[o.INVOICETYPE] || {};
+  if (OK.side !== K.side || OK.credit) throw new Error('الفاتورة ' + o.INVOICEID + ' لا تصلح أصلاً لهذا الإشعار');
+  if (low_(o.PARTYID) !== low_(h.PARTYID)) throw new Error('الفاتورة ' + o.INVOICEID + ' تخص ' + o.PARTYID + ' وليس ' + h.PARTYID);
+  if (o.STATUS !== 'Posted') throw new Error('الفاتورة الأصلية ' + o.INVOICEID + ' غير مُرحّلة');
+  if (!K.credit) return 0;
+  const applied = round_(num_(h.TOTALAMOUNT) * (num_(h.EXCHANGERATE) || 1) / (num_(o.EXCHANGERATE) || 1), 3);
+  // لا يتجاوز الإشعار ما لم يُخصم بعد من إجمالي الفاتورة؛ إن تجاوز المتبقي (فاتورة مسددة) يصبح الفرق رصيداً دائناً للطرف
+  const cap = round_(num_(o.TOTALAMOUNT) - num_(o.CREDITAMOUNT), 3);
+  if (applied > cap + 0.0005) throw new Error('الإشعار (' + applied + ') أكبر من قيمة الفاتورة ' + o.INVOICEID + ' غير المخصومة (' + cap + ' ' + o.CURRENCYCODE + ')');
+  return applied;
+}
+
+/** إشعار دائن مُرحّل: يُخصم من الفاتورة الأصلية ويُعتبر الإشعار نفسه مُسوّى. sign = -1 عند الإلغاء. */
+function applyNote_(ctx, h, sign) {
+  if (!invKind_(h.INVOICETYPE).credit || !h.ORIGINVOICE) return;
+  const o = ctx.find('invoices', h.ORIGINVOICE);
+  if (!o) return;
+  const applied = round_(num_(h.TOTALAMOUNT) * (num_(h.EXCHANGERATE) || 1) / (num_(o.EXCHANGERATE) || 1), 3);
+  o.CREDITAMOUNT = Math.max(0, round_(num_(o.CREDITAMOUNT) + sign * applied, 3));
+  ctx.touch('invoices', o);
+  h.PAIDAMOUNT = sign > 0 ? num_(h.TOTALAMOUNT) : 0;
 }
 
 /** حفظ فاتورة (الرأس + السطور) وترحيلها مباشرة إذا post = true. */
@@ -2841,11 +2907,12 @@ function saveInvoice(token, head, lines, isNew, post) {
     }
     const ph = prepare_('invoices', head, isNew ? 'add' : 'edit', ctx);
     ph.rec.STATUS = 'Draft';
-    ph.rec.PAIDAMOUNT = 0;
+    ph.rec.PAIDAMOUNT = 0; ph.rec.CREDITAMOUNT = 0;
     const id = ph.rec.INVOICEID;
-    ctx.invType = ph.rec.INVOICETYPE;
+    const K = invKind_(ph.rec.INVOICETYPE);
+    ctx.invType = K.side;
     const rows = (lines || []).filter(function (x) { return x && (x.ITEMID || x.ITEMDESCRIPTION || x.MAINACCOUNTID || num_(x.UNITPRICE)); });
-    if (!rows.length) throw new Error('الفاتورة لا تحتوي على سطور');
+    if (!rows.length) throw new Error((ph.rec.INVOICETYPE === K.side ? 'الفاتورة' : 'الإشعار') + ' لا يحتوي على سطور');
     let sub = 0, tax = 0;
     const pl = rows.map(function (x, i) {
       const p = prepare_('invlines', {
@@ -2857,9 +2924,10 @@ function saveInvoice(token, head, lines, isNew, post) {
       return p;
     });
     ph.rec.SUBTOTAL = round_(sub, 3); ph.rec.TAXAMOUNT = round_(tax, 3); ph.rec.TOTALAMOUNT = round_(sub + tax, 3);
-    if (!(ph.rec.TOTALAMOUNT > 0)) throw new Error('إجمالي الفاتورة يجب أن يكون أكبر من صفر');
+    if (!(ph.rec.TOTALAMOUNT > 0)) throw new Error('الإجمالي يجب أن يكون أكبر من صفر');
+    checkNoteLink_(ctx, ph.rec);
     // التحقق من القيد قبل أي كتابة
-    if (post) prepareVoucher_(ctx, { TRANSDATE: ph.rec.INVOICEDATE, JOURNALNAME: ph.rec.INVOICETYPE === 'Sales' ? 'SI' : 'PI' },
+    if (post) prepareVoucher_(ctx, { TRANSDATE: ph.rec.INVOICEDATE, JOURNALNAME: K.jn },
       invoiceLegs_(ctx, ph.rec, pl.map(function (p) { return p.rec; })), 'add');
     const lt = ctx.table('invlines');
     const old = [];
@@ -2867,16 +2935,18 @@ function saveInvoice(token, head, lines, isNew, post) {
     deleteRows_(lt, old);
     ctx.resetIndex('invlines');
     if (id === '@pending') {
-      const no = ph.rec.INVOICETYPE === 'Sales' ? nextSeq_('SISEQ', 'SIPREFIX', 'SI-') : nextSeq_('PISEQ', 'PIPREFIX', 'PI-');
+      const no = nextSeq_(K.seq[0], K.seq[1], K.seq[2]);
       ph.rec.INVOICEID = no;
       pl.forEach(function (p) { p.rec.INVOICEID = no; });
     }
     if (post) {
       ph.rec.GLVOUCHER = postInvoice_(ctx, ph.rec, pl.map(function (p) { return p.rec; }));
       ph.rec.STATUS = 'Posted'; ph.rec.POSTEDBY = s.username; ph.rec.POSTEDON = stamp_();
+      applyNote_(ctx, ph.rec, 1);
     }
     commit_('invoices', ph, ctx);
     pl.forEach(function (p) { commit_('invlines', p, ctx); });
+    ctx.flush();
     return { id: ph.rec.INVOICEID, status: ph.rec.STATUS, total: ph.rec.TOTALAMOUNT, gl: ph.rec.GLVOUCHER || '' };
   });
 }
@@ -2903,17 +2973,23 @@ function invoiceAction(token, id, action, date) {
     if (action === 'post') {
       if (h.STATUS !== 'Draft') throw new Error('الفاتورة مُرحّلة مسبقاً');
       checkOpenPeriod_(ctx, h.INVOICEDATE, 'الفاتورة');
+      checkNoteLink_(ctx, h);
       h.GLVOUCHER = postInvoice_(ctx, h, invLines_(ctx, id));
       h.STATUS = 'Posted'; h.POSTEDBY = s.username; h.POSTEDON = stamp_();
+      applyNote_(ctx, h, 1);
     } else if (action === 'cancel') {
       if (h.STATUS !== 'Posted') throw new Error('يمكن إلغاء الفواتير المُرحّلة فقط');
-      if (num_(h.PAIDAMOUNT) > 0.0005) throw new Error('الفاتورة عليها سداد ' + h.PAIDAMOUNT + ' — ألغِ سندات القبض/الصرف المرتبطة أولاً');
+      const K = invKind_(h.INVOICETYPE);
+      if (!K.credit && num_(h.PAIDAMOUNT) > 0.0005) throw new Error('الفاتورة عليها سداد ' + h.PAIDAMOUNT + ' — ألغِ سندات القبض/الصرف المرتبطة أولاً');
+      if (num_(h.CREDITAMOUNT) > 0.0005) throw new Error('على الفاتورة إشعارات دائنة بمبلغ ' + h.CREDITAMOUNT + ' — ألغِها أولاً');
       const d = date ? toDate_(date, ctx.dateFmt, { ar: 'تاريخ الإلغاء' }) : today_();
       if (d < String(h.INVOICEDATE)) throw new Error('تاريخ الإلغاء قبل تاريخ الفاتورة');
       h.REVERSALVOUCHER = postInvoice_(ctx, h, invLines_(ctx, id), true, d);
       h.STATUS = 'Cancelled';
+      applyNote_(ctx, h, -1);
     } else throw new Error('إجراء غير معروف');
     writeRow_(t, i, h);
+    ctx.flush();
     return { gl: action === 'post' ? h.GLVOUCHER : h.REVERSALVOUCHER };
   });
 }
@@ -2936,13 +3012,15 @@ function checkInvoiceLink_(ctx, rec) {
   if (!h) throw new Error('الفاتورة غير موجودة "' + rec.INVOICEID + '"');
   rec.INVOICEID = h.INVOICEID;
   if (h.STATUS !== 'Posted') throw new Error('الفاتورة ' + h.INVOICEID + ' غير مُرحّلة');
-  const want = h.INVOICETYPE === 'Sales' ? ['Receipt', 'Customer'] : ['Payment', 'Vendor'];
+  const K = invKind_(h.INVOICETYPE);
+  if (K.credit) throw new Error(h.INVOICEID + ' إشعار دائن مُسوّى بالخصم من فاتورته ولا يُربط بسند');
+  const want = K.side === 'Sales' ? ['Receipt', 'Customer'] : ['Payment', 'Vendor'];
   if (rec.VOUCHERTYPE !== want[0] || rec.PARTYTYPE !== want[1]) {
-    throw new Error('الفاتورة ' + h.INVOICEID + (h.INVOICETYPE === 'Sales' ? ' فاتورة مبيعات وتُحصَّل بسند قبض من العميل' : ' فاتورة مشتريات وتُسدَّد بسند صرف للمورد'));
+    throw new Error(h.INVOICEID + (K.side === 'Sales' ? ' مستند مبيعات ويُحصَّل بسند قبض من العميل' : ' مستند مشتريات ويُسدَّد بسند صرف للمورد'));
   }
   if (low_(h.PARTYID) !== low_(rec.PARTYID)) throw new Error('الفاتورة ' + h.INVOICEID + ' تخص ' + h.PARTYID + ' وليس ' + rec.PARTYID);
   const applied = num_(rec.AMOUNT) * (num_(rec.EXCHANGERATE) || 1) / (num_(h.EXCHANGERATE) || 1);
-  const rem = round_(num_(h.TOTALAMOUNT) - num_(h.PAIDAMOUNT), 3);
+  const rem = invRem_(h);
   if (applied > rem + 0.0005) throw new Error('المبلغ أكبر من المتبقي على الفاتورة ' + h.INVOICEID + ' (' + rem + ' ' + h.CURRENCYCODE + ')');
 }
 
@@ -2955,19 +3033,27 @@ function agingData(token, type, asOf) {
   if (!P || type === 'Bank') throw new Error('نوع غير معروف');
   need_(s, P.perm, 'view');
   asOf = String(asOf || today_());
-  const invType = type === 'Customer' ? 'Sales' : 'Purchase';
+  const side = type === 'Customer' ? 'Sales' : 'Purchase';
   const paid = {};
   readTable_('CashVouchers').rows.forEach(function (c) {
     if (!c.INVOICEID || c.STATUS !== 'Posted' || String(c.TRANSDATE) > asOf) return;
     const k = low_(c.INVOICEID);
     paid[k] = (paid[k] || 0) + num_(c.AMOUNT) * (num_(c.EXCHANGERATE) || 1);   // بالعملة المحلية
   });
-  const invoices = readTable_('Invoices').rows.filter(function (h) {
-    return h.INVOICEID && h.INVOICETYPE === invType && h.STATUS === 'Posted' && String(h.INVOICEDATE) <= asOf;
+  const all = readTable_('Invoices').rows;
+  // الإشعارات الدائنة المُرحّلة حتى التاريخ تُخصم من فواتيرها
+  all.forEach(function (n) {
+    if (!n.ORIGINVOICE || n.STATUS !== 'Posted' || !(INV_KIND[n.INVOICETYPE] || {}).credit || String(n.INVOICEDATE) > asOf) return;
+    const k = low_(n.ORIGINVOICE);
+    paid[k] = (paid[k] || 0) + num_(n.TOTALAMOUNT) * (num_(n.EXCHANGERATE) || 1);
+  });
+  const invoices = all.filter(function (h) {
+    const K = INV_KIND[h.INVOICETYPE] || {};
+    return h.INVOICEID && K.side === side && !K.credit && h.STATUS === 'Posted' && String(h.INVOICEDATE) <= asOf;
   }).map(function (h) {
     const rate = num_(h.EXCHANGERATE) || 1;
     const p = round_((paid[low_(h.INVOICEID)] || 0) / rate, 3);
-    return { id: String(h.INVOICEID), party: String(h.PARTYID), name: String(h.PARTYNAME || ''), date: String(h.INVOICEDATE), due: String(h.DUEDATE || h.INVOICEDATE),
+    return { id: String(h.INVOICEID), type: h.INVOICETYPE, party: String(h.PARTYID), name: String(h.PARTYNAME || ''), date: String(h.INVOICEDATE), due: String(h.DUEDATE || h.INVOICEDATE),
       cur: String(h.CURRENCYCODE || ''), rate: rate, total: num_(h.TOTALAMOUNT), paid: p, rem: round_(num_(h.TOTALAMOUNT) - p, 3), ref: String(h.PARTYREF || '') };
   }).filter(function (x) { return x.rem > 0.0005; });
   return { asOf: asOf, invoices: invoices };

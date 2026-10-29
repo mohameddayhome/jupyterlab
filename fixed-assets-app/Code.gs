@@ -10,8 +10,8 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '13.0.0';
-const SETUP_VERSION = '13';
+const APP_VERSION = '14.0.0';
+const SETUP_VERSION = '14';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
@@ -222,7 +222,10 @@ const SCHEMAS = {
         aliases: ['Last depreciation date', 'LASTDEPRECIATIONRUNDATE'] })
     ].concat(unitFields_('', 'dims', 'dims', { calc: 1, ou: { list: 1 } })).concat([
       F('DEFAULTDIMENSIONDISPLAYVALUE', 'قيمة الأبعاد الافتراضية', 'Default dimension display value', 'text', { calc: 1, sec: 'dims', grp: 'dims',
-        aliases: ['Default dimension', 'DEFAULTDIMENSION', 'Financial dimensions'] })
+        aliases: ['Default dimension', 'DEFAULTDIMENSION', 'Financial dimensions'] }),
+      F('OPENINGVOUCHER', 'قيد الرصيد الافتتاحي', 'Opening voucher', 'text', { sys: 1, sec: 'general', grp: 'bal' }),
+      F('OPENINGCOST', 'التكلفة الافتتاحية المُقيّدة', 'Opening cost posted', 'number', { dec: 3, sys: 1, sec: 'general', grp: 'bal' }),
+      F('OPENINGACCUM', 'مجمع الإهلاك الافتتاحي المُقيّد', 'Opening accumulated depreciation posted', 'number', { dec: 3, sys: 1, sec: 'general', grp: 'bal' })
     ])
   },
 
@@ -1755,6 +1758,10 @@ const HOOKS = {
       throw new Error('فترات الإهلاك المتبقية أكبر من إجمالي فترات الإهلاك');
     }
     if (rec.ACQUISITIONPRICE !== '' && rec.ACQUISITIONPRICE < 0) throw new Error('سعر الاقتناء لا يمكن أن يكون سالباً');
+    if (ex && ex.OPENINGVOUCHER && ctx.find('glheaders', ex.OPENINGVOUCHER) &&
+        (num_(ex.ACQUISITIONPRICE) !== num_(rec.ACQUISITIONPRICE) || num_(ex.ACCUMULATEDDEPRECIATION) !== num_(rec.ACCUMULATEDDEPRECIATION))) {
+      throw new Error('رصيد هذا الدفتر مُقيّد في القيد الافتتاحي ' + ex.OPENINGVOUCHER + ' — عدّل القيمة عبر يومية الأصول (تسوية اقتناء / تسوية إهلاك) أو احذف القيد وهو مسودة');
+    }
     // الأبعاد تأتي من الأصل. إن لم تكن على الأصل (استيراد من D365) تُنقل من الدفتر إلى الأصل.
     if (a.OPERATINGUNIT || a.SUB2_OPERATINGUNIT) {
       copyUnits_(a, rec);
@@ -3101,6 +3108,149 @@ function agingData(token, type, asOf) {
       cur: String(h.CURRENCYCODE || ''), rate: rate, total: num_(h.TOTALAMOUNT), paid: p, rem: round_(num_(h.TOTALAMOUNT) - p, 3), ref: String(h.PARTYREF || '') };
   }).filter(function (x) { return x.rem > 0.0005; });
   return { asOf: asOf, invoices: invoices };
+}
+
+/* ============================== Fixed assets opening balances ============================== */
+
+/** الأرصدة الافتتاحية للأصول = قيم الدفتر الأساسي غير المُرحّلة عبر يومية الأصول (مثل الأصول المستوردة من D365). */
+function faOpeningRows_(ctx) {
+  const posted = {};
+  ctx.table('journal').rows.forEach(function (j) {
+    if (j.STATUS !== 'Posted' || !j.FIXEDASSETNUMBER) return;
+    const k = low_(j.FIXEDASSETNUMBER) + '|' + low_(j.BOOKID || 'General');
+    const p = posted[k] = posted[k] || { cost: 0, accum: 0 };
+    const amt = num_(j.DEBITAMOUNT) - num_(j.CREDITAMOUNT);
+    if (j.TRANSACTIONTYPE === 'Acquisition' || j.TRANSACTIONTYPE === 'AcquisitionAdj') p.cost += amt;
+    else if (DEP_TYPES[j.TRANSACTIONTYPE]) p.accum -= amt;
+  });
+  const glOk = function (v) { return v && ctx.find('glheaders', v); };
+  const rows = [], errors = [];
+  let done = 0;
+  const prim = primaryBooks_(ctx.table('books').rows);
+  Object.keys(prim).forEach(function (k) {
+    const b = prim[k];
+    if (b.STATUS !== 'Open' && b.STATUS !== 'Suspended') return;
+    if (glOk(b.OPENINGVOUCHER)) { done++; return; }
+    const p = posted[low_(b.FIXEDASSETNUMBER) + '|' + low_(b.BOOKID || 'General')] || { cost: 0, accum: 0 };
+    const cost = round_(num_(b.ACQUISITIONPRICE) - p.cost, 3), accum = round_(num_(b.ACCUMULATEDDEPRECIATION) - p.accum, 3);
+    if (Math.abs(cost) < 0.0005 && Math.abs(accum) < 0.0005) return;
+    const a = ctx.asset(b.FIXEDASSETNUMBER) || {};
+    const g = ctx.find('groups', a.FIXEDASSETGROUPID) || {};
+    const r = { asset: b.FIXEDASSETNUMBER, book: b.BOOKID, name: a.NAME || '', group: a.FIXEDASSETGROUPID || '', ou: a.OPERATINGUNIT || '',
+      s1: a.SUB1_OPERATINGUNIT || '', s2: a.SUB2_OPERATINGUNIT || '', cost: cost, accum: accum, nbv: round_(cost - accum, 3),
+      assetAcc: g.ASSETACCOUNT || '', accumAcc: g.ACCUMDEPACCOUNT || '' };
+    if (cost && !r.assetAcc) errors.push(r.asset + ': مجموعة الأصل ' + (r.group || '—') + ' بدون حساب أصل');
+    if (accum && !r.accumAcc) errors.push(r.asset + ': مجموعة الأصل ' + (r.group || '—') + ' بدون حساب مجمع إهلاك');
+    rows.push(r);
+  });
+  rows.sort(function (x, y) { return String(x.asset).localeCompare(String(y.asset), undefined, { numeric: true }); });
+  return { rows: rows, errors: errors, done: done };
+}
+
+function faOpeningData(token) {
+  const s = auth_(token);
+  need_(s, 'books', 'view');
+  const ctx = ctx_(s);
+  const r = faOpeningRows_(ctx);
+  r.offset = getSettings_().OPENINGBALANCEACCOUNT || '';
+  return r;
+}
+
+/** ينشئ قيد الأرصدة الافتتاحية للأصول (مسودة): من حـ/ الأصول ← إلى حـ/ مجمع الإهلاك + حـ/ الأرصدة الافتتاحية، مجمّعاً حسب الحساب والوحدة. */
+function createFAOpeningVoucher(token, date, offsetAccount) {
+  const s = auth_(token);
+  need_(s, 'books', 'edit');
+  need_(s, 'gl', 'add');
+  return withLock_(function () {
+    const ctx = ctx_(s);
+    const d = faOpeningRows_(ctx);
+    if (!d.rows.length) throw new Error('لا توجد أرصدة افتتاحية للأصول غير مُرحّلة');
+    if (d.errors.length) throw new Error('أكمل حسابات مجموعات الأصول أولاً:\n' + d.errors.slice(0, 10).join('\n'));
+    const off = postingAccount_(ctx, offsetAccount || getSettings_().OPENINGBALANCEACCOUNT, 'حساب الأرصدة الافتتاحية');
+    if (!off) throw new Error('حدد حساب الأرصدة الافتتاحية (المقابل)');
+    date = toDate_(date || today_(), ctx.dateFmt, { ar: 'التاريخ' });
+    const local = String(getSettings_().CURRENCY || '').toUpperCase();
+    const agg = {}, order = [];
+    const add = function (acc, r, amt, what) {
+      if (Math.abs(amt) < 0.0005) return;
+      const k = [low_(acc), low_(r.ou), low_(r.s1), low_(r.s2)].join('|');
+      if (!agg[k]) { agg[k] = { acc: acc, ou: r.ou, s1: r.s1, s2: r.s2, amt: 0, n: 0, what: what }; order.push(k); }
+      agg[k].amt += amt; agg[k].n++;
+    };
+    let net = 0;
+    d.rows.forEach(function (r) { add(r.assetAcc, r, r.cost, 'تكلفة'); add(r.accumAcc, r, -r.accum, 'مجمع إهلاك'); net += r.cost - r.accum; });
+    const legs = order.map(function (k) {
+      const x = agg[k], amt = round_(x.amt, 3);
+      return { acc: x.acc, ou: x.ou, s1: x.s1, s2: x.s2, cur: local, rate: 1, curDebit: amt > 0 ? amt : 0, curCredit: amt < 0 ? -amt : 0,
+        note: 'رصيد افتتاحي — ' + x.what + ' الأصول (' + x.n + ' أصل)', ref: 'FA-OPENING' };
+    }).filter(function (l) { return l.curDebit || l.curCredit; });
+    net = round_(net, 3);
+    if (net) legs.push({ acc: off, cur: local, rate: 1, curDebit: net < 0 ? -net : 0, curCredit: net > 0 ? net : 0, note: 'مقابل الأرصدة الافتتاحية للأصول الثابتة', ref: 'FA-OPENING' });
+    const v = prepareVoucher_(ctx, { TRANSDATE: date, JOURNALNAME: 'GJ', DESCRIPTION: 'الأرصدة الافتتاحية للأصول الثابتة (' + d.rows.length + ' أصل)', REFERENCE: 'FA-OPENING' }, legs, 'add');
+    v.head.rec.SOURCE = 'Manual';
+    v.head.rec.STATUS = 'Draft';
+    if (!balanced_(v)) throw new Error('القيد غير متوازن');
+    writeVoucher_(ctx, v);
+    const bt = ctx.table('books'), bi = ctx.index('books');
+    d.rows.forEach(function (r) {
+      const i = bi[low_(r.asset) + '|' + low_(r.book || 'General')];
+      if (i === undefined) return;
+      const b = bt.rows[i];
+      b.OPENINGVOUCHER = v.head.rec.VOUCHER; b.OPENINGCOST = r.cost; b.OPENINGACCUM = r.accum;
+      writeRow_(bt, i, b);
+    });
+    return { voucher: v.head.rec.VOUCHER, count: d.rows.length, cost: round_(d.rows.reduce(function (a, r) { return a + r.cost; }, 0), 3),
+      accum: round_(d.rows.reduce(function (a, r) { return a + r.accum; }, 0), 3) };
+  });
+}
+
+/* ============================== Sales & purchases dashboard ============================== */
+
+/** بيانات لوحة المبيعات والمشتريات لسنة: شهرياً، أكبر العملاء والموردين، المستحقات والمتأخرات، والمرتجعات (بالعملة المحلية، قبل الضريبة). */
+function salesDashboard(token, year) {
+  const s = auth_(token);
+  need_(s, 'invoices', 'view');
+  year = String(year || new Date().getFullYear());
+  const today = today_();
+  const z = function () { return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; };
+  const out = { year: year, sales: z(), purch: z(), salesRet: z(), purchRet: z(), customers: {}, vendors: {},
+    ar: { total: 0, overdue: 0, b4: 0, n: 0 }, ap: { total: 0, overdue: 0, b4: 0, n: 0 }, counts: { si: 0, pi: 0, notes: 0 }, overdueList: [] };
+  readTable_('Invoices').rows.forEach(function (h) {
+    if (!h.INVOICEID || h.STATUS !== 'Posted') return;
+    const K = INV_KIND[h.INVOICETYPE];
+    if (!K) return;
+    const rate = num_(h.EXCHANGERATE) || 1, net = num_(h.SUBTOTAL) * rate, sales = K.side === 'Sales';
+    // المستحقات والمتأخرات (كل السنوات، حتى اليوم)
+    if (!K.credit) {
+      const rem = invRem_(h) * rate;
+      if (rem > 0.0005) {
+        const box = sales ? out.ar : out.ap;
+        const due = String(h.DUEDATE || h.INVOICEDATE);
+        box.total += rem; box.n++;
+        if (due < today) {
+          box.overdue += rem;
+          const days = Math.round((Date.parse(today + 'T00:00:00Z') - Date.parse(due + 'T00:00:00Z')) / 86400000);
+          if (days > 90) box.b4 += rem;
+          out.overdueList.push({ id: h.INVOICEID, type: h.INVOICETYPE, side: K.side, party: h.PARTYID, name: h.PARTYNAME || '', due: due, days: days, rem: round_(rem, 3) });
+        }
+      }
+    }
+    if (String(h.INVOICEDATE).slice(0, 4) !== year) return;
+    const m = Number(String(h.INVOICEDATE).slice(5, 7)) - 1;
+    if (!(m >= 0 && m < 12)) return;
+    if (K.credit) { (sales ? out.salesRet : out.purchRet)[m] += net; out.counts.notes++; }
+    else { (sales ? out.sales : out.purch)[m] += net; if (h.INVOICETYPE === 'Sales') out.counts.si++; else if (h.INVOICETYPE === 'Purchase') out.counts.pi++; else out.counts.notes++; }
+    const map = sales ? out.customers : out.vendors, pk = low_(h.PARTYID);
+    map[pk] = map[pk] || { c: h.PARTYID, n: h.PARTYNAME || '', v: 0 };
+    map[pk].v += K.credit ? -net : net;
+  });
+  const top = function (m) { return Object.keys(m).map(function (k) { m[k].v = round_(m[k].v, 3); return m[k]; }).sort(function (a, b) { return b.v - a.v; }).slice(0, 8); };
+  out.customers = top(out.customers); out.vendors = top(out.vendors);
+  ['sales', 'purch', 'salesRet', 'purchRet'].forEach(function (k) { out[k] = out[k].map(function (x) { return round_(x, 3); }); });
+  ['ar', 'ap'].forEach(function (k) { ['total', 'overdue', 'b4'].forEach(function (f) { out[k][f] = round_(out[k][f], 3); }); });
+  out.overdueList.sort(function (a, b) { return b.days - a.days; });
+  out.overdueList = out.overdueList.slice(0, 10);
+  return out;
 }
 
 /* ============================== Budgets: header + lines ============================== */

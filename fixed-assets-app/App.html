@@ -700,6 +700,7 @@
     { h: 1, ar: 'العملاء', en: 'Customers' },
     { id: 'customers', icon: 'users', ar: 'العملاء', en: 'Customers', perm: 'customers' },
     { id: 'salesinv', icon: 'journal', ar: 'فواتير المبيعات', en: 'Sales invoices', perm: 'invoices' },
+    { id: 'salesdash', icon: 'chart', ar: 'لوحة المبيعات والمشتريات', en: 'Sales & purchases dashboard', perm: 'invoices' },
     { id: 'custnotes', icon: 'undo', ar: 'إشعارات العملاء (دائن / مدين)', en: 'Customer credit/debit notes', perm: 'invoices' },
     { id: 'custreports', icon: 'chart', ar: 'تقارير العملاء', en: 'Customer reports', perm: 'customers' },
     { h: 1, ar: 'الموردون', en: 'Vendors' },
@@ -785,6 +786,7 @@
         case 'reports': return await pageReports();
         case 'budgets': return await (S.view.id ? pageBudgetDoc() : pageBudgetList());
         case 'account': return pageAccount();
+        case 'salesdash': return await pageSalesDash();
         case 'salesinv': case 'purchinv': case 'custnotes': case 'vendnotes': return await (S.view.id ? pageInvDoc() : pageInvList());
         case 'cashvouchers': return await (S.view.no ? pageCashDoc() : pageCashList());
         case 'customers': case 'banks': case 'salesitems': case 'purchitems': case 'itemgroups':
@@ -2991,7 +2993,11 @@
   /* ---------- page ---------- */
   async function pageFin(force) {
     crumbs([S.b.settings.ORGNAME, T('التقارير المالية', 'Financial reports')]);
-    if (!S.fin || force) S.fin = await api('ledgerData', S.token);
+    if (!S.fin || force) {
+      S.fin = await api('ledgerData', S.token);
+      S.faPending = 0;
+      if (can('books', 'view')) { try { S.faPending = (await api('faOpeningData', S.token)).rows.length; } catch (e) { /* ignore */ } }
+    }
     var tab = S.view.tab || 'tb';
     var f = S.finF = S.finF || finDefaults();
     var title = FIN_TABS.filter(function (t) { return t[0] === tab; })[0];
@@ -3021,6 +3027,8 @@
     S.finTitle = T(title[1], title[2]) + ' — ' + period + (f.unit ? ' — ' + f.unit.split(':').slice(1).join(':') : '');
     $('#main').innerHTML = head + phead(T('المحاسبة', 'Accounting'), esc(T(title[1], title[2])) + ' <small style="font-size:13px;color:#605e5c;font-weight:400">' + esc(period) + '</small>') +
       '<div class="content"><div class="card">' + filters + '<div class="gridwrap" style="max-height:none">' + stmtHtml(rep.heads, rep.rows) + '</div></div>' +
+      (S.faPending ? '<div class="note fa-warn">' + icon('book') + ' ' + T('يوجد ', 'There are ') + S.faPending + T(' أصلاً بقيم في دفاترها غير مُقيّدة في القيود، فلا تظهر في القوائم المالية. ', ' assets whose book values are not in the ledger, so they are missing from the statements. ') +
+        '<a onclick="FA.go(\'books\');setTimeout(FA.faOpeningDlg,400)">' + T('أنشئ قيد الأرصدة الافتتاحية للأصول', 'Create the fixed assets opening voucher') + '</a></div>' : '') +
       (S.fin.lines.length ? '' : '<div class="note">' + T('لا توجد قيود مُرحّلة بعد — التقارير المالية تعتمد على القيود المحاسبية المُرحّلة فقط.', 'No posted vouchers yet — financial reports use posted journal entries only.') + '</div>') + '</div>';
     // روابط أرقام القيود في دفتر الأستاذ
     if (tab === 'ledger') $$('.stmt tr.r-acc td:first-child bdi').forEach(function (b) { b.outerHTML = '<a onclick="FA.go(\'gl\',{voucher:' + jsArg(b.textContent) + '})">' + esc(b.textContent) + '</a>'; });
@@ -4004,6 +4012,171 @@
       }) : [{ QTY: 1, TAXPERCENT: Number(S.b.settings.DEFAULTTAXPERCENT) || 0 }] } });
   }
 
+  /* ======================= Fixed assets opening balances ======================= */
+  async function faOpeningDlg() {
+    var d;
+    try { d = await api('faOpeningData', S.token); } catch (e) { return fail(e); }
+    S.faOpen = d;
+    var tc = 0, ta = 0;
+    d.rows.forEach(function (r) { tc += r.cost; ta += r.accum; });
+    var y = new Date().getFullYear();
+    var body = !d.rows.length
+      ? '<p style="margin-top:0">' + T('لا توجد أرصدة افتتاحية غير مُقيّدة — كل الدفاتر مُقيّدة في القيود.', 'Nothing to post — every book is already in the ledger.') + (d.done ? ' (' + d.done + T(' دفتر مُقيّد سابقاً)', ' books already posted)') : '') + '</p>'
+      : '<p style="margin-top:0">' + T('قيم الدفاتر التي لم تمر بيومية الأصول (مثل الأصول المستوردة من D365) لا تظهر في القوائم المالية. هذا القيد (مسودة) يُدخلها: من حـ/ الأصول ← إلى حـ/ مجمع الإهلاك وحـ/ الأرصدة الافتتاحية، مجمّعاً حسب الحساب والوحدة.',
+        'Book values that did not go through the FA journal (e.g. imported from D365) are missing from the financial statements. This draft voucher brings them in: Dr asset accounts, Cr accumulated depreciation and the opening balance account, grouped by account and unit.') + '</p>' +
+        '<div class="pinfo" style="margin:0 0 10px"><span><b>' + T('عدد الأصول', 'Assets') + ':</b> ' + d.rows.length + '</span><span><b>' + T('التكلفة', 'Cost') + ':</b> ' + fmtNum(tc, 2) + '</span>' +
+        '<span><b>' + T('مجمع الإهلاك', 'Accum. dep.') + ':</b> ' + fmtNum(ta, 2) + '</span><span><b>' + T('صافي القيمة', 'Net book value') + ':</b> ' + fmtNum(tc - ta, 2) + '</span></div>' +
+        (d.errors.length ? '<div class="note" style="color:#a4262c">' + T('أكمل حسابات مجموعات الأصول أولاً (صفحة مجموعات الأصول):', 'Complete the asset group accounts first:') + '<br>' + d.errors.slice(0, 8).map(esc).join('<br>') + (d.errors.length > 8 ? '<br>…' : '') + '</div>' : '') +
+        '<div class="gridwrap" style="max-height:220px;margin-bottom:10px"><table class="stmt"><thead><tr><th>' + T('الأصل', 'Asset') + '</th><th>' + T('الاسم', 'Name') + '</th><th>' + T('الوحدة', 'Unit') + '</th><th class="n">' + T('التكلفة', 'Cost') + '</th><th class="n">' + T('مجمع الإهلاك', 'Accum.') + '</th></tr></thead><tbody>' +
+        d.rows.slice(0, 300).map(function (r) {
+          return '<tr class="r-acc"><td><bdi>' + esc(r.asset) + '</bdi></td><td>' + esc(r.name) + '</td><td><bdi>' + esc(r.s2 || r.s1 || r.ou) + '</bdi></td><td class="n">' + fmtNum(r.cost, 2) + '</td><td class="n">' + fmtNum(r.accum, 2) + '</td></tr>';
+        }).join('') + '</tbody></table></div>' +
+        '<div class="fld"><label>' + T('تاريخ القيد (يُفضّل آخر يوم قبل بداية السنة المالية)', 'Voucher date (best: the day before the fiscal year starts)') + '</label><input class="inp" type="date" id="faoDate" value="' + (y - 1) + '-12-31"></div>' +
+        '<div class="fld"><label>' + T('حساب الأرصدة الافتتاحية (المقابل)', 'Opening balance offset account') + '</label><input class="inp" id="faoAcc" list="dl_faoacc" dir="ltr" value="' + esc(d.offset || '') + '">' +
+        '<datalist id="dl_faoacc">' + datalistOpts('@accounts', null, {}) + '</datalist></div>';
+    modal(T('قيد الأرصدة الافتتاحية للأصول الثابتة', 'Fixed assets opening balances'), body,
+      (d.rows.length && !d.errors.length && can('gl', 'add') ? '<button class="btn pri" onclick="FA.faOpeningGo()">' + icon('save') + T('إنشاء القيد', 'Create voucher') + '</button>' : '') +
+      '<button class="btn" onclick="FA.closeModal()">' + T('إغلاق', 'Close') + '</button>');
+  }
+  async function faOpeningGo() {
+    try {
+      var r = await api('createFAOpeningVoucher', S.token, $('#faoDate').value, $('#faoAcc').value.trim());
+      closeModal();
+      toast(T('تم إنشاء القيد ', 'Created voucher ') + r.voucher + ' — ' + r.count + T(' أصل. اعتمده ورحّله ليظهر في القوائم المالية.', ' assets. Approve and post it.'), 'ok');
+      await Promise.all([load('books', true), load('glheaders', true), load('gllines', true)]);
+      S.fin = null; S.faPending = null;
+      go('gl', { voucher: r.voucher });
+    } catch (e) { fail(e); }
+  }
+
+  /* ======================= Sales & purchases dashboard ======================= */
+  var SD_C = { s: '#2a78d6', p: '#eb6834' };
+  async function pageSalesDash(force) {
+    crumbs([S.b.settings.ORGNAME, T('لوحة المبيعات والمشتريات', 'Sales & purchases dashboard')]);
+    var f = S.sdF = S.sdF || { year: String(new Date().getFullYear()) };
+    if (!S.sd || S.sd.year !== f.year || force) S.sd = await api('salesDashboard', S.token, f.year);
+    var d = S.sd, cur = localCur();
+    var sum = function (a) { return a.reduce(function (x, y) { return x + y; }, 0); };
+    var ns = d.sales.map(function (v, i) { return v - d.salesRet[i]; }), np = d.purch.map(function (v, i) { return v - d.purchRet[i]; });
+    var gs = sum(d.sales), gp = sum(d.purch), rs = sum(d.salesRet), rp = sum(d.purchRet);
+    var y0 = new Date().getFullYear(), years = [];
+    for (var y = y0 - 4; y <= y0 + 1; y++) years.push(String(y));
+    var tile = function (t, v, sub, page) { return kpi(page || 'salesdash', 'chart', t, compact(v), sub); };
+    var html = apane([
+      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.sdRefresh()' },
+      { icon: 'download', ar: 'Excel', en: 'Excel', on: 'FA.sdExport()' }
+    ]) + phead(T('المبيعات والمشتريات', 'Sales & purchases'), T('لوحة المبيعات والمشتريات', 'Sales & purchases dashboard') + ' <small style="font-size:13px;color:#605e5c;font-weight:400">' +
+      T('بالعملة المحلية قبل الضريبة', 'local currency, before tax') + ' (' + esc(cur) + ')</small>') +
+      '<div class="content"><div class="fin-filters" style="background:none;padding:0 0 12px"><label>' + T('السنة', 'Year') + '<select class="inp" onchange="FA.sdSet(this.value)">' +
+      years.map(function (x) { return '<option' + (x === f.year ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label></div>' +
+      '<div class="tiles">' +
+      tile(T('صافي المبيعات', 'Net sales'), gs - rs, T('بعد المرتجعات — ', 'after returns — ') + d.counts.si + T(' فاتورة', ' invoices'), 'salesinv') +
+      tile(T('صافي المشتريات', 'Net purchases'), gp - rp, T('بعد المرتجعات — ', 'after returns — ') + d.counts.pi + T(' فاتورة', ' invoices'), 'purchinv') +
+      tile(T('الفرق (مبيعات − مشتريات)', 'Sales − purchases'), (gs - rs) - (gp - rp), T('مؤشر تقريبي وليس صافي الربح', 'indicative, not net profit')) +
+      tile(T('نسبة مرتجعات المبيعات', 'Sales returns rate'), 0, '', 'custnotes').replace(/<div class="v" dir="ltr">[^<]*<\/div>/, '<div class="v" dir="ltr">' + (gs ? fmtNum(rs / gs * 100, 1) : '0') + '%</div>')
+        .replace('<div class="d"></div>', '<div class="d">' + esc(compact(rs)) + T(' من ', ' of ') + esc(compact(gs)) + '</div>') +
+      tile(T('مستحق من العملاء', 'Receivables'), d.ar.total, T('متأخر: ', 'overdue: ') + compact(d.ar.overdue) + ' — ' + d.ar.n + T(' فاتورة', ' invoices'), 'custreports') +
+      tile(T('مستحق للموردين', 'Payables'), d.ap.total, T('متأخر: ', 'overdue: ') + compact(d.ap.overdue) + ' — ' + d.ap.n + T(' فاتورة', ' invoices'), 'vendreports') +
+      '</div>' +
+      '<div class="card sd-card"><div class="sd-h"><h3>' + T('المبيعات والمشتريات الشهرية (صافي بعد المرتجعات)', 'Monthly net sales and purchases') + '</h3>' +
+      '<div class="sd-legend"><span><i style="background:' + SD_C.s + '"></i>' + T('المبيعات', 'Sales') + '</span><span><i style="background:' + SD_C.p + '"></i>' + T('المشتريات', 'Purchases') + '</span>' +
+      '<label class="ck"><input type="checkbox" ' + (S.sdTable ? 'checked' : '') + ' onchange="FA.sdTable(this.checked)"> ' + T('عرض كجدول', 'Show as table') + '</label></div></div>' +
+      (S.sdTable ? sdTableHtml(ns, np, d) : sdChart(ns, np)) + '</div>' +
+      '<div class="sd-2">' + sdTop(T('أكبر العملاء (صافي المبيعات)', 'Top customers (net sales)'), d.customers, SD_C.s, 'custreports') +
+      sdTop(T('أكبر الموردين (صافي المشتريات)', 'Top vendors (net purchases)'), d.vendors, SD_C.p, 'vendreports') + '</div>' +
+      '<div class="card"><div class="sd-h"><h3>' + T('أكثر الفواتير تأخراً', 'Most overdue invoices') + '</h3></div>' +
+      (d.overdueList.length ? '<div class="gridwrap" style="max-height:none"><table class="stmt"><thead><tr><th>' + T('الرقم', 'Number') + '</th><th>' + T('الطرف', 'Party') + '</th><th>' + T('النوع', 'Type') + '</th><th>' + T('الاستحقاق', 'Due') + '</th><th class="n">' + T('أيام التأخير', 'Days overdue') + '</th><th class="n">' + T('المتبقي', 'Balance') + '</th></tr></thead><tbody>' +
+        d.overdueList.map(function (x) {
+          var K = KIND[x.type] || {};
+          return '<tr class="r-acc"><td><a onclick="FA.go(\'' + K.page + '\',{id:\'' + String(x.id).replace(/[^\w-]/g, '') + '\'})"><bdi>' + esc(x.id) + '</bdi></a></td><td>' + esc(x.name || x.party) + '</td><td>' + esc(T(K.ar, K.en)) +
+            '</td><td>' + esc(x.due) + '</td><td class="n' + (x.days > 90 ? ' ag-b4' : x.days > 60 ? ' ag-b3' : '') + '">' + x.days + '</td><td class="n">' + fmtNum(x.rem, 2) + '</td></tr>';
+        }).join('') + '</tbody></table></div>' : '<div class="empty">' + T('لا توجد فواتير متأخرة', 'No overdue invoices') + '</div>') + '</div></div>';
+    $('#main').innerHTML = html;
+    sdBindTips();
+  }
+  var MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  var MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function sdMonth(i) { return S.lang === 'ar' ? MONTHS_AR[i] : MONTHS_EN[i]; }
+  /** أعمدة شهرية مزدوجة بمحور واحد. الشهر الأول في جهة بداية القراءة (يمين في العربية). */
+  function sdChart(ns, np) {
+    var rtl = S.lang === 'ar';
+    // في العربية: الأشهر من اليمين لليسار ومحور القيم على اليمين
+    var W = 900, H = 280, L = rtl ? 12 : 70, R = rtl ? 70 : 12, Tp = 14, B = 34;
+    var max = Math.max.apply(null, ns.concat(np).concat([0])), min = Math.min.apply(null, ns.concat(np).concat([0]));
+    if (max === min) max = min + 1;
+    var step = Math.pow(10, Math.floor(Math.log10((max - min) / 4))), nice = [1, 2, 2.5, 5, 10].map(function (k) { return k * step; }).filter(function (k) { return (max - min) / k <= 5; })[0] || step * 10;
+    var top = Math.ceil(max / nice) * nice, bot = Math.floor(min / nice) * nice;
+    var yv = function (v) { return Tp + (top - v) / (top - bot) * (H - Tp - B); };
+    var cw = (W - L - R) / 12, bw = Math.min(22, cw * 0.32);
+    var g = '';
+    for (var t = bot; t <= top + nice / 2; t += nice) {
+      g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yv(t) + '" y2="' + yv(t) + '" class="sd-grid' + (Math.abs(t) < nice / 2 ? ' z' : '') + '"/>' +
+        '<text x="' + (rtl ? W - R + 8 : L - 8) + '" y="' + (yv(t) + 4) + '" class="sd-ax" text-anchor="' + (rtl ? 'start' : 'end') + '">' + esc(compact(t)) + '</text>';
+    }
+    var bar = function (x, v, c, i, k) {
+      var y1 = yv(Math.max(v, 0)), y2 = yv(Math.min(v, 0)), h = Math.max(y2 - y1, v ? 1 : 0);
+      if (!h) return '';
+      var r = Math.min(4, h), up = v >= 0;
+      var d = up ? 'M' + x + ',' + (y1 + h) + 'V' + (y1 + r) + 'Q' + x + ',' + y1 + ' ' + (x + r) + ',' + y1 + 'H' + (x + bw - r) + 'Q' + (x + bw) + ',' + y1 + ' ' + (x + bw) + ',' + (y1 + r) + 'V' + (y1 + h) + 'Z'
+        : 'M' + x + ',' + y1 + 'V' + (y1 + h - r) + 'Q' + x + ',' + (y1 + h) + ' ' + (x + r) + ',' + (y1 + h) + 'H' + (x + bw - r) + 'Q' + (x + bw) + ',' + (y1 + h) + ' ' + (x + bw) + ',' + (y1 + h - r) + 'V' + y1 + 'Z';
+      return '<path d="' + d + '" fill="' + c + '"/>';
+    };
+    var marks = '', hits = '';
+    for (var i = 0; i < 12; i++) {
+      var slot = rtl ? 11 - i : i, cx = L + cw * slot + cw / 2;
+      marks += bar(cx - bw - 1, ns[i], SD_C.s, i, 's') + bar(cx + 1, np[i], SD_C.p, i, 'p');
+      g += '<text x="' + cx + '" y="' + (H - B + 18) + '" class="sd-ax" text-anchor="middle">' + esc(sdMonth(i)) + '</text>';
+      hits += '<rect class="sd-hit" data-m="' + i + '" x="' + (L + cw * slot) + '" y="' + Tp + '" width="' + cw + '" height="' + (H - Tp - B) + '"/>';
+    }
+    return '<div class="sd-chart"><svg direction="ltr" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(T('المبيعات والمشتريات الشهرية', 'Monthly sales and purchases')) + '">' + g + marks + hits + '</svg><div class="sd-tip hidden" id="sdTip"></div></div>';
+  }
+  function sdBindTips() {
+    var tip = $('#sdTip');
+    if (!tip) return;
+    var d = S.sd;
+    $$('.sd-hit').forEach(function (h) {
+      h.addEventListener('mousemove', function (ev) {
+        var m = Number(h.getAttribute('data-m')), box = h.closest('.sd-chart').getBoundingClientRect();
+        $$('.sd-hit').forEach(function (x) { x.classList.toggle('on', x === h); });
+        tip.innerHTML = '<b>' + esc(sdMonth(m)) + ' ' + esc(d.year) + '</b>' +
+          '<div><i style="background:' + SD_C.s + '"></i>' + T('المبيعات', 'Sales') + ' <span>' + fmtNum(d.sales[m] - d.salesRet[m], 0) + '</span></div>' +
+          (d.salesRet[m] ? '<div class="m">' + T('منها مرتجعات −', 'returns −') + fmtNum(d.salesRet[m], 0) + '</div>' : '') +
+          '<div><i style="background:' + SD_C.p + '"></i>' + T('المشتريات', 'Purchases') + ' <span>' + fmtNum(d.purch[m] - d.purchRet[m], 0) + '</span></div>' +
+          (d.purchRet[m] ? '<div class="m">' + T('منها مرتجعات −', 'returns −') + fmtNum(d.purchRet[m], 0) + '</div>' : '');
+        tip.classList.remove('hidden');
+        var x = ev.clientX - box.left, w = tip.offsetWidth;
+        tip.style.left = Math.max(4, Math.min(box.width - w - 4, x + (x > box.width / 2 ? -w - 14 : 14))) + 'px';
+        tip.style.top = Math.max(4, ev.clientY - box.top - 30) + 'px';
+      });
+      h.addEventListener('mouseleave', function () { tip.classList.add('hidden'); h.classList.remove('on'); });
+    });
+  }
+  function sdTableHtml(ns, np, d) {
+    var tr = function (label, a, cls) { return '<tr class="' + (cls || 'r-acc') + '"><td>' + esc(label) + '</td>' + a.map(function (v) { return '<td class="n">' + fmtAcc(v, 0) + '</td>'; }).join('') + '<td class="n"><b>' + fmtAcc(a.reduce(function (x, y) { return x + y; }, 0), 0) + '</b></td></tr>'; };
+    return '<div class="gridwrap" style="max-height:none"><table class="stmt"><thead><tr><th></th>' + d.sales.map(function (_, i) { return '<th class="n">' + esc(sdMonth(i)) + '</th>'; }).join('') + '<th class="n">' + T('الإجمالي', 'Total') + '</th></tr></thead><tbody>' +
+      tr(T('المبيعات', 'Sales'), d.sales) + tr(T('مرتجعات المبيعات', 'Sales returns'), d.salesRet.map(function (v) { return -v; })) + tr(T('صافي المبيعات', 'Net sales'), ns, 'r-sub') +
+      tr(T('المشتريات', 'Purchases'), d.purch) + tr(T('مرتجعات المشتريات', 'Purchase returns'), d.purchRet.map(function (v) { return -v; })) + tr(T('صافي المشتريات', 'Net purchases'), np, 'r-sub') + '</tbody></table></div>';
+  }
+  function sdTop(title, list, color, page) {
+    var max = Math.max.apply(null, list.map(function (x) { return Math.abs(x.v); }).concat([1]));
+    return '<div class="card"><div class="sd-h"><h3>' + esc(title) + '</h3></div>' + (list.length ? '<div class="sd-top">' + list.map(function (x) {
+      return '<div class="sd-row" title="' + esc(x.c + ' — ' + x.n + ': ' + fmtNum(x.v, 2)) + '"><span class="nm">' + esc(x.n || x.c) + '</span><span class="br"><i style="width:' + Math.max(2, Math.abs(x.v) / max * 100) + '%;background:' + color + '"></i></span><span class="vl">' + esc(compact(x.v)) + '</span></div>';
+    }).join('') + '</div>' : '<div class="empty">' + T('لا توجد فواتير في هذه السنة', 'No invoices this year') + '</div>') + '</div>';
+  }
+  function sdSet(y) { S.sdF.year = y; pageSalesDash(); }
+  function sdRefresh() { pageSalesDash(true); }
+  function sdTableToggle(on) { S.sdTable = on; pageSalesDash(); }
+  function sdExport() {
+    if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
+    var d = S.sd, aoa = [[S.b.settings.ORGNAME], [T('لوحة المبيعات والمشتريات ', 'Sales & purchases ') + d.year], [], [T('الشهر', 'Month'), T('المبيعات', 'Sales'), T('مرتجعات المبيعات', 'Sales returns'), T('المشتريات', 'Purchases'), T('مرتجعات المشتريات', 'Purchase returns')]];
+    d.sales.forEach(function (v, i) { aoa.push([sdMonth(i), v, d.salesRet[i], d.purch[i], d.purchRet[i]]); });
+    aoa.push([], [T('أكبر العملاء', 'Top customers')]); d.customers.forEach(function (x) { aoa.push([x.c, x.n, x.v]); });
+    aoa.push([], [T('أكبر الموردين', 'Top vendors')]); d.vendors.forEach(function (x) { aoa.push([x.c, x.n, x.v]); });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Dashboard');
+    XLSX.writeFile(wb, 'sales_purchases_' + d.year + '.xlsx');
+  }
+
   /* ======================= Budget control ======================= */
   async function pageBudgetCtl(force) {
     crumbs([S.b.settings.ORGNAME, T('مراقبة الموازنة', 'Budget control')]);
@@ -4277,7 +4450,9 @@
       { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: "FA.reload('books')" },
       (can('books', 'add') || can('books', 'edit')) && { icon: 'upload', ar: 'استيراد من Excel', en: 'Import from Excel', on: "FA.importStart('books')" },
       { icon: 'download', ar: 'تصدير إلى Excel', en: 'Export to Excel', on: "FA.exportGrid('books','list_books')" },
-      { icon: 'excel', ar: 'قالب الاستيراد', en: 'Import template', on: "FA.exportTemplate('books')" }
+      { icon: 'excel', ar: 'قالب الاستيراد', en: 'Import template', on: "FA.exportTemplate('books')" },
+      '|',
+      { icon: 'send', ar: 'قيد الأرصدة الافتتاحية للأصول', en: 'Opening balances voucher', on: 'FA.faOpeningDlg()' }
     ]) + phead(esc(L(s.title)) + ' | ' + T('العرض القياسي', 'Standard view'), esc(L(s.title))) +
       '<div class="content"><div class="card">' + grid('list_books', {
         rows: function () { return S.data.books || []; }, cols: [{ k: 'FIXEDASSETNUMBER', label: T('رقم الأصل', 'Fixed asset') },
@@ -4631,6 +4806,7 @@
     openingDlg: openingDlg, openingGo: openingGo, partySet: partySet, partyRefresh: partyRefresh, partyExport: partyExport, partyPrint: partyPrint,
     invReload: invReload, invCell: invCell, invAddLine: invAddLine, invDelLine: invDelLine, invSave: invSave, invCancelDlg: invCancelDlg,
     invAct: invAct, invNote: invNote, pwHint: pwHint, pwShow: pwShow, invDelete: invDelete, invPay: invPay, invPrint: invPrint,
+    faOpeningDlg: faOpeningDlg, faOpeningGo: faOpeningGo, sdSet: sdSet, sdRefresh: sdRefresh, sdTable: sdTableToggle, sdExport: sdExport,
     cashReload: cashReload, cashSave: cashSave, cashCancelDlg: cashCancelDlg, cashAct: cashAct, cashDelete: cashDelete, cashPrint: cashPrint,
     bgReload: bgReload, bgDeleteSelected: bgDeleteSelected, bgExportAll: bgExportAll, bgCell: bgCell, bgAddLine: bgAddLine, bgDelLine: bgDelLine,
     bgSave: bgSave, bgAct: bgAct, bgExport: bgExport, bgImport: bgImport, bgImportFile: bgImportFile, bgPrint: bgPrint,

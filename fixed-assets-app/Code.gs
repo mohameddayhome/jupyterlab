@@ -10,8 +10,8 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '14.0.0';
-const SETUP_VERSION = '14';
+const APP_VERSION = '15.0.0';
+const SETUP_VERSION = '15';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
@@ -82,6 +82,35 @@ const CASH_STATUS = [o('Draft', 'مسودة', 'Draft'), o('Posted', 'مُرحّ�
 const PAY_METHODS = [o('Cash', 'نقداً', 'Cash'), o('Check', 'شيك', 'Cheque'), o('Transfer', 'تحويل بنكي', 'Bank transfer')];
 const BUDGET_PERIODS = [o('Annual', 'سنوي (يوزّع على 12 شهراً)', 'Annual (spread over 12 months)'), o('Monthly', 'شهري (لكل شهر)', 'Monthly (each month)')];
 const ACCOUNT_KINDS = [o('Ledger', 'حساب أستاذ', 'Ledger'), o('Customer', 'عميل', 'Customer'), o('Vendor', 'مورد', 'Vendor'), o('Bank', 'صندوق / بنك', 'Bank')];
+/** تبويب القوائم المالية وفق معيار المحاسبة الدولي IAS 1 (قائمة المركز المالي + قائمة الدخل حسب الوظيفة). */
+const FS_CLASSES = [
+  o('NCA_PPE', 'أصول غير متداولة — ممتلكات وآلات ومعدات (بالتكلفة)', 'Non-current — property, plant & equipment (cost)'),
+  o('NCA_ACCDEP', 'أصول غير متداولة — مجمع الإهلاك (يُطرح من الممتلكات)', 'Non-current — accumulated depreciation (contra)'),
+  o('NCA_INT', 'أصول غير متداولة — أصول غير ملموسة', 'Non-current — intangible assets'),
+  o('NCA_OTHER', 'أصول غير متداولة — أخرى', 'Non-current — other assets'),
+  o('CA_INV', 'أصول متداولة — المخزون', 'Current — inventories'),
+  o('CA_REC', 'أصول متداولة — ذمم مدينة وأرصدة مدينة أخرى', 'Current — trade and other receivables'),
+  o('CA_OTHER', 'أصول متداولة — أخرى', 'Current — other assets'),
+  o('CA_CASH', 'أصول متداولة — النقدية وما في حكمها', 'Current — cash and cash equivalents'),
+  o('EQ_CAP', 'حقوق الملكية — رأس المال', 'Equity — share capital / fund'),
+  o('EQ_RES', 'حقوق الملكية — الاحتياطيات', 'Equity — reserves'),
+  o('EQ_RE', 'حقوق الملكية — الأرباح المحتجزة (الفائض المتراكم)', 'Equity — retained earnings'),
+  o('EQ_OTHER', 'حقوق الملكية — أخرى', 'Equity — other'),
+  o('NCL_LOAN', 'التزامات غير متداولة — قروض طويلة الأجل', 'Non-current liabilities — borrowings'),
+  o('NCL_OTHER', 'التزامات غير متداولة — أخرى', 'Non-current liabilities — other'),
+  o('CL_PAY', 'التزامات متداولة — ذمم دائنة وأرصدة دائنة أخرى', 'Current liabilities — trade and other payables'),
+  o('CL_LOAN', 'التزامات متداولة — قروض قصيرة الأجل وسحب على المكشوف', 'Current liabilities — short-term borrowings'),
+  o('CL_TAX', 'التزامات متداولة — ضرائب مستحقة', 'Current liabilities — taxes payable'),
+  o('CL_OTHER', 'التزامات متداولة — مخصصات والتزامات أخرى', 'Current liabilities — provisions and other'),
+  o('PL_REV', 'قائمة الدخل — الإيرادات', 'Income — revenue'),
+  o('PL_COGS', 'قائمة الدخل — تكلفة الإيرادات / المبيعات', 'Income — cost of sales'),
+  o('PL_OTHINC', 'قائمة الدخل — إيرادات أخرى', 'Income — other income'),
+  o('PL_DIST', 'قائمة الدخل — مصروفات بيع وتوزيع', 'Income — distribution costs'),
+  o('PL_ADMIN', 'قائمة الدخل — مصروفات إدارية وعمومية', 'Income — administrative expenses'),
+  o('PL_OPEX', 'قائمة الدخل — مصروفات تشغيلية أخرى', 'Income — other operating expenses'),
+  o('PL_FIN', 'قائمة الدخل — تكاليف التمويل', 'Income — finance costs'),
+  o('PL_TAX', 'قائمة الدخل — ضريبة الدخل', 'Income — income tax')
+];
 const FISCAL_STATUS = [o('Open', 'مفتوحة', 'Open'), o('Closed', 'مقفلة', 'Closed')];
 
 const ACCOUNT_TYPES = [o('ProfitAndLoss', 'أرباح وخسائر', 'Profit and loss'), o('Revenue', 'إيرادات', 'Revenue'),
@@ -642,7 +671,8 @@ const SCHEMAS = {
       F('CASHFLOWCATEGORY', 'تصنيف التدفق النقدي', 'Cash flow category', 'select', { opts: CASHFLOW_CATS, sec: 'general', grp: 'cls',
         aliases: ['Cash flow'] }),
       F('MAINACCOUNTTYPE', 'نوع الحساب', 'Account type', 'select', { opts: ACCOUNT_TYPES, req: 1, sec: 'general', grp: 'cls', list: 1,
-        aliases: ['Main account type', 'Type', 'AccountType'] })
+        aliases: ['Main account type', 'Type', 'AccountType'] }),
+      F('FSCLASS', 'تبويب القوائم المالية (IAS 1)', 'Financial statement line (IAS 1)', 'select', { opts: FS_CLASSES, sec: 'general', grp: 'cls', list: 1 })
     ]
   }
 };
@@ -3718,11 +3748,14 @@ function ledgerData(token) {
   });
   const accounts = readTable_('MainAccounts').rows.filter(function (a) { return a.MAINACCOUNTID; }).map(function (a) {
     return { c: String(a.MAINACCOUNTID), n: String(a.NAME || ''), h: a.ACCOUNTLEVEL === 'Header' ? 1 : 0, p: String(a.PARENTACCOUNT || ''),
-      t: a.MAINACCOUNTTYPE || '', cat: String(a.MAINACCOUNTCATEGORY || ''), cf: a.CASHFLOWCATEGORY || '' };
+      t: a.MAINACCOUNTTYPE || '', cat: String(a.MAINACCOUNTCATEGORY || ''), cf: a.CASHFLOWCATEGORY || '', fs: a.FSCLASS || '' };
   });
-  const fa = {};
-  readTable_('AssetGroups').rows.forEach(function (g) { if (g.ASSETACCOUNT) fa[low_(g.ASSETACCOUNT)] = 1; });
-  return { lines: lines, accounts: accounts, faAccounts: Object.keys(fa) };
+  const fa = {}, acc = {};
+  readTable_('AssetGroups').rows.forEach(function (g) {
+    if (g.ASSETACCOUNT) fa[low_(g.ASSETACCOUNT)] = 1;
+    if (g.ACCUMDEPACCOUNT) acc[low_(g.ACCUMDEPACCOUNT)] = 1;
+  });
+  return { lines: lines, accounts: accounts, faAccounts: Object.keys(fa), accumAccounts: Object.keys(acc), canEdit: can_(s, 'masterdata', 'edit') };
 }
 
 function reportData(token) {

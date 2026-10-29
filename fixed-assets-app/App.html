@@ -2680,7 +2680,8 @@
   /* ======================= Financial reports ======================= */
   var FIN_TABS = [
     ['tb', 'ميزان المراجعة', 'Trial balance'], ['ledger', 'دفتر الأستاذ', 'General ledger'],
-    ['bs', 'الميزانية العمومية', 'Balance sheet'], ['is', 'قائمة الدخل', 'Income statement'], ['cf', 'التدفقات النقدية', 'Cash flow statement']
+    ['bs', 'قائمة المركز المالي (الميزانية)', 'Statement of financial position'], ['is', 'قائمة الدخل', 'Statement of profit or loss'], ['cf', 'التدفقات النقدية', 'Cash flow statement'],
+    ['cls', 'تبويب الحسابات', 'Account mapping']
   ];
   // مؤشرات أعمدة سطور القيود القادمة من الخادم
   var LD = { date: 0, voucher: 1, journal: 2, desc: 3, acc: 4, ou: 5, s1: 6, s2: 7, dr: 8, cr: 9, note: 10, ref: 11, src: 12, line: 13 };
@@ -2732,24 +2733,15 @@
   }
 
   /** نوع الحساب لأغراض القوائم: أصول/خصوم/حقوق ملكية/إيرادات/مصروفات/أخرى. */
-  function accClass(a, bal) {
-    var t = a ? a.t : '';
-    if (t === 'Asset') return 'A';
-    if (t === 'Liability') return 'L';
-    if (t === 'Equity') return 'E';
-    if (t === 'Revenue') return 'R';
-    if (t === 'Expense') return 'X';
-    if (t === 'ProfitAndLoss') return 'P';
-    if (t === 'BalanceSheet') return bal >= 0 ? 'A' : 'L';
-    return '';
-  }
-  function isPL(cls) { return cls === 'R' || cls === 'X' || cls === 'P'; }
-
   /** تصنيف التدفق النقدي للحساب (المحدد في الدليل أو الافتراضي). */
   function cfClass(a, am) {
     if (!a) return 'Operating';
     if (a.cf) return a.cf;
     if (String(a.cat).toUpperCase() === 'CASH') return 'Cash';
+    var fs = fsResolve(a, am).c;
+    if (fs === 'CA_CASH') return 'Cash';
+    if (/^NCA_(PPE|INT|OTHER|ACCDEP)$/.test(fs)) return fs === 'NCA_ACCDEP' ? 'Operating' : 'Investing';
+    if (/^EQ_/.test(fs) || fs === 'NCL_LOAN' || fs === 'CL_LOAN') return 'Financing';
     if (S.fin.faAccounts.indexOf(low(a.c)) >= 0) return 'Investing';
     var parent = am[low(a.p)];
     if (parent && String(parent.cat).toUpperCase() === 'FA' && a.t === 'Asset' && !/مجمع/.test(a.n)) return 'Investing';
@@ -2864,88 +2856,262 @@
   }
 
   /* ---------- Income statement ---------- */
-  function plSections(lines, am) {
-    var b = sumBy(lines), sec = { R: [], X: [], P: [] };
-    Object.keys(b).forEach(function (k) {
-      var a = am[k], bal = b[k].dr - b[k].cr, c = accClass(a, bal);
-      if (!isPL(c)) return;
-      var amt = c === 'X' ? bal : -bal; // الإيرادات والأخرى بطبيعة دائنة، المصروفات مدينة
-      if (Math.abs(amt) < 0.0005) return;
-      sec[c].push({ a: a, amt: amt });
-    });
-    return sec;
+  /* ---------- Balance sheet ---------- */
+  /* ---------- IAS 1 classification ---------- */
+  var FS_LABEL = {
+    NCA_PPE: ['ممتلكات وآلات ومعدات (بالتكلفة)', 'Property, plant and equipment (cost)'], NCA_ACCDEP: ['يُطرح: مجمع الإهلاك', 'Less: accumulated depreciation'],
+    NCA_INT: ['أصول غير ملموسة', 'Intangible assets'], NCA_OTHER: ['أصول غير متداولة أخرى', 'Other non-current assets'],
+    CA_INV: ['المخزون', 'Inventories'], CA_REC: ['ذمم مدينة وأرصدة مدينة أخرى', 'Trade and other receivables'], CA_OTHER: ['أصول متداولة أخرى', 'Other current assets'],
+    CA_CASH: ['النقدية وما في حكمها', 'Cash and cash equivalents'],
+    EQ_CAP: ['رأس المال / رصيد الصندوق', 'Share capital / fund balance'], EQ_RES: ['الاحتياطيات', 'Reserves'], EQ_RE: ['الأرباح المحتجزة (الفائض المتراكم)', 'Retained earnings'], EQ_OTHER: ['حقوق ملكية أخرى', 'Other equity'],
+    NCL_LOAN: ['قروض طويلة الأجل', 'Long-term borrowings'], NCL_OTHER: ['التزامات غير متداولة أخرى', 'Other non-current liabilities'],
+    CL_PAY: ['ذمم دائنة وأرصدة دائنة أخرى', 'Trade and other payables'], CL_LOAN: ['قروض قصيرة الأجل وسحب على المكشوف', 'Short-term borrowings'],
+    CL_TAX: ['ضرائب مستحقة', 'Taxes payable'], CL_OTHER: ['مخصصات والتزامات متداولة أخرى', 'Provisions and other current liabilities'],
+    PL_REV: ['الإيرادات', 'Revenue'], PL_COGS: ['تكلفة الإيرادات', 'Cost of sales'], PL_OTHINC: ['إيرادات أخرى', 'Other income'],
+    PL_DIST: ['مصروفات بيع وتوزيع', 'Distribution costs'], PL_ADMIN: ['مصروفات إدارية وعمومية', 'Administrative expenses'], PL_OPEX: ['مصروفات تشغيلية أخرى', 'Other operating expenses'],
+    PL_FIN: ['تكاليف التمويل', 'Finance costs'], PL_TAX: ['ضريبة الدخل', 'Income tax'],
+    BS_UNC: ['حسابات ميزانية غير مبوبة', 'Unclassified balance sheet accounts'], PL_UNC: ['حسابات قائمة دخل غير مبوبة', 'Unclassified income statement accounts']
+  };
+  var RX = {
+    accdep: /(مجمع|مخصص)\s*(ال)?(إهلاك|اهلاك|استهلاك)|accumulated\s+depreciation/i,
+    equity: /حقوق\s*(ال)?ملكية|رأس\s*المال|راس\s*المال|احتياط|أرباح\s*محتجزة|ارباح\s*محتجزة|الفائض|العجز\s*المتراكم|رصيد\s*الصندوق|equity|capital|reserve|retained/i,
+    liab: /خصوم|التزام|مطلوبات|دائن|مورد|قرض|قروض|مستحق|liabilit|payable|loan/i,
+    asset: /أصول|اصول|موجودات|نقد|صندوق|بنك|عملاء|مدين|ذمم|عهد|سلف|مخزون|أراض|اراض|مبان|عقار|asset|cash|bank|receivable|inventor/i,
+    rev: /إيراد|ايراد|مبيعات|تبرعات|منح|اشتراكات|رسوم\s*مقبوضة|revenue|income|sales/i,
+    exp: /مصروف|مصاريف|تكلفة|تكاليف|رواتب|أجور|اجور|إهلاك|اهلاك|استهلاك|expense|cost/i
+  };
+  function fsChain(a, am) {   // الحساب ثم آباؤه حتى الجذر
+    var out = [], seen = {};
+    while (a && !seen[low(a.c)]) { out.push(a); seen[low(a.c)] = 1; a = am[low(a.p)]; }
+    return out;
   }
+  /** طبيعة الحساب: A/L/E/R/X من نوعه، وإلا من أسماء الحساب وآبائه (الجذر أولاً)، وإلا من أول رقم. */
+  function fsNature(a, am) {
+    var t = a.t;
+    if (t === 'Asset') return 'A'; if (t === 'Liability') return 'L'; if (t === 'Equity') return 'E';
+    if (t === 'Revenue') return 'R'; if (t === 'Expense') return 'X';
+    var chain = fsChain(a, am).reverse();   // من الجذر إلى الحساب
+    for (var i = 0; i < chain.length; i++) {
+      var n = chain[i].n, ty = chain[i].t;
+      if (ty === 'Asset') return 'A'; if (ty === 'Liability') return 'L'; if (ty === 'Equity') return 'E'; if (ty === 'Revenue') return 'R'; if (ty === 'Expense') return 'X';
+      if (RX.accdep.test(n)) return 'A';
+      if (t !== 'ProfitAndLoss') {
+        if (RX.equity.test(n)) return 'E';
+        if (RX.liab.test(n) && !RX.asset.test(n)) return 'L';
+        if (RX.asset.test(n)) return 'A';
+      }
+      if (t !== 'BalanceSheet') {
+        if (/(تكلفة|تكاليف)\s*(ال)?(مبيعات|إيراد|ايراد|بضاعة|خدمات|نشاط)/.test(n)) return 'X';
+        if (RX.rev.test(n) && !RX.exp.test(n)) return 'R';
+        if (RX.exp.test(n)) return 'X';
+      }
+    }
+    var d = String(a.c).charAt(0);
+    if (t === 'BalanceSheet') return d === '1' ? 'A' : d === '3' ? 'E' : d === '2' ? 'L' : '';
+    if (t === 'ProfitAndLoss') return d === '4' ? 'R' : /[5-9]/.test(d) ? 'X' : '';
+    return { '1': 'A', '2': 'L', '3': 'E', '4': 'R', '5': 'X', '6': 'X', '7': 'X' }[d] || '';
+  }
+  /** التبويب التلقائي لحساب (بدون تبويب يدوي). */
+  function fsAuto(a, am) {
+    var names = fsChain(a, am).map(function (x) { return x.n; }).join(' | ');
+    var lc = low(a.c), cat = String(a.cat).toUpperCase();
+    if (S.fin.accumAccounts.indexOf(lc) >= 0 || RX.accdep.test(names)) return 'NCA_ACCDEP';
+    if (S.fin.faAccounts.indexOf(lc) >= 0) return 'NCA_PPE';
+    var nat = fsNature(a, am);
+    if (nat === 'A') {
+      if (cat === 'CASH' || a.cf === 'Cash' || /نقد|صندوق|بنك|خزين|cash|bank/i.test(names)) return 'CA_CASH';
+      if (/مخزون|بضاع|inventor/i.test(names)) return 'CA_INV';
+      if (cat === 'AR' || /عملاء|مدين|ذمم|عهد|سلف|مقدم|receivable|advance/i.test(names)) return 'CA_REC';
+      if (/غير\s*ملموس|برامج|شهرة|intangible/i.test(names)) return 'NCA_INT';
+      if (cat === 'FA' || /(أ|ا)صول\s*(ال)?ثابتة|ممتلكات|أراض|اراض|مبان|عقار|سيار|معدات|أثاث|اثاث|أجهزة|اجهزة|آلات|الات|fixed\s*asset|property|equipment|land|building/i.test(names)) return 'NCA_PPE';
+      if (/طويل|استثمار|non.?current|long.?term/i.test(names)) return 'NCA_OTHER';
+      return 'CA_OTHER';
+    }
+    if (nat === 'L') {
+      if (/قرض|قروض|تمويل|سحب\s*على\s*المكشوف|loan|borrow|overdraft/i.test(names)) return /طويل|long/i.test(names) ? 'NCL_LOAN' : 'CL_LOAN';
+      if (cat === 'TAX' || /ضريب|زكاة|tax/i.test(names)) return 'CL_TAX';
+      if (/مخصص|provision/i.test(names)) return 'CL_OTHER';
+      if (/طويل|non.?current|long.?term/i.test(names)) return 'NCL_OTHER';
+      return 'CL_PAY';
+    }
+    if (nat === 'E') {
+      if (/احتياط|reserve/i.test(names)) return 'EQ_RES';
+      if (/محتجز|مرحل|متراكم|الفائض|العجز|retained/i.test(names)) return 'EQ_RE';
+      if (/رأس\s*المال|راس\s*المال|رصيد\s*الصندوق|جمعية|capital|fund/i.test(names)) return 'EQ_CAP';
+      if (cat === 'EQ' || /حقوق/.test(names)) return 'EQ_CAP';
+      return 'EQ_OTHER';
+    }
+    if (nat === 'R') return /أخرى|اخرى|متنوع|فوائد\s*دائن|other/i.test(names) ? 'PL_OTHINC' : 'PL_REV';
+    if (nat === 'X') {
+      if (/(تكلفة|تكاليف)\s*(ال)?(مبيعات|إيراد|ايراد|بضاعة|خدمات|نشاط)|cost\s*of\s*(sales|goods|revenue|services)/i.test(names)) return 'PL_COGS';
+      if (/ضريبة\s*(ال)?دخل|income\s*tax/i.test(names)) return 'PL_TAX';
+      if (/تمويل|فوائد|عمولات\s*بنك|finance|interest/i.test(names)) return 'PL_FIN';
+      if (/بيع|تسويق|توزيع|إعلان|اعلان|selling|marketing|distribution/i.test(names)) return 'PL_DIST';
+      if (/إدار|ادار|عمومي|رواتب|أجور|اجور|admin|general|salar/i.test(names)) return 'PL_ADMIN';
+      return 'PL_OPEX';
+    }
+    return a.t === 'ProfitAndLoss' || a.t === 'Revenue' || a.t === 'Expense' ? 'PL_UNC' : 'BS_UNC';
+  }
+  /** التبويب النهائي: يدوي على الحساب ← يدوي على أقرب أب ← تلقائي. يرجع { c: الرمز, src: 'manual'|'parent'|'auto', from }. */
+  function fsResolve(a, am) {
+    S.fsCache = S.fsCache || {};
+    var k = low(a.c);
+    if (S.fsCache[k]) return S.fsCache[k];
+    var chain = fsChain(a, am), r = null;
+    for (var i = 0; i < chain.length; i++) if (chain[i].fs) { r = { c: chain[i].fs, src: i ? 'parent' : 'manual', from: chain[i].c }; break; }
+    if (!r) r = { c: fsAuto(a, am), src: 'auto' };
+    return (S.fsCache[k] = r);
+  }
+  function fsIsPL(c) { return c.slice(0, 3) === 'PL_'; }
 
-  function groupedRows(items, am, sign) {
-    var rows = [], groups = {}, order = [], total = 0;
-    items.forEach(function (it) {
-      var g = it.a && low(it.a.p) && am[low(it.a.p)] ? low(it.a.p) : '_';
-      if (!groups[g]) { groups[g] = []; order.push(g); }
-      groups[g].push(it);
+  /** يجمع الأرصدة حسب التبويب: { cls: [{ a, amt }] } — amt بطبيعة البند (الأصول مدين، الالتزامات والإيرادات دائن). */
+  function fsItems(lines, am) {
+    var b = sumBy(lines), out = {};
+    Object.keys(b).forEach(function (k) {
+      var a = am[k] || { c: k, n: k, p: '', t: '' }, bal = b[k].dr - b[k].cr;
+      if (Math.abs(bal) < 0.0005) return;
+      var c = fsResolve(a, am).c;
+      var debitNature = /^(NCA|CA)_/.test(c) || /^PL_(COGS|DIST|ADMIN|OPEX|FIN|TAX)$/.test(c);
+      (out[c] = out[c] || []).push({ a: a, amt: debitNature ? bal : -bal, bal: bal });
     });
-    order.sort(function (a, b) { return a === '_' ? 1 : b === '_' ? -1 : a.localeCompare(b, undefined, { numeric: true }); });
-    order.forEach(function (g) {
-      var h = am[g], sub = 0;
-      if (h) rows.push({ k: 'grp', code: h.c, label: h.n });
-      groups[g].sort(function (a, b) { return String(a.a.c).localeCompare(String(b.a.c), undefined, { numeric: true }); }).forEach(function (it) {
-        rows.push({ k: 'acc', code: it.a ? it.a.c : '', label: it.a ? it.a.n : '', v: [it.amt * (sign || 1)], link: 1, indent: h ? 1 : 0 });
-        sub += it.amt;
-      });
-      if (h && groups[g].length > 1) rows.push({ k: 'sub', label: T('إجمالي ', 'Total ') + h.n, v: [sub * (sign || 1)] });
+    return out;
+  }
+  function fsBlock(rows, items, codes, detail, sign) {
+    var total = 0;
+    codes.forEach(function (c) {
+      var list = (items[c] || []).sort(function (x, y) { return String(x.a.c).localeCompare(String(y.a.c), undefined, { numeric: true }); });
+      if (!list.length) return;
+      var sub = list.reduce(function (s, x) { return s + x.amt; }, 0) * (sign || 1);
+      if (detail) {
+        rows.push({ k: 'grp', label: T(FS_LABEL[c][0], FS_LABEL[c][1]) });
+        list.forEach(function (x) { rows.push({ k: 'acc', code: x.a.c, label: x.a.n, v: [x.amt * (sign || 1)], link: 1, indent: 1 }); });
+        if (codes.length > 1) rows.push({ k: 'sub', label: T('إجمالي ', 'Total ') + T(FS_LABEL[c][0], FS_LABEL[c][1]).replace(/^يُطرح: /, ''), v: [sub] });
+      } else rows.push({ k: 'acc', label: T(FS_LABEL[c][0], FS_LABEL[c][1]), v: [sub], indent: 1 });
       total += sub;
     });
-    return { rows: rows, total: total };
+    return total;
   }
 
-  function buildIS() {
-    var f = S.finF, am = finAcc();
-    var sec = plSections(finLines(f.to, f.from).filter(function (l) { return l[LD.src] !== 'YearEnd'; }), am);
-    var rows = [], r = groupedRows(sec.R, am), x = groupedRows(sec.X, am), p = groupedRows(sec.P, am);
-    rows.push({ k: 'sec', label: T('الإيرادات', 'Revenue') });
-    rows = rows.concat(r.rows);
-    rows.push({ k: 'tot', label: T('إجمالي الإيرادات', 'Total revenue'), v: [r.total] });
-    rows.push({ k: 'sec', label: T('المصروفات', 'Expenses') });
-    rows = rows.concat(x.rows);
-    rows.push({ k: 'tot', label: T('إجمالي المصروفات', 'Total expenses'), v: [x.total] });
-    if (sec.P.length) {
-      rows.push({ k: 'sec', label: T('أرباح وخسائر أخرى', 'Other gains and losses') });
-      rows = rows.concat(p.rows);
-      rows.push({ k: 'tot', label: T('صافي الأرباح والخسائر الأخرى', 'Net other gains/losses'), v: [p.total] });
+  /* ---------- Statement of financial position (IAS 1) ---------- */
+  function buildBS() {
+    var f = S.finF, am = finAcc(), detail = f.detail !== false;
+    S.fsCache = {};
+    var it = fsItems(finLines(f.to), am), rows = [];
+    var pl = Object.keys(it).filter(fsIsPL).reduce(function (s, c) { return s + it[c].reduce(function (x, y) { return x - y.bal; }, 0); }, 0);  // ربح = دائن − مدين
+    rows.push({ k: 'sec', label: T('الأصول', 'Assets') });
+    rows.push({ k: 'grp', label: T('الأصول غير المتداولة', 'Non-current assets') });
+    var ppe = fsBlock(rows, it, ['NCA_PPE', 'NCA_ACCDEP'], detail);
+    if ((it.NCA_PPE || it.NCA_ACCDEP)) rows.push({ k: 'sub', label: T('صافي الممتلكات والآلات والمعدات', 'Net property, plant and equipment'), v: [ppe] });
+    var nca = ppe + fsBlock(rows, it, ['NCA_INT', 'NCA_OTHER'], detail);
+    rows.push({ k: 'tot', label: T('إجمالي الأصول غير المتداولة', 'Total non-current assets'), v: [nca] });
+    rows.push({ k: 'grp', label: T('الأصول المتداولة', 'Current assets') });
+    var ca = fsBlock(rows, it, ['CA_INV', 'CA_REC', 'CA_OTHER', 'CA_CASH'], detail);
+    rows.push({ k: 'tot', label: T('إجمالي الأصول المتداولة', 'Total current assets'), v: [ca] });
+    var assets = nca + ca;
+    rows.push({ k: 'grand', label: T('إجمالي الأصول', 'Total assets'), v: [assets] });
+    rows.push({ k: 'sec', label: T('حقوق الملكية والالتزامات', 'Equity and liabilities') });
+    rows.push({ k: 'grp', label: T('حقوق الملكية', 'Equity') });
+    var eq = fsBlock(rows, it, ['EQ_CAP', 'EQ_RES', 'EQ_RE', 'EQ_OTHER'], detail);
+    rows.push({ k: 'acc', label: T('صافي ربح (خسارة) الفترات غير المُقفلة', 'Profit (loss) for unclosed periods'), v: [pl], indent: 1 });
+    eq += pl;
+    rows.push({ k: 'tot', label: T('إجمالي حقوق الملكية', 'Total equity'), v: [eq] });
+    rows.push({ k: 'grp', label: T('الالتزامات غير المتداولة', 'Non-current liabilities') });
+    var ncl = fsBlock(rows, it, ['NCL_LOAN', 'NCL_OTHER'], detail);
+    rows.push({ k: 'tot', label: T('إجمالي الالتزامات غير المتداولة', 'Total non-current liabilities'), v: [ncl] });
+    rows.push({ k: 'grp', label: T('الالتزامات المتداولة', 'Current liabilities') });
+    var cl = fsBlock(rows, it, ['CL_PAY', 'CL_LOAN', 'CL_TAX', 'CL_OTHER'], detail);
+    rows.push({ k: 'tot', label: T('إجمالي الالتزامات المتداولة', 'Total current liabilities'), v: [cl] });
+    rows.push({ k: 'tot', label: T('إجمالي الالتزامات', 'Total liabilities'), v: [ncl + cl] });
+    var le = eq + ncl + cl;
+    rows.push({ k: 'grand', label: T('إجمالي حقوق الملكية والالتزامات', 'Total equity and liabilities'), v: [le] });
+    var unc = it.BS_UNC || [];
+    if (unc.length) {
+      rows.push({ k: 'sec', label: T(FS_LABEL.BS_UNC[0], FS_LABEL.BS_UNC[1]) });
+      unc.forEach(function (x) { rows.push({ k: 'acc', code: x.a.c, label: x.a.n + T(' (رصيد مدين +)', ' (debit +)'), v: [x.bal], link: 1, indent: 1 }); });
     }
-    var net = r.total - x.total + p.total;
-    rows.push({ k: 'grand', label: net >= 0 ? T('صافي الربح', 'Net profit') : T('صافي الخسارة', 'Net loss'), v: [net] });
+    var ok = Math.abs(assets - le) < 0.01 && !unc.length;
+    rows.push({ k: 'note', label: ok ? '<span class="badge b-ok">' + T('قائمة المركز المالي متوازنة', 'Statement balances') + '</span>'
+      : '<span class="badge b-err">' + (unc.length ? T('توجد حسابات غير مبوبة — ', 'Unclassified accounts — ') : T('الفرق: ', 'Difference: ') + fmtAcc(assets - le) + ' — ') +
+        '<a onclick="FA.go(\'finreports\',{tab:\'cls\'})">' + T('راجع تبويب الحسابات', 'review account mapping') + '</a></span>' });
+    return { heads: [T('رقم الحساب', 'Account'), T('البيان', 'Item'), T('كما في ', 'As of ') + f.to], rows: rows };
+  }
+
+  /* ---------- Statement of profit or loss by function (IAS 1) ---------- */
+  function buildIS() {
+    var f = S.finF, am = finAcc(), detail = f.detail !== false;
+    S.fsCache = {};
+    var it = fsItems(finLines(f.to, f.from).filter(function (l) { return l[LD.src] !== 'YearEnd'; }), am), rows = [];
+    var rev = fsBlock(rows, it, ['PL_REV'], detail);
+    rows.push({ k: 'tot', label: T('صافي الإيرادات', 'Net revenue'), v: [rev] });
+    var cogs = fsBlock(rows, it, ['PL_COGS'], detail, -1);
+    var gross = rev + cogs;
+    rows.push({ k: 'tot', label: gross >= 0 ? T('مجمل الربح', 'Gross profit') : T('مجمل الخسارة', 'Gross loss'), v: [gross] });
+    var oth = fsBlock(rows, it, ['PL_OTHINC'], detail);
+    var opx = fsBlock(rows, it, ['PL_DIST', 'PL_ADMIN', 'PL_OPEX'], detail, -1);
+    var unc = it.PL_UNC || [];
+    var uncAmt = 0;
+    if (unc.length) {
+      rows.push({ k: 'grp', label: T(FS_LABEL.PL_UNC[0], FS_LABEL.PL_UNC[1]) });
+      unc.forEach(function (x) { rows.push({ k: 'acc', code: x.a.c, label: x.a.n, v: [-x.bal], link: 1, indent: 1 }); uncAmt -= x.bal; });
+    }
+    var op = gross + oth + opx + uncAmt;
+    rows.push({ k: 'tot', label: op >= 0 ? T('الربح التشغيلي', 'Operating profit') : T('الخسارة التشغيلية', 'Operating loss'), v: [op] });
+    var fin = fsBlock(rows, it, ['PL_FIN'], detail, -1);
+    var pbt = op + fin;
+    rows.push({ k: 'tot', label: T('الربح (الخسارة) قبل الضريبة', 'Profit (loss) before tax'), v: [pbt] });
+    var tax = fsBlock(rows, it, ['PL_TAX'], detail, -1);
+    var net = pbt + tax;
+    rows.push({ k: 'grand', label: net >= 0 ? T('صافي ربح الفترة', 'Profit for the period') : T('صافي خسارة الفترة', 'Loss for the period'), v: [net] });
+    rows.push({ k: 'note', label: T('المصروفات تظهر بين قوسين (تُطرح).', 'Expenses are shown in brackets (deducted).') + (unc.length ? ' <span class="badge b-err">' + T('توجد حسابات غير مبوبة — ', 'Unclassified accounts — ') +
+      '<a onclick="FA.go(\'finreports\',{tab:\'cls\'})">' + T('راجع تبويب الحسابات', 'review account mapping') + '</a></span>' : '') });
     return { heads: [T('رقم الحساب', 'Account'), T('البيان', 'Item'), T('المبلغ', 'Amount')], rows: rows, net: net };
   }
 
-  /* ---------- Balance sheet ---------- */
-  function buildBS() {
+  /* ---------- Account mapping (تبويب الحسابات) ---------- */
+  function buildCls() {
     var f = S.finF, am = finAcc();
-    var lines = finLines(f.to);
-    var b = sumBy(lines), items = { A: [], L: [], E: [] }, earnings = 0;
-    Object.keys(b).forEach(function (k) {
-      var a = am[k], bal = b[k].dr - b[k].cr, c = accClass(a, bal);
-      if (isPL(c)) { earnings -= bal; return; }
-      if (!c || Math.abs(bal) < 0.0005) return;
-      items[c].push({ a: a, amt: c === 'A' ? bal : -bal });
-    });
-    var rows = [];
-    var A = groupedRows(items.A, am), Lb = groupedRows(items.L, am), E = groupedRows(items.E, am);
-    rows.push({ k: 'sec', label: T('الأصول', 'Assets') });
-    rows = rows.concat(A.rows);
-    rows.push({ k: 'grand', label: T('إجمالي الأصول', 'Total assets'), v: [A.total] });
-    rows.push({ k: 'sec', label: T('الخصوم', 'Liabilities') });
-    rows = rows.concat(Lb.rows);
-    rows.push({ k: 'tot', label: T('إجمالي الخصوم', 'Total liabilities'), v: [Lb.total] });
-    rows.push({ k: 'sec', label: T('حقوق الملكية', 'Equity') });
-    rows = rows.concat(E.rows);
-    rows.push({ k: 'acc', label: T('صافي ربح (خسارة) الفترات غير المُقفلة', 'Unclosed net profit (loss)'), v: [earnings], indent: 1 });
-    rows.push({ k: 'tot', label: T('إجمالي حقوق الملكية', 'Total equity'), v: [E.total + earnings] });
-    var le = Lb.total + E.total + earnings;
-    rows.push({ k: 'grand', label: T('إجمالي الخصوم وحقوق الملكية', 'Total liabilities & equity'), v: [le] });
-    var ok = Math.abs(A.total - le) < 0.01;
-    rows.push({ k: 'note', label: ok ? '<span class="badge b-ok">' + T('الميزانية متوازنة', 'Balance sheet balances') + '</span>'
-      : '<span class="badge b-err">' + T('الفرق: ', 'Difference: ') + fmtAcc(A.total - le) + ' — ' + T('راجع أنواع الحسابات في الدليل', 'check account types in the chart') + '</span>' });
-    return { heads: [T('رقم الحساب', 'Account'), T('البيان', 'Item'), T('كما في ', 'As of ') + f.to], rows: rows };
+    S.fsCache = {};
+    var b = sumBy(finLines(f.to)), used = {};
+    Object.keys(b).forEach(function (k) { if (Math.abs(b[k].dr - b[k].cr) >= 0.0005 && am[k]) fsChain(am[k], am).forEach(function (a) { used[low(a.c)] = 1; }); });
+    var path = function (a) { return fsChain(a, am).reverse().map(function (x) { return x.c; }).join('/'); };
+    var list = S.fin.accounts.filter(function (a) { return f.allAcc || used[low(a.c)]; })
+      .sort(function (x, y) { return path(x) < path(y) ? -1 : path(x) > path(y) ? 1 : 0; });
+    var opts = Object.keys(FS_LABEL).filter(function (c) { return !/UNC$/.test(c); });
+    var edit = S.fin.canEdit;
+    var depth = function (a) { return fsChain(a, am).length - 1; };
+    var srcTxt = function (r) {
+      return r.src === 'manual' ? '<span class="badge b-ok">' + T('يدوي', 'Manual') + '</span>' : r.src === 'parent' ? '<span class="badge b-info">' + T('من ', 'From ') + esc(r.from) + '</span>'
+        : /UNC$/.test(r.c) ? '<span class="badge b-err">' + T('غير مبوب', 'Unclassified') + '</span>' : '<span class="badge b-gray">' + T('تلقائي', 'Auto') + '</span>';
+    };
+    var html = '<table class="stmt fs-map"><thead><tr><th>' + T('رقم الحساب', 'Account') + '</th><th>' + T('اسم الحساب', 'Name') + '</th><th>' + T('النوع', 'Type') + '</th><th class="n">' + T('الرصيد (مدين +)', 'Balance (Dr +)') + '</th>' +
+      '<th>' + T('التبويب الحالي', 'Current line') + '</th><th>' + T('المصدر', 'Source') + '</th>' + (edit ? '<th>' + T('تعيين يدوي', 'Set manually') + '</th>' : '') + '</tr></thead><tbody>' +
+      list.map(function (a) {
+        var r = fsResolve(a, am), bal = 0;
+        if (!a.h) { var x = b[low(a.c)]; bal = x ? x.dr - x.cr : 0; }
+        var lab = FS_LABEL[r.c] || [r.c, r.c];
+        return '<tr class="' + (a.h ? 'r-grp' : 'r-acc') + (/UNC$/.test(r.c) ? ' fs-bad' : '') + '"><td><bdi>' + esc(a.c) + '</bdi></td><td style="padding-inline-start:' + (8 + depth(a) * 16) + 'px">' + esc(a.n) + '</td><td>' + esc(a.t) + '</td>' +
+          '<td class="n">' + (a.h ? '' : fmtAcc(bal)) + '</td><td>' + esc(T(lab[0], lab[1])) + '</td><td>' + srcTxt(r) + '</td>' +
+          (edit ? '<td><select class="inp sm" onchange="FA.fsSet(' + jsArg(a.c) + ', this.value)"><option value="">' + T('— تلقائي / من الأب —', '— auto / inherit —') + '</option>' +
+            opts.map(function (c) { return '<option value="' + c + '"' + (a.fs === c ? ' selected' : '') + '>' + esc(T(FS_LABEL[c][0], FS_LABEL[c][1])) + '</option>'; }).join('') + '</select></td>' : '') + '</tr>';
+      }).join('') + '</tbody></table>';
+    var aoa = [[T('رقم الحساب', 'Account'), T('اسم الحساب', 'Name'), T('النوع', 'Type'), T('التبويب', 'Line'), T('المصدر', 'Source')]].concat(list.map(function (a) {
+      var r = fsResolve(a, am); return [a.c, a.n, a.t, T((FS_LABEL[r.c] || [r.c])[0], (FS_LABEL[r.c] || [r.c, r.c])[1]), r.src + (r.from ? ' ' + r.from : '')];
+    }));
+    return { heads: aoa[0], rows: [], html: html, aoa: aoa };
+  }
+  async function fsSet(code, cls) {
+    try {
+      var recs = await load('accounts');
+      var rec = (recs || []).filter(function (r) { return low(r.MAINACCOUNTID) === low(code); })[0];
+      if (!rec) throw new Error(T('الحساب غير موجود', 'Account not found'));
+      rec = Object.assign({}, rec, { FSCLASS: cls });
+      await api('saveRecord', S.token, 'accounts', rec, false);
+      S.fin.accounts.forEach(function (a) { if (low(a.c) === low(code)) a.fs = cls; });
+      S.fsCache = {};
+      delete S.data.accounts;
+      toast(T('تم حفظ تبويب الحساب ', 'Saved mapping for ') + code + (cls ? '' : T(' (تلقائي)', ' (auto)')), 'ok');
+      pageFin();
+    } catch (e) { fail(e); }
   }
 
   /* ---------- Cash flow (direct method) ---------- */
@@ -3027,16 +3193,21 @@
       '<label>' + T('الوحدة', 'Unit') + '<select class="inp" onchange="FA.finSet(\'unit\', this.value)">' + opt(unitOpts, f.unit) + '</select></label>' +
       (tab === 'ledger' ? '<label>' + T('الحساب', 'Account') + '<input class="inp" list="dl_finacc" dir="ltr" value="' + esc(f.account) + '" placeholder="' + T('كل الحسابات', 'All accounts') +
         '" onchange="FA.finSet(\'account\', this.value)"><datalist id="dl_finacc">' + datalistOpts('@allAccounts', null, {}) + '</datalist></label>' : '') +
+      (tab === 'bs' || tab === 'is' ? '<label class="ck"><input type="checkbox" ' + (f.detail !== false ? 'checked' : '') + ' onchange="FA.finSet(\'detail\', this.checked)"> ' + T('تفصيل الحسابات', 'Show accounts') + '</label>' : '') +
+      (tab === 'cls' ? '<label class="ck"><input type="checkbox" ' + (f.allAcc ? 'checked' : '') + ' onchange="FA.finSet(\'allAcc\', this.checked)"> ' + T('كل الحسابات (وليس ذات الأرصدة فقط)', 'All accounts (not only with balances)') + '</label>' : '') +
       (tab === 'tb' ? '<label class="ck"><input type="checkbox" ' + (f.zero ? 'checked' : '') + ' onchange="FA.finSet(\'zero\', this.checked)"> ' + T('إظهار الحسابات الصفرية', 'Show zero balances') + '</label>' +
         '<label class="ck"><input type="checkbox" ' + (f.headersOnly ? 'checked' : '') + ' onchange="FA.finSet(\'headersOnly\', this.checked)"> ' + T('الحسابات الرئيسية فقط', 'Header accounts only') + '</label>' +
         '<label class="ck"><input type="checkbox" ' + (f.noClosing ? 'checked' : '') + ' onchange="FA.finSet(\'noClosing\', this.checked)"> ' + T('قبل قيد الإقفال', 'Before closing entries') + '</label>' : '') +
       '</div>';
-    var rep = tab === 'ledger' ? buildLedger() : tab === 'bs' ? buildBS() : tab === 'is' ? buildIS() : tab === 'cf' ? buildCF() : buildTB();
+    var rep = tab === 'ledger' ? buildLedger() : tab === 'bs' ? buildBS() : tab === 'is' ? buildIS() : tab === 'cf' ? buildCF() : tab === 'cls' ? buildCls() : buildTB();
     S.finRep = rep;
     var period = tab === 'bs' ? T('كما في ', 'As of ') + f.to : T('من ', 'From ') + f.from + T(' إلى ', ' to ') + f.to;
     S.finTitle = T(title[1], title[2]) + ' — ' + period + (f.unit ? ' — ' + f.unit.split(':').slice(1).join(':') : '');
     $('#main').innerHTML = head + phead(T('المحاسبة', 'Accounting'), esc(T(title[1], title[2])) + ' <small style="font-size:13px;color:#605e5c;font-weight:400">' + esc(period) + '</small>') +
-      '<div class="content"><div class="card">' + filters + '<div class="gridwrap" style="max-height:none">' + stmtHtml(rep.heads, rep.rows) + '</div></div>' +
+      '<div class="content"><div class="card">' + filters + (tab === 'cls' ? '<div class="note" style="margin:10px 14px">' +
+        T('كل حساب يُبوَّب في بند من بنود قائمة المركز المالي أو قائمة الدخل وفق IAS 1. التبويب اليدوي على حساب رئيسي ينطبق على كل حساباته الفرعية. الحسابات التي لم تُبوَّب يدوياً تُبوَّب تلقائياً من نوعها واسمها واسم الحساب الرئيسي، ولا يُستخدم اتجاه الرصيد أبداً.',
+          'Each account maps to an IAS 1 line. A manual mapping on a header applies to all its children. Unmapped accounts are mapped automatically from their type and names — never from the balance sign.') + '</div>' : '') +
+      '<div class="gridwrap" style="max-height:none">' + (rep.html || stmtHtml(rep.heads, rep.rows)) + '</div></div>' +
       (S.faPending ? '<div class="note fa-warn">' + icon('book') + ' ' + T('يوجد ', 'There are ') + S.faPending + T(' أصلاً بقيم في دفاترها غير مُقيّدة في القيود، فلا تظهر في القوائم المالية. ', ' assets whose book values are not in the ledger, so they are missing from the statements. ') +
         '<a onclick="FA.go(\'books\');setTimeout(FA.faOpeningDlg,400)">' + T('أنشئ قيد الأرصدة الافتتاحية للأصول', 'Create the fixed assets opening voucher') + '</a></div>' : '') +
       (S.fin.lines.length ? '' : '<div class="note">' + T('لا توجد قيود مُرحّلة بعد — التقارير المالية تعتمد على القيود المحاسبية المُرحّلة فقط.', 'No posted vouchers yet — financial reports use posted journal entries only.') + '</div>') + '</div>';
@@ -3050,12 +3221,12 @@
   function finExport() {
     if (typeof XLSX === 'undefined') return toast(T('مكتبة Excel غير محمّلة', 'Excel library not loaded'), 'err');
     var wb = XLSX.utils.book_new();
-    var aoa = [[S.b.settings.ORGNAME], [S.finTitle], []].concat(stmtAoa(S.finRep.heads, S.finRep.rows));
+    var aoa = [[S.b.settings.ORGNAME], [S.finTitle], []].concat(S.finRep.aoa || stmtAoa(S.finRep.heads, S.finRep.rows));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Report');
     XLSX.writeFile(wb, (S.view.tab || 'tb') + '_' + today() + '.xlsx');
   }
   function finPrint() {
-    printDoc('<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(S.finTitle) + stmtHtml(S.finRep.heads, S.finRep.rows) + '</div>',
+    printDoc('<div class="doc" dir="' + document.documentElement.dir + '">' + printHeader(S.finTitle) + (S.finRep.html || stmtHtml(S.finRep.heads, S.finRep.rows)) + '</div>',
       (S.view.tab || 'tb') === 'tb' || S.view.tab === 'ledger' ? 'landscape' : 'portrait');
   }
 
@@ -4809,7 +4980,7 @@
     glExport: glExport, glCell: glCell, glAddLine: glAddLine, glDelLine: glDelLine, glSave: glSave, glAct: glAct, glPrint: glPrint,
     printDoc: printDoc, printGo: printGo, fyDlg: fyDlg, fySave: fySave, fyClosePrompt: fyClosePrompt, fyCloseGo: fyCloseGo, fyReopen: fyReopen,
     curDlg: curDlg, curSave: curSave,
-    finSet: finSet, finRefresh: finRefresh, finLedger: finLedger, finExport: finExport, finPrint: finPrint,
+    finSet: finSet, fsSet: fsSet, finRefresh: finRefresh, finLedger: finLedger, finExport: finExport, finPrint: finPrint,
     accSearch: accSearch, accToggle: accToggle, accAll: accAll, exportRowsAcc: exportRowsAcc,
     openingDlg: openingDlg, openingGo: openingGo, partySet: partySet, partyRefresh: partyRefresh, partyExport: partyExport, partyPrint: partyPrint,
     invReload: invReload, invCell: invCell, invAddLine: invAddLine, invDelLine: invDelLine, invSave: invSave, invCancelDlg: invCancelDlg,

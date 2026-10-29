@@ -3826,7 +3826,7 @@
       if (it) {
         var g = refFind(S.b.refs.itemgroups, it.g) || {};
         l.ITEMID = it.c; l.ITEMDESCRIPTION = it.n; l.UNIT = it.u; l.UNITPRICE = it.pr;
-        l.MAINACCOUNTID = (invSide() === 'Purchase' ? g.pa : g.sa) || l.MAINACCOUNTID;
+        l.MAINACCOUNTID = invLineAcc(g) || l.MAINACCOUNTID;
         // إعادة الرسم بعد انتهاء حدث الخروج من الخلية حتى لا يتعارض مع المتصفح
         setTimeout(function () {
           drawInvLines();
@@ -3854,7 +3854,7 @@
     var head = readForm(form);
     head.INVOICETYPE = S.invHead.INVOICETYPE;
     if (!isNew) head.INVOICEID = S.view.id;
-    var st = S.b.settings, defAcc = invSide() === 'Sales' ? st.SALESACCOUNT : st.PURCHASEACCOUNT;
+    var st = S.b.settings, defAcc = invLineAcc(null);
     var lines = S.invLines.filter(function (l) { return l.ITEMID || l.ITEMDESCRIPTION || Number(parseNum(l.UNITPRICE)); })
       .map(function (l) { return { ITEMID: l.ITEMID, ITEMDESCRIPTION: l.ITEMDESCRIPTION, UNIT: l.UNIT, MAINACCOUNTID: l.MAINACCOUNTID || (l.ITEMID ? '' : defAcc || ''),
         QTY: parseNum(l.QTY), UNITPRICE: parseNum(l.UNITPRICE), TAXPERCENT: parseNum(l.TAXPERCENT) }; });
@@ -3982,6 +3982,14 @@
   }
 
   /* ======================= Items in invoices ======================= */
+  /** حساب السطر: في المرتجع (إشعار دائن للعميل / مدين للمورد) حساب المردودات من المجموعة ثم الإعدادات. */
+  function invLineAcc(g, kind) {
+    var st = S.b.settings, pur = invSide() === 'Purchase';
+    var credit = (KIND[kind || (S.invHead || {}).INVOICETYPE] || {}).credit;
+    var normal = g ? (pur ? g.pa : g.sa) : (pur ? st.PURCHASEACCOUNT : st.SALESACCOUNT);
+    if (!credit) return normal || '';
+    return (g ? (pur ? g.pr : g.sr) : '') || (pur ? st.PURCHRETURNACCOUNT : st.SALESRETURNACCOUNT) || normal || '';
+  }
   function invItems() { return (invSide() === 'Purchase' ? S.b.refs.purchitems : S.b.refs.salesitems) || []; }
   /** إنشاء إشعار من فاتورة مُرحّلة: نفس الطرف والوحدة، وسطور الفاتورة كبداية للمرتجع. */
   function invNote(kind) {
@@ -3990,7 +3998,10 @@
       head: { PARTYID: h.PARTYID, PARTYNAME: h.PARTYNAME, CURRENCYCODE: h.CURRENCYCODE, EXCHANGERATE: h.EXCHANGERATE, ORIGINVOICE: h.INVOICEID,
         SUB2_OPERATINGUNIT: h.SUB2_OPERATINGUNIT, SUB1_OPERATINGUNIT: h.SUB1_OPERATINGUNIT, OPERATINGUNIT: h.OPERATINGUNIT,
         DESCRIPTION: (K.credit ? T('مرتجع من الفاتورة ', 'Return on invoice ') : T('إضافة على الفاتورة ', 'Charge on invoice ')) + h.INVOICEID },
-      lines: K.credit ? S.invLines.map(function (l) { return Object.assign({}, l); }) : [{ QTY: 1, TAXPERCENT: Number(S.b.settings.DEFAULTTAXPERCENT) || 0 }] } });
+      lines: K.credit ? S.invLines.map(function (l) {
+        var it = l.ITEMID && refFind(invItems(), l.ITEMID), g = it && refFind(S.b.refs.itemgroups, it.g);
+        return Object.assign({}, l, { MAINACCOUNTID: invLineAcc(g || null, kind) || l.MAINACCOUNTID });
+      }) : [{ QTY: 1, TAXPERCENT: Number(S.b.settings.DEFAULTTAXPERCENT) || 0 }] } });
   }
 
   /* ======================= Budget control ======================= */
@@ -4495,7 +4506,8 @@
       '<div class="fld"><label>' + T('حساب الأرصدة الافتتاحية (العملاء / الموردين / البنوك)', 'Opening balance offset account') + '</label><input class="inp" data-s="OPENINGBALANCEACCOUNT" list="dl_setacc" dir="ltr" value="' + esc(st.OPENINGBALANCEACCOUNT || '') + '" ' + (ro ? 'readonly' : '') + '></div></div>' +
       '<div class="fgroup"><h5>' + T('الفواتير والضريبة', 'Invoices & tax') + '</h5>' +
       [['SALESACCOUNT', T('حساب المبيعات الافتراضي', 'Default sales account')], ['PURCHASEACCOUNT', T('حساب المشتريات الافتراضي', 'Default purchase account')],
-        ['SALESTAXACCOUNT', T('حساب ضريبة المبيعات (مخرجات)', 'Sales tax account (output)')], ['PURCHTAXACCOUNT', T('حساب ضريبة المشتريات (مدخلات)', 'Purchase tax account (input)')]].map(function (x) {
+        ['SALESTAXACCOUNT', T('حساب ضريبة المبيعات (مخرجات)', 'Sales tax account (output)')], ['PURCHTAXACCOUNT', T('حساب ضريبة المشتريات (مدخلات)', 'Purchase tax account (input)')],
+        ['SALESRETURNACCOUNT', T('حساب مردودات المبيعات الافتراضي', 'Default sales returns account')], ['PURCHRETURNACCOUNT', T('حساب مردودات المشتريات الافتراضي', 'Default purchase returns account')]].map(function (x) {
         return '<div class="fld"><label>' + esc(x[1]) + '</label><input class="inp" data-s="' + x[0] + '" list="dl_setacc" dir="ltr" value="' + esc(st[x[0]] || '') + '" ' + (ro ? 'readonly' : '') + '></div>';
       }).join('') + sf('DEFAULTTAXPERCENT', T('نسبة الضريبة الافتراضية %', 'Default tax %'), st.DEFAULTTAXPERCENT || '0', ro) + '</div>' +
       '</div>' + (ro ? '' : '<div style="padding:0 14px 14px"><button class="btn pri" onclick="FA.saveSettings()">' + icon('save') + T('حفظ الإعدادات', 'Save settings') + '</button></div>') + '</div>';

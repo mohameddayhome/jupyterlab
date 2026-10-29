@@ -10,8 +10,8 @@
  *   - Vendors          ≈ Vendors V2           (VendVendorV2Entity)
  */
 
-const APP_VERSION = '12.0.0';
-const SETUP_VERSION = '12';
+const APP_VERSION = '13.0.0';
+const SETUP_VERSION = '13';
 const SS_PROP = 'FA_SPREADSHEET_ID';
 const HASH_ROUNDS = 300;
 const AUTH_ERR = 'AUTH: ';
@@ -25,12 +25,12 @@ const SETTING_DEFAULTS = {
   ORGNAME: 'الإدارة المالية', ORGEMAIL: '', CURRENCY: 'DJF', SESSIONTIMEOUT: '60',
   MAXSESSIONS: '3', DATEFORMAT: 'MDY', LOGO: '', JOURNALPREFIX: 'FAJ-', JOURNALSEQ: '0', TRANSFERPREFIX: 'TRF-', TRANSFERSEQ: '0', GLPREFIX: 'JV-', GLSEQ: '0', TRFJOURNALNAME: 'FAJ', RETAINEDEARNINGSACCOUNT: '', CLOSINGJOURNALNAME: 'YE', OPENINGBALANCEACCOUNT: '', BUDGETPREFIX: 'BG-', BUDGETSEQ: '0', RVPREFIX: 'RV-', RVSEQ: '0', PVPREFIX: 'PV-', PVSEQ: '0', SIPREFIX: 'SI-', SISEQ: '0', PIPREFIX: 'PI-', PISEQ: '0', SCNPREFIX: 'SCN-', SCNSEQ: '0', SDNPREFIX: 'SDN-', SDNSEQ: '0',
   PDNPREFIX: 'PDN-', PDNSEQ: '0', PCNPREFIX: 'PCN-', PCNSEQ: '0',
-  SALESACCOUNT: '', PURCHASEACCOUNT: '', SALESTAXACCOUNT: '', PURCHTAXACCOUNT: '', DEFAULTTAXPERCENT: '0',
+  SALESACCOUNT: '', PURCHASEACCOUNT: '', SALESTAXACCOUNT: '', PURCHTAXACCOUNT: '', DEFAULTTAXPERCENT: '0', SALESRETURNACCOUNT: '', PURCHRETURNACCOUNT: '',
   DEPJOURNALNAME: 'FADEP', DEPOFFSETACCOUNT: '', DEPMONTHS: '3'
 };
 const PUBLIC_SETTINGS = ['ORGNAME', 'ORGEMAIL', 'CURRENCY', 'SESSIONTIMEOUT', 'MAXSESSIONS', 'DATEFORMAT', 'LOGO', 'JOURNALPREFIX',
   'DEPJOURNALNAME', 'DEPOFFSETACCOUNT', 'DEPMONTHS', 'TRANSFERPREFIX', 'GLPREFIX', 'TRFJOURNALNAME', 'RETAINEDEARNINGSACCOUNT', 'CLOSINGJOURNALNAME', 'OPENINGBALANCEACCOUNT',
-  'SALESACCOUNT', 'PURCHASEACCOUNT', 'SALESTAXACCOUNT', 'PURCHTAXACCOUNT', 'DEFAULTTAXPERCENT'];
+  'SALESACCOUNT', 'PURCHASEACCOUNT', 'SALESTAXACCOUNT', 'PURCHTAXACCOUNT', 'DEFAULTTAXPERCENT', 'SALESRETURNACCOUNT', 'PURCHRETURNACCOUNT'];
 
 /* ============================== Schemas ============================== */
 
@@ -433,7 +433,9 @@ const SCHEMAS = {
       F('ITEMGROUPID', 'رقم المجموعة', 'Item group', 'text', { req: 1, key: 1, sec: 'g', grp: 'g1', list: 1, aliases: ['ITEMGROUP', 'Item group'] }),
       F('NAME', 'اسم المجموعة', 'Name', 'text', { req: 1, sec: 'g', grp: 'g1', list: 1 }),
       F('SALESACCOUNT', 'حساب المبيعات (الإيراد)', 'Sales revenue account', 'lookup', { lk: '@accounts', sec: 'g', grp: 'g2', list: 1 }),
-      F('PURCHASEACCOUNT', 'حساب المشتريات (المصروف)', 'Purchase / expense account', 'lookup', { lk: '@accounts', sec: 'g', grp: 'g2', list: 1 })
+      F('PURCHASEACCOUNT', 'حساب المشتريات (المصروف)', 'Purchase / expense account', 'lookup', { lk: '@accounts', sec: 'g', grp: 'g2', list: 1 }),
+      F('SALESRETURNACCOUNT', 'حساب مردودات المبيعات', 'Sales returns account', 'lookup', { lk: '@accounts', sec: 'g', grp: 'g2', list: 1 }),
+      F('PURCHRETURNACCOUNT', 'حساب مردودات المشتريات', 'Purchase returns account', 'lookup', { lk: '@accounts', sec: 'g', grp: 'g2', list: 1 })
     ]
   },
 
@@ -730,6 +732,7 @@ function setup() {
     migrateV10_();
     migrateV11_();
     migrateV12_();
+    migrateV13_();
 
     const def = ss.getSheetByName('Sheet1') || ss.getSheetByName('ورقة1');
     if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
@@ -1029,6 +1032,32 @@ function migrateV12_() {
   jt.rows.forEach(function (r) { have[low_(r.CODE)] = 1; });
   [['CN', 'إشعارات دائنة - Credit notes'], ['DN', 'إشعارات مدينة - Debit notes']].forEach(function (x) {
     if (!have[low_(x[0])]) appendRow_(jt, { CODE: x[0], NAME: x[1], CREATEDBY: 'setup', CREATEDON: stamp_() });
+  });
+}
+
+/** الإصدار 13: حسابا مردودات المبيعات والمشتريات (في الدليل الافتراضي) وربطهما بالإعدادات والمجموعة العامة. */
+function migrateV13_() {
+  const stamp = stamp_();
+  const at = readTable_('MainAccounts');
+  const accs = {};
+  at.rows.forEach(function (r) { accs[low_(r.MAINACCOUNTID)] = 1; });
+  const add = function (id, name, parent, type) {
+    if (accs[low_(id)] || !accs[low_(parent)]) return;
+    appendRow_(at, { MAINACCOUNTID: id, NAME: name, ACCOUNTLEVEL: 'Posting', PARENTACCOUNT: parent, MAINACCOUNTTYPE: type, MAINACCOUNTCATEGORY: 'RET', CREATEDBY: 'setup', CREATEDON: stamp });
+    accs[low_(id)] = 1;
+  };
+  add('410900', 'مردودات ومسموحات المبيعات', '4100', 'Revenue');
+  add('620900', 'مردودات ومسموحات المشتريات', '6200', 'Expense');
+  const st = getSettings_(), o = {};
+  if (!st.SALESRETURNACCOUNT && accs['410900']) o.SALESRETURNACCOUNT = '410900';
+  if (!st.PURCHRETURNACCOUNT && accs['620900']) o.PURCHRETURNACCOUNT = '620900';
+  if (Object.keys(o).length) setSettings_(o);
+  const gt = readTable_('ItemGroups');
+  gt.rows.forEach(function (g, i) {
+    if (low_(g.ITEMGROUPID) !== 'gen' || g.SALESRETURNACCOUNT || g.PURCHRETURNACCOUNT) return;
+    g.SALESRETURNACCOUNT = o.SALESRETURNACCOUNT || st.SALESRETURNACCOUNT || '';
+    g.PURCHRETURNACCOUNT = o.PURCHRETURNACCOUNT || st.PURCHRETURNACCOUNT || '';
+    writeRow_(gt, i, g);
   });
 }
 
@@ -1452,7 +1481,8 @@ function refs_(s) {
   }
   if (['items', 'invoices'].some(function (pg) { return can_(s, pg, 'view'); })) {
     out.itemgroups = readTable_('ItemGroups').rows.filter(function (r) { return r.ITEMGROUPID; })
-      .map(function (r) { return { c: String(r.ITEMGROUPID), n: String(r.NAME || ''), sa: r.SALESACCOUNT || '', pa: r.PURCHASEACCOUNT || '' }; });
+      .map(function (r) { return { c: String(r.ITEMGROUPID), n: String(r.NAME || ''), sa: r.SALESACCOUNT || '', pa: r.PURCHASEACCOUNT || '',
+        sr: r.SALESRETURNACCOUNT || '', pr: r.PURCHRETURNACCOUNT || '' }; });
     ['salesitems', 'purchitems'].forEach(function (e) {
       out[e] = readTable_(SCHEMAS[e].sheet).rows.filter(function (r) { return r.ITEMID; })
         .map(function (r) { return { c: String(r.ITEMID), n: String(r.NAME || ''), g: String(r.ITEMGROUP || ''), u: String(r.UNIT || ''), pr: num_(r.PRICE) }; });
@@ -1863,6 +1893,8 @@ HOOKS.budgets = function (rec, ex, ctx) {
 HOOKS.itemgroups = function (rec, ex, ctx) {
   rec.SALESACCOUNT = postingAccount_(ctx, rec.SALESACCOUNT, 'حساب المبيعات');
   rec.PURCHASEACCOUNT = postingAccount_(ctx, rec.PURCHASEACCOUNT, 'حساب المشتريات');
+  rec.SALESRETURNACCOUNT = postingAccount_(ctx, rec.SALESRETURNACCOUNT, 'حساب مردودات المبيعات');
+  rec.PURCHRETURNACCOUNT = postingAccount_(ctx, rec.PURCHRETURNACCOUNT, 'حساب مردودات المشتريات');
   if (!rec.SALESACCOUNT && !rec.PURCHASEACCOUNT) throw new Error('حدد حساب المبيعات أو حساب المشتريات للمجموعة');
 };
 
@@ -1901,6 +1933,16 @@ HOOKS.invoices = function (rec, ex, ctx) {
   checkOpenPeriod_(ctx, rec.INVOICEDATE, 'الفاتورة');
 };
 
+/** حساب سطر الفاتورة/الإشعار: المرتجع (إشعار دائن للعميل أو مدين للمورد) يذهب لحساب المردودات
+ *  من مجموعة الصنف ثم من الإعدادات، وإلا فحساب المبيعات/المشتريات العادي. */
+function lineAccount_(ctx, g) {
+  const st = getSettings_(), pur = ctx.invType === 'Purchase';
+  const normal = (pur ? g.PURCHASEACCOUNT : g.SALESACCOUNT) || (pur ? st.PURCHASEACCOUNT : st.SALESACCOUNT) || '';
+  if (!ctx.invCredit) return (pur ? g.PURCHASEACCOUNT : g.SALESACCOUNT) || (g.ITEMGROUPID ? '' : normal);
+  return (pur ? g.PURCHRETURNACCOUNT : g.SALESRETURNACCOUNT) || (pur ? st.PURCHRETURNACCOUNT : st.SALESRETURNACCOUNT) ||
+    (pur ? g.PURCHASEACCOUNT : g.SALESACCOUNT) || (g.ITEMGROUPID ? '' : normal);
+}
+
 HOOKS.invlines = function (rec, ex, ctx) {
   const lbl = 'سطر ' + (rec.LINENUM || '');
   if (rec.ITEMID) {
@@ -1912,10 +1954,11 @@ HOOKS.invlines = function (rec, ex, ctx) {
     if (!rec.UNIT) rec.UNIT = it.UNIT || '';
     if (!rec.MAINACCOUNTID) {
       const g = ctx.find('itemgroups', it.ITEMGROUP) || {};
-      rec.MAINACCOUNTID = ent === 'purchitems' ? g.PURCHASEACCOUNT : g.SALESACCOUNT;
+      rec.MAINACCOUNTID = lineAccount_(ctx, g);
       if (!rec.MAINACCOUNTID) throw new Error(lbl + ': مجموعة الصنف ' + it.ITEMGROUP + ' بدون حساب ' + (ent === 'purchitems' ? 'مشتريات' : 'مبيعات'));
     }
   }
+  if (!rec.MAINACCOUNTID) rec.MAINACCOUNTID = lineAccount_(ctx, {});
   rec.MAINACCOUNTID = postingAccount_(ctx, rec.MAINACCOUNTID, lbl + ' — الحساب');
   rec.ACCOUNTNAME = (ctx.find('accounts', rec.MAINACCOUNTID) || {}).NAME || '';
   deriveChain_(ctx, rec, UNIT_CHAIN);
@@ -2911,6 +2954,7 @@ function saveInvoice(token, head, lines, isNew, post) {
     const id = ph.rec.INVOICEID;
     const K = invKind_(ph.rec.INVOICETYPE);
     ctx.invType = K.side;
+    ctx.invCredit = !!K.credit;
     const rows = (lines || []).filter(function (x) { return x && (x.ITEMID || x.ITEMDESCRIPTION || x.MAINACCOUNTID || num_(x.UNITPRICE)); });
     if (!rows.length) throw new Error((ph.rec.INVOICETYPE === K.side ? 'الفاتورة' : 'الإشعار') + ' لا يحتوي على سطور');
     let sub = 0, tax = 0;
@@ -3717,7 +3761,7 @@ function saveSettings(token, data) {
   if ('DATEFORMAT' in data) out.DATEFORMAT = data.DATEFORMAT === 'DMY' ? 'DMY' : 'MDY';
   if ('RETAINEDEARNINGSACCOUNT' in data) out.RETAINEDEARNINGSACCOUNT = String(data.RETAINEDEARNINGSACCOUNT).trim().slice(0, 40);
   if ('OPENINGBALANCEACCOUNT' in data) out.OPENINGBALANCEACCOUNT = String(data.OPENINGBALANCEACCOUNT).trim().slice(0, 40);
-  ['SALESACCOUNT', 'PURCHASEACCOUNT', 'SALESTAXACCOUNT', 'PURCHTAXACCOUNT'].forEach(function (k) { if (k in data) out[k] = String(data[k]).trim().slice(0, 40); });
+  ['SALESACCOUNT', 'PURCHASEACCOUNT', 'SALESTAXACCOUNT', 'PURCHTAXACCOUNT', 'SALESRETURNACCOUNT', 'PURCHRETURNACCOUNT'].forEach(function (k) { if (k in data) out[k] = String(data[k]).trim().slice(0, 40); });
   if ('DEFAULTTAXPERCENT' in data) {
     const tx = Number(data.DEFAULTTAXPERCENT);
     if (!(tx >= 0 && tx <= 100)) throw new Error('نسبة الضريبة الافتراضية بين 0 و100');

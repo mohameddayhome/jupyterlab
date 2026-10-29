@@ -700,7 +700,6 @@
     { h: 1, ar: 'العملاء', en: 'Customers' },
     { id: 'customers', icon: 'users', ar: 'العملاء', en: 'Customers', perm: 'customers' },
     { id: 'salesinv', icon: 'journal', ar: 'فواتير المبيعات', en: 'Sales invoices', perm: 'invoices' },
-    { id: 'salesdash', icon: 'chart', ar: 'لوحة المبيعات والمشتريات', en: 'Sales & purchases dashboard', perm: 'invoices' },
     { id: 'custnotes', icon: 'undo', ar: 'إشعارات العملاء (دائن / مدين)', en: 'Customer credit/debit notes', perm: 'invoices' },
     { id: 'custreports', icon: 'chart', ar: 'تقارير العملاء', en: 'Customer reports', perm: 'customers' },
     { h: 1, ar: 'الموردون', en: 'Vendors' },
@@ -786,7 +785,7 @@
         case 'reports': return await pageReports();
         case 'budgets': return await (S.view.id ? pageBudgetDoc() : pageBudgetList());
         case 'account': return pageAccount();
-        case 'salesdash': return await pageSalesDash();
+        case 'salesdash': return go('dashboard', { tab: 'sales' });   // الرابط القديم
         case 'salesinv': case 'purchinv': case 'custnotes': case 'vendnotes': return await (S.view.id ? pageInvDoc() : pageInvList());
         case 'cashvouchers': return await (S.view.no ? pageCashDoc() : pageCashList());
         case 'customers': case 'banks': case 'salesitems': case 'purchitems': case 'itemgroups':
@@ -803,11 +802,22 @@
   }
 
   /* ======================= Dashboard ======================= */
+  /** تبويبات لوحة المعلومات: نظرة عامة + المبيعات والمشتريات (لمن له صلاحية الفواتير). */
+  function dashTabs(tab, extra) {
+    var tabs = [['overview', T('نظرة عامة', 'Overview')]];
+    if (can('invoices', 'view')) tabs.push(['sales', T('المبيعات والمشتريات', 'Sales & purchases')]);
+    if (tabs.length < 2 && !extra) return '';
+    return apane([]).replace('<div class="bar"></div>', '<div class="bar">' + (tabs.length > 1 ? tabs.map(function (t) {
+      return '<button class="abtn tab ' + (t[0] === tab ? 'on' : '') + '" onclick="FA.go(\'dashboard\',{tab:\'' + t[0] + '\'})">' + esc(t[1]) + '</button>';
+    }).join('') : '') + (extra ? '<span class="sep"></span>' + extra : '') + '</div>');
+  }
+
   async function pageDashboard() {
+    if (S.view.tab === 'sales' && can('invoices', 'view')) return pageSalesDash();
     crumbs([S.b.settings.ORGNAME, T('لوحة المعلومات', 'Dashboard')]);
     var main = $('#main');
     var hello = T('مرحباً، ', 'Welcome, ') + esc(S.b.user.fullName || S.b.user.username);
-    main.innerHTML = phead(esc(S.b.settings.ORGNAME), hello) + '<div class="content"><div class="empty">…</div></div>';
+    main.innerHTML = dashTabs('overview') + phead(esc(S.b.settings.ORGNAME), hello) + '<div class="content"><div class="empty">…</div></div>';
     var d = await api('dashboard', S.token);
     S.dash = d;
     var cur = S.b.settings.CURRENCY;
@@ -838,7 +848,7 @@
       side += '<div class="card" style="padding:14px"><h3 style="margin:0 0 8px;font-size:14px">' + T('الدفاتر حسب الحالة', 'Books by status') + '</h3>' +
         (Object.keys(d.byStatus).map(function (k) { return '<div class="kv"><span>' + badge('book', k) + '</span><b>' + d.byStatus[k] + '</b></div>'; }).join('') || '<div class="empty">—</div>') + '</div>';
     }
-    main.innerHTML = phead(esc(S.b.settings.ORGNAME), hello) + '<div class="content"><div class="tiles kpis">' + cards + '</div>' +
+    main.innerHTML = dashTabs('overview') + phead(esc(S.b.settings.ORGNAME), hello) + '<div class="content"><div class="tiles kpis">' + cards + '</div>' +
       '<div class="split" style="margin-top:12px"><div class="grow">' + chart + '</div>' + (side ? '<div class="factbox">' + side + '</div>' : '') + '</div></div>';
   }
 
@@ -4052,7 +4062,7 @@
   /* ======================= Sales & purchases dashboard ======================= */
   var SD_C = { s: '#2a78d6', p: '#eb6834' };
   async function pageSalesDash(force) {
-    crumbs([S.b.settings.ORGNAME, T('لوحة المبيعات والمشتريات', 'Sales & purchases dashboard')]);
+    crumbs([S.b.settings.ORGNAME, T('لوحة المعلومات', 'Dashboard'), T('المبيعات والمشتريات', 'Sales & purchases')]);
     var f = S.sdF = S.sdF || { year: String(new Date().getFullYear()) };
     if (!S.sd || S.sd.year !== f.year || force) S.sd = await api('salesDashboard', S.token, f.year);
     var d = S.sd, cur = localCur();
@@ -4061,11 +4071,9 @@
     var gs = sum(d.sales), gp = sum(d.purch), rs = sum(d.salesRet), rp = sum(d.purchRet);
     var y0 = new Date().getFullYear(), years = [];
     for (var y = y0 - 4; y <= y0 + 1; y++) years.push(String(y));
-    var tile = function (t, v, sub, page) { return kpi(page || 'salesdash', 'chart', t, compact(v), sub); };
-    var html = apane([
-      { icon: 'refresh', ar: 'تحديث', en: 'Refresh', on: 'FA.sdRefresh()' },
-      { icon: 'download', ar: 'Excel', en: 'Excel', on: 'FA.sdExport()' }
-    ]) + phead(T('المبيعات والمشتريات', 'Sales & purchases'), T('لوحة المبيعات والمشتريات', 'Sales & purchases dashboard') + ' <small style="font-size:13px;color:#605e5c;font-weight:400">' +
+    var tile = function (t, v, sub, page) { return kpi(page || '', 'chart', t, compact(v), sub); };
+    var html = dashTabs('sales', '<button class="abtn" onclick="FA.sdRefresh()">' + icon('refresh') + T('تحديث', 'Refresh') + '</button>' +
+      '<button class="abtn" onclick="FA.sdExport()">' + icon('download') + 'Excel</button>') + phead(T('لوحة المعلومات', 'Dashboard'), T('المبيعات والمشتريات', 'Sales & purchases') + ' <small style="font-size:13px;color:#605e5c;font-weight:400">' +
       T('بالعملة المحلية قبل الضريبة', 'local currency, before tax') + ' (' + esc(cur) + ')</small>') +
       '<div class="content"><div class="fin-filters" style="background:none;padding:0 0 12px"><label>' + T('السنة', 'Year') + '<select class="inp" onchange="FA.sdSet(this.value)">' +
       years.map(function (x) { return '<option' + (x === f.year ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label></div>' +

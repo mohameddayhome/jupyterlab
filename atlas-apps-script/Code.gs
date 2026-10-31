@@ -49,3 +49,13 @@ function getSheetChunk(url, gid, start, count) {
   if (n <= 0 || lastCol <= 0) return '[]';
   return JSON.stringify(sheet.getRange(start, 1, n, lastCol).getDisplayValues());
 }
+
+/** Saved calculated-column definitions (JSON string), kept in script properties. */
+function getCalcColumns() {
+  return PropertiesService.getScriptProperties().getProperty('atlasCalcColumns') || '[]';
+}
+
+function saveCalcColumns(json) {
+  JSON.parse(json); // reject malformed input
+  PropertiesService.getScriptProperties().setProperty('atlasCalcColumns', json);
+}

@@ -122,6 +122,8 @@
   .calc-item code{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;color:var(--muted);font-size:11px}
   .calc-item button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
   .calc-item button:hover{color:var(--accent)}
+  .calc-item.inactive{opacity:.55}
+  .calc-item em{font-style:normal;color:var(--muted);font-size:11px}
   .calc-error{color:var(--accent);font-size:12px;min-height:16px;margin-bottom:8px}
   .calc-actions{display:flex;gap:10px;justify-content:flex-end}
   .calc-actions .upload-cta{padding:10px 18px}
@@ -464,6 +466,7 @@
     <div class="calc-preview" id="calcPreview"></div>
     <div class="calc-error" id="calcError"></div>
     <div class="calc-list" id="calcList"></div>
+    <div class="chart-sub" data-i18n="calcSavedNote" style="margin:-6px 0 16px">الأعمدة المحسوبة تُحفظ تلقائيًا وتُطبَّق على أي ملف يحتوي نفس الأعمدة.</div>
     <div class="calc-actions">
       <button type="button" class="ghost" id="calcCancel" data-i18n="close">إغلاق</button>
       <button type="submit" class="upload-cta" data-i18n="calcAdd">إضافة العمود</button>
@@ -563,7 +566,7 @@ const I18N = {
     calcBtn:'ƒx عمود محسوب', calcTitle:'عمود محسوب', calcHint:'أنشئ عمودًا جديدًا من عمودين رقميين أو عمود ورقم ثابت',
     calcName:'اسم العمود', calcConstPh:'الرقم الثابت', calcConstOpt:'رقم ثابت…', close:'إغلاق', calcAdd:'إضافة العمود',
     calcNeedNum:'لا توجد أعمدة رقمية في البيانات.', calcNeedName:'اكتب اسمًا للعمود.', calcNameTaken:'يوجد عمود بهذا الاسم.',
-    calcNeedConst:'اكتب الرقم الثابت.', calcExample:'مثال: ', calcDefaultName:'{a} {op} {b}', calcRemove:'حذف العمود', calcAdded:'تمت إضافة العمود «{n}».'
+    calcNeedConst:'اكتب الرقم الثابت.', calcExample:'مثال: ', calcDefaultName:'{a} {op} {b}', calcRemove:'حذف العمود', calcAdded:'تمت إضافة العمود «{n}» وحفظه تلقائيًا.', calcSavedNote:'الأعمدة المحسوبة تُحفظ تلقائيًا وتُطبَّق على أي ملف يحتوي نفس الأعمدة.', calcSkipped:'محفوظ، لكن أعمدته غير موجودة في هذا الملف'
   },
   en: {
     docTitle:'Atlas — Dynamic Data Dashboard', brandTag:'Dynamic Dashboard / v1', processing:'Parsing', excel:'Excel',
@@ -605,7 +608,7 @@ const I18N = {
     calcBtn:'ƒx Calculated column', calcTitle:'Calculated column', calcHint:'Create a new column from two numeric columns, or a column and a fixed number',
     calcName:'Column name', calcConstPh:'Fixed number', calcConstOpt:'Fixed number…', close:'Close', calcAdd:'Add column',
     calcNeedNum:'There are no numeric columns in the data.', calcNeedName:'Enter a column name.', calcNameTaken:'A column with this name already exists.',
-    calcNeedConst:'Enter the fixed number.', calcExample:'Example: ', calcDefaultName:'{a} {op} {b}', calcRemove:'Remove column', calcAdded:'Column “{n}” added.'
+    calcNeedConst:'Enter the fixed number.', calcExample:'Example: ', calcDefaultName:'{a} {op} {b}', calcRemove:'Remove column', calcAdded:'Column “{n}” added and saved automatically.', calcSavedNote:'Calculated columns are saved automatically and re-applied to any file with the same columns.', calcSkipped:'saved, but its columns are not in this file'
   }
 };
 let lang = document.documentElement.getAttribute('lang') === 'en' ? 'en' : 'ar';
@@ -1031,6 +1034,7 @@ function ingestNow(rawRows){
   document.getElementById('uploadView').style.display='none';
   document.getElementById('dashView').classList.add('active');
 
+  applySavedCalcColumns();
   buildDashboard();
 }
 
@@ -1188,10 +1192,55 @@ function updateCalcPreview(){
 }
 
 function renderCalcList(){
-  calcList.innerHTML = state.calcColumns.map((c, i) =>
-    `<div class="calc-item"><span><strong>${escapeHtml(c.name)}</strong> &nbsp;<code dir="ltr">= ${escapeHtml(calcFormula(c))}</code></span><button type="button" data-i="${i}" title="${escapeHtml(t('calcRemove'))}">&times;</button></div>`
+  const active = new Set(state.calcColumns.map(c => c.name));
+  const items = [...state.calcColumns, ...loadSavedCalcs().filter(c => !active.has(c.name))];
+  calcList.innerHTML = items.map(c =>
+    `<div class="calc-item${active.has(c.name) ? '' : ' inactive'}"><span><strong>${escapeHtml(c.name)}</strong> &nbsp;<code dir="ltr">= ${escapeHtml(calcFormula(c))}</code>${active.has(c.name) ? '' : ` &nbsp;<em>${escapeHtml(t('calcSkipped'))}</em>`}</span><button type="button" data-name="${escapeHtml(c.name)}" title="${escapeHtml(t('calcRemove'))}">&times;</button></div>`
   ).join('');
-  calcList.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => removeCalcColumn(state.calcColumns[+btn.dataset.i].name)));
+  calcList.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => removeCalcColumn(btn.dataset.name)));
+}
+
+// Saved definitions live in the browser and, inside Apps Script, in the script's properties
+const CALC_KEY = 'atlas-calc-columns';
+const hasAppsScript = () => !!(window.google && google.script && google.script.run);
+function loadSavedCalcs(){
+  try{ const list = JSON.parse(localStorage.getItem(CALC_KEY)); return Array.isArray(list) ? list : []; }catch(e){ return []; }
+}
+function persistCalcs(list){
+  try{ localStorage.setItem(CALC_KEY, JSON.stringify(list)); }catch(e){}
+  if(hasAppsScript()) google.script.run.withFailureHandler(err => console.warn('calc save failed', err)).saveCalcColumns(JSON.stringify(list));
+}
+if(hasAppsScript()){
+  google.script.run.withSuccessHandler(json => {
+    let server = [];
+    try{ server = JSON.parse(json || '[]'); }catch(e){}
+    if(server.length){
+      try{ localStorage.setItem(CALC_KEY, JSON.stringify(server)); }catch(e){}
+      if(state.rows.length && applySavedCalcColumns()){ buildFilters(); refreshAll(); }
+    } else if(loadSavedCalcs().length){
+      persistCalcs(loadSavedCalcs());
+    }
+  }).getCalcColumns();
+}
+
+function canApplyCalc(c){
+  const numeric = name => state.columns.some(col => col.name === name && col.type === 'number');
+  return !state.columns.some(col => col.name === c.name) && numeric(c.a) && (c.b === '__CONST__' ? Number.isFinite(c.k) : numeric(c.b));
+}
+
+function addCalcToState(c){
+  for(const row of state.rows) row[c.name] = computeCalc(row, c);
+  state.calcColumns.push(c);
+  state.columns.push({name:c.name, type:'number', uniqueCount:0, calc:true});
+}
+
+// Re-apply saved definitions in order (a calc column may build on an earlier one)
+function applySavedCalcColumns(){
+  let added = 0;
+  for(const c of loadSavedCalcs()){
+    if(canApplyCalc(c)){ addCalcToState(c); added++; }
+  }
+  return added;
 }
 
 function saveCalcColumn(){
@@ -1200,19 +1249,18 @@ function saveCalcColumn(){
   if(!c.name) { calcError.textContent = t('calcNeedName'); return; }
   if(state.columns.some(col => col.name === c.name)) { calcError.textContent = t('calcNameTaken'); return; }
   if(c.b === '__CONST__' && (c.k === null || !Number.isFinite(c.k))) { calcError.textContent = t('calcNeedConst'); return; }
-  for(const row of state.rows) row[c.name] = computeCalc(row, c);
-  state.calcColumns.push(c);
-  state.columns.push({name:c.name, type:'number', uniqueCount:0, calc:true});
-  calcError.textContent = t('calcAdded', {n:c.name});
+  addCalcToState(c);
+  persistCalcs([...loadSavedCalcs().filter(saved => saved.name !== c.name), c]);
   calcNameTouched = false;
   calcName.value = '';
-  renderCalcList();
-  updateCalcPreview();
+  openCalcDialog();  // refresh dropdowns so the new column can be used right away
+  calcError.textContent = t('calcAdded', {n:c.name});
   buildFilters();
   refreshAll();
 }
 
 function removeCalcColumn(name){
+  persistCalcs(loadSavedCalcs().filter(c => c.name !== name));
   state.calcColumns = state.calcColumns.filter(c => c.name !== name);
   state.columns = state.columns.filter(c => c.name !== name);
   for(const row of state.rows) delete row[name];
@@ -1221,8 +1269,7 @@ function removeCalcColumn(name){
   state.kpiConfigs = state.kpiConfigs.filter(k => k.colName !== name);
   state.chartConfigs = state.chartConfigs.filter(cfg => ![cfg.catCol, cfg.valueCol, cfg.dateCol, cfg.xCol, cfg.yCol].includes(name));
   if(state.sortKey === name) state.sortKey = null;
-  calcError.textContent = '';
-  renderCalcList();
+  openCalcDialog();
   buildFilters();
   refreshAll();
 }
@@ -1240,11 +1287,35 @@ function exportToExcel(){
     return [column.name, value instanceof Date ? value.toISOString().slice(0, 10) : value];
   })));
   const worksheet = XLSX.utils.json_to_sheet(exportRows);
+  writeCalcFormulas(worksheet, rows.length);
   worksheet['!autofilter'] = {ref: worksheet['!ref']};
   worksheet['!cols'] = state.columns.map(column => ({wch: Math.min(32, Math.max(12, column.name.length + 3))}));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, t('exportSheet'));
   XLSX.writeFile(workbook, `atlas-dashboard-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// Calculated columns are exported as live Excel formulas (with cached values),
+// so they keep working when the source cells are edited in Excel.
+function writeCalcFormulas(worksheet, rowCount){
+  const colLetter = name => XLSX.utils.encode_col(state.columns.findIndex(c => c.name === name));
+  state.calcColumns.forEach(c => {
+    const target = colLetter(c.name);
+    const a = colLetter(c.a);
+    const b = c.b === '__CONST__' ? null : colLetter(c.b);
+    for(let r = 2; r <= rowCount + 1; r++){
+      const A = `${a}${r}`, B = b ? `${b}${r}` : `(${c.k})`;
+      const blanks = b ? [`${A}=""`, `${B}=""`] : [`${A}=""`];
+      const formula = c.op === '/'
+        ? `IF(OR(${[...blanks, `${B}=0`].join(',')}),"",${A}/${B})`
+        : `IF(${blanks.length > 1 ? `OR(${blanks.join(',')})` : blanks[0]},"",${A}${c.op}${B})`;
+      const addr = `${target}${r}`;
+      const cached = worksheet[addr] ? worksheet[addr].v : undefined;
+      worksheet[addr] = (cached === undefined || cached === null || cached === '')
+        ? {t:'s', v:'', f:formula}
+        : {t:'n', v:cached, f:formula};
+    }
+  });
 }
 
 function exportToPdf(){

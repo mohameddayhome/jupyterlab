@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Atlas — Dynamic Data Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  (function(){
+    var t = null;
+    try{ t = localStorage.getItem('atlas-theme'); }catch(e){}
+    if(!t) t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<style>
+  :root{
+    --bg:#eef3f2;
+    --panel:#ffffff;
+    --ink:#17313a;
+    --ink-soft:#48616a;
+    --muted:#789099;
+    --line:#d9e5e4;
+    --line-strong:#aec5c5;
+    --accent:#e06b4f;
+    --accent-soft:#fbe1d9;
+    --good:#28877b;
+    --warn:#c8953d;
+    --c1:#e06b4f; --c2:#2f6878; --c3:#28877b; --c4:#c8953d; --c5:#91627e; --c6:#4c8490; --c7:#b45e52; --c8:#738b5b;
+    --shadow:0 1px 2px rgba(23,49,58,0.04), 0 14px 30px -18px rgba(23,49,58,0.22);
+    --radius:10px;
+    --header-bg:rgba(238,243,242,0.88);
+    --soft-bg:#f7faf9;
+    --hover-bg:#f4f8f7;
+    --upload-hover:#fffaf6;
+    --totals-head:#edf5f3;
+    --totals-first:#f8fbfa;
+    --totals-grand:#fff3ee;
+    --totals-hover:#eaf4f1;
+    --error-bg:#fbe9e0;
+    --error-ink:#7a2810;
+    --grain-opacity:0.35;
+    --grain-blend:multiply;
+    --chart-text:#48616a;
+    --chart-grid:#d9e5e4;
+    --chart-tick:#789099;
+    --tooltip-bg:#17313a;
+    --chart-line:#2b4a6f;
+    --chart-line-fill:rgba(47,104,120,0.08);
+    color-scheme:light;
+  }
+  /* ---------- NIGHT MODE ---------- */
+  :root[data-theme="dark"]{
+    --bg:#0f1b20;
+    --panel:#16262d;
+    --ink:#e4eeee;
+    --ink-soft:#a9bfc4;
+    --muted:#7f979e;
+    --line:#24383f;
+    --line-strong:#36515a;
+    --accent:#f07e62;
+    --accent-soft:#4a2a22;
+    --good:#4fb3a5;
+    --warn:#ddb067;
+    --shadow:0 1px 2px rgba(0,0,0,0.25), 0 14px 30px -18px rgba(0,0,0,0.6);
+    --header-bg:rgba(15,27,32,0.86);
+    --soft-bg:#1b2e35;
+    --hover-bg:#1c3038;
+    --upload-hover:#1d2a2c;
+    --totals-head:#1b3036;
+    --totals-first:#182a31;
+    --totals-grand:#3a2620;
+    --totals-hover:#203840;
+    --error-bg:#3d211a;
+    --error-ink:#ffb9a6;
+    --grain-opacity:0.18;
+    --grain-blend:screen;
+    --chart-text:#b7cbcf;
+    --chart-grid:#263c43;
+    --chart-tick:#87a0a6;
+    --tooltip-bg:#05100f;
+    --chart-line:#7fb8c8;
+    --chart-line-fill:rgba(120,180,195,0.12);
+    color-scheme:dark;
+  }
+  html,body,.filters-bar,.kpi,.chart-card,.table-card,.totals-card,.upload,th,td,select,input,button{transition:background-color .25s,border-color .25s,color .25s}
+  .theme-toggle{display:inline-flex;align-items:center;gap:6px}
+  .theme-toggle svg{width:13px;height:13px}
+  .theme-toggle .ico-sun{display:none}
+  :root[data-theme="dark"] .theme-toggle .ico-sun{display:inline}
+  :root[data-theme="dark"] .theme-toggle .ico-moon{display:none}
+  .sheet-load{display:flex;gap:8px;max-width:520px;margin:14px auto 0}
+  .sheet-load input{flex:1;min-width:0;font:inherit;font-size:13px;padding:10px 12px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink)}
+  .sheet-load input:focus{outline:none;border-color:var(--accent)}
+  .sheet-load button{white-space:nowrap}
+  @media (max-width:680px){.sheet-load{flex-direction:column}}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Geist',-apple-system,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:var(--grain-opacity);mix-blend-mode:var(--grain-blend);
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  header.top{position:sticky;top:0;z-index:50;background:var(--header-bg);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+  .top-inner{display:flex;align-items:baseline;justify-content:space-between;padding:18px 28px;max-width:1600px;margin:0 auto}
+  .brand{display:flex;align-items:baseline;gap:12px}
+  .brand-mark{font-family:'Fraunces',serif;font-weight:500;font-size:28px;letter-spacing:-0.02em;font-style:italic}
+  .brand-mark::after{content:"●";color:var(--accent);margin-left:4px;font-style:normal;font-size:18px;vertical-align:middle}
+  .brand-tag{font-family:'Geist Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .top-meta{display:flex;gap:18px;align-items:center;font-family:'Geist Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-soft)}
+  .pill{padding:4px 10px;border:1px solid var(--line-strong);border-radius:999px;background:var(--panel)}
+  button.ghost{background:transparent;border:1px solid var(--line-strong);padding:6px 12px;font-family:'Geist Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;cursor:pointer;border-radius:4px;color:var(--ink);transition:all .15s}
+  button.ghost:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+  main{max-width:1600px;margin:0 auto;padding:32px 28px 80px;position:relative;z-index:2}
+
+  /* Upload zone */
+  .upload-wrap{display:flex;align-items:center;justify-content:center;min-height:60vh}
+  .upload{width:100%;max-width:760px;background:var(--panel);border:1.5px dashed var(--line-strong);border-radius:var(--radius);padding:64px 40px;text-align:center;transition:all .2s;cursor:pointer;position:relative;overflow:hidden}
+  .upload:hover{border-color:var(--accent);background:var(--upload-hover)}
+  .upload.drag{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.005)}
+  .upload h1{font-family:'Fraunces',serif;font-weight:400;font-size:48px;line-height:1.05;letter-spacing:-0.02em;margin:0 0 12px}
+  .upload h1 em{font-style:italic;color:var(--accent)}
+  .upload p{color:var(--ink-soft);max-width:480px;margin:0 auto 28px;font-size:15px}
+  .upload-cta{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:var(--bg);padding:12px 22px;border-radius:4px;font-family:'Geist Mono',monospace;font-size:12px;text-transform:uppercase;letter-spacing:0.16em;border:none;cursor:pointer;transition:all .15s}
+  .upload-cta:hover{background:var(--accent)}
+  .upload-formats{margin-top:20px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .upload-or{display:block;margin:18px 0;font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)}
+  .sample-link{background:none;border:none;color:var(--accent);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit;font-size:13px}
+  .sample-link:hover{color:var(--ink)}
+
+  /* Dashboard layout */
+  .dash{display:none}
+  .dash.active{display:block}
+  .section-label{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.2em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .section-label::before{content:"";width:24px;height:1px;background:var(--line-strong)}
+  .section-action{margin-left:auto;opacity:0;pointer-events:none;transition:opacity .15s;background:var(--panel);border:1px solid var(--line-strong);border-radius:4px;color:var(--ink-soft);padding:5px 9px;font:700 10px 'Geist Mono',monospace;text-transform:uppercase;letter-spacing:.1em;cursor:pointer}
+  .section-label:hover .section-action,.section-label:focus-within .section-action{opacity:1;pointer-events:auto}
+  .section-action:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  .filters-bar{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 22px;margin-bottom:24px;box-shadow:var(--shadow)}
+  .filters-row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+  .filter{display:flex;flex-direction:column;gap:6px;min-width:160px;flex:1 1 180px;max-width:240px}
+  .filter label{font-family:'Geist Mono',monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted)}
+  .filter select, .filter input{font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);width:100%}
+  .filter select[multiple]{min-height:96px;padding:4px 6px}
+  .filter select[multiple] option{padding:5px 6px;border-radius:3px}
+  .filter select[multiple] option:checked{background:var(--accent-soft);color:var(--ink)}
+  .multi-select-dropdown{position:relative;width:100%}
+  .multi-select-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);font:inherit;font-size:13px;font-weight:700;text-align:left;cursor:pointer}
+  .multi-select-trigger::after{content:'⌄';color:var(--muted);font-size:16px;line-height:1}
+  .multi-select-dropdown.open .multi-select-trigger{border-color:var(--accent);border-bottom-left-radius:0;border-bottom-right-radius:0}
+  .multi-select-menu{display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--panel);border:1px solid var(--accent);border-top:0;border-radius:0 0 5px 5px;box-shadow:0 12px 24px -14px rgba(23,49,58,.45);padding:8px}
+  .multi-select-dropdown.open .multi-select-menu{display:block}
+  .multi-select-search{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:3px;background:var(--soft-bg);color:var(--ink);font:inherit;font-size:12px;font-weight:700;margin-bottom:6px}
+  .multi-select-search:focus{outline:none;border-color:var(--accent)}
+  .multi-select-options{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+  .multi-select-actions{display:flex;gap:6px;margin-bottom:6px}
+  .multi-select-action{flex:1;padding:5px 6px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);font-family:'Geist Mono',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
+  .multi-select-action:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+  .multi-select-option{display:flex;align-items:center;gap:8px;padding:6px;border-radius:3px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .multi-select-option:hover{background:var(--accent-soft)}
+  .multi-select-option input{width:auto;margin:0;padding:0;accent-color:var(--accent);flex:0 0 auto}
+  .filter select:focus, .filter input:focus{outline:none;border-color:var(--accent)}
+  .filter-clear{align-self:flex-end}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:28px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+  .kpi::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent)}
+  .kpi:nth-child(2)::before{background:var(--c2)}
+  .kpi:nth-child(3)::before{background:var(--c3)}
+  .kpi:nth-child(4)::before{background:var(--c4)}
+  .kpi:nth-child(5)::before{background:var(--c5)}
+  .kpi:nth-child(6)::before{background:var(--c6)}
+  .kpi-label{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted);margin-bottom:8px}
+  .kpi-value{font-family:'Fraunces',serif;font-size:34px;font-weight:400;letter-spacing:-0.02em;line-height:1.1}
+  .kpi-sub{font-size:11px;color:var(--ink-soft);margin-top:6px;font-family:'Geist Mono',monospace;letter-spacing:0.06em}
+
+  .charts-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px;margin-bottom:28px}
+  .chart-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);min-height:340px;display:flex;flex-direction:column}
+  .chart-card.span-12{grid-column:span 12}
+  .chart-card.span-8{grid-column:span 8}
+  .chart-card.span-6{grid-column:span 6}
+  .chart-card.span-4{grid-column:span 4}
+  @media (max-width:1100px){
+    .chart-card.span-8,.chart-card.span-6,.chart-card.span-4{grid-column:span 12}
+  }
+  .chart-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px}
+  .chart-title{font-family:'Fraunces',serif;font-weight:500;font-size:18px;letter-spacing:-0.01em;margin:0}
+  .chart-sub{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);margin-top:3px}
+  .chart-controls{display:flex;gap:6px;align-items:center}
+  .chart-controls select{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;padding:5px 8px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);cursor:pointer}
+  .chart-canvas-wrap{flex:1;position:relative;min-height:260px}
+
+  .table-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .table-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+  .table-search{padding:7px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);font:inherit;font-size:12px;min-width:220px}
+  .table-scroll{overflow:auto;max-height:520px}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+  thead{position:sticky;top:0;background:var(--panel);z-index:1}
+  th{text-align:left;padding:12px 16px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;background:var(--soft-bg)}
+  th:hover{color:var(--ink)}
+  th .sort-ind{margin-left:4px;opacity:0.4}
+  th.sorted .sort-ind{opacity:1;color:var(--accent)}
+  td{padding:11px 16px;border-bottom:1px solid var(--line);white-space:normal;min-width:110px;max-width:360px;overflow-wrap:anywhere;vertical-align:top}
+  tr:hover td{background:var(--hover-bg)}
+  #dataTable{min-width:max-content}
+  #dataTable th,#dataTable td{min-width:140px}
+  #dataTable td.num{white-space:nowrap;min-width:120px}
+  td.num{text-align:right;font-family:'Geist Mono',monospace}
+
+  .table-foot{padding:12px 22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:'Geist Mono',monospace;font-size:11px;color:var(--ink-soft);letter-spacing:0.06em}
+  .pager{display:flex;gap:6px}
+  .pager button{background:var(--bg);border:1px solid var(--line-strong);padding:4px 10px;font:inherit;cursor:pointer;border-radius:3px;color:var(--ink)}
+  .pager button:disabled{opacity:0.4;cursor:not-allowed}
+  .pager button:not(:disabled):hover{background:var(--ink);color:var(--bg)}
+
+  .footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+
+  .empty-state{text-align:center;padding:60px 20px;color:var(--muted);font-family:'Fraunces',serif;font-style:italic;font-size:18px}
+
+  .totals-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:28px}
+  .totals-table-wrap{overflow:auto}
+  .totals-table{min-width:720px}
+  .totals-table th,.totals-table td{text-align:right;min-width:120px;white-space:nowrap}
+  .totals-table th:first-child,.totals-table td:first-child{text-align:left;min-width:190px;position:sticky;left:0}
+  .totals-table th:last-child,.totals-table td:last-child{min-width:140px;background:var(--totals-head);font-weight:700;color:var(--ink)}
+  .totals-table th:first-child{background:var(--totals-head)}
+  .totals-table td:first-child{background:var(--totals-first);font-family:'Geist',sans-serif;font-weight:600;color:var(--ink)}
+  .totals-table tbody td{font-family:'Geist Mono',monospace;font-size:12px}
+  .totals-table .totals-grand-row td{border-top:2px solid var(--accent);background:var(--totals-grand);color:var(--ink);font-weight:700}
+  .totals-table tbody tr:hover td{background:var(--totals-hover)}
+
+  /* Loading */
+  .loader{display:none;align-items:center;gap:10px;font-family:'Geist Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .loader.show{display:flex}
+  .loader::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:0.3;transform:scale(0.8)}50%{opacity:1;transform:scale(1.1)}}
+
+  .error{background:var(--error-bg);border:1px solid var(--accent);color:var(--error-ink);padding:14px 18px;border-radius:var(--radius);margin-bottom:18px;font-size:13px}
+
+  .remove-filter{transition:color .15s}
+  .remove-filter:hover{color:var(--accent) !important}
+
+  @media (max-width:680px){
+    .top-inner{padding:14px 18px;flex-wrap:wrap;gap:10px}
+    main{padding:20px 16px 60px}
+    .upload{padding:40px 24px}
+    .upload h1{font-size:34px}
+    .kpi-value{font-size:26px}
+  }
+
+  /* Dynamic KPI and Chart styling */
+  .kpi-label-row{display:flex;align-items:center;gap:4px;margin-bottom:8px;position:relative}
+  .kpi-select{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed var(--line-strong);padding:0 2px;cursor:pointer;outline:none}
+  .kpi-select:hover{color:var(--ink);border-bottom-color:var(--accent)}
+  .kpi-remove{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;opacity:0;transition:opacity .15s, color .15s;padding:0 4px;line-height:1;z-index:10}
+  .kpi:hover .kpi-remove{opacity:1}
+  .kpi-remove:hover{color:var(--accent)}
+  
+  .kpi.add-card{display:flex;align-items:center;justify-content:center;border:1px dashed var(--line-strong);background:transparent;cursor:pointer;min-height:100px;box-shadow:none;position:relative}
+  .kpi.add-card::before{display:none}
+  .kpi.add-card:hover{border-color:var(--accent);background:var(--panel)}
+  .kpi-add-btn{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .kpi.add-card:hover .kpi-add-btn{color:var(--accent)}
+
+  .chart-card.add-card{display:flex;align-items:center;justify-content:center;border:1px dashed var(--line-strong);background:transparent;cursor:pointer;min-height:340px;box-shadow:none;grid-column:span 4}
+  .chart-card.add-card:hover{border-color:var(--accent);background:var(--panel)}
+  .chart-card.add-card:hover .kpi-add-btn{color:var(--accent)}
+  .kpi.add-card,.chart-card.add-card{display:none}
+  @media print{
+    @page{size:auto;margin:12mm}
+    body{background:#fff;color:#000}
+    .theme-toggle,.sheet-load{display:none !important}
+    .grain,header.top,.filters-bar,.section-action,.chart-controls,.chart-remove,.kpi-remove,.table-search,.table-foot,.upload-wrap{display:none !important}
+    main{max-width:none;padding:0}
+    .dash{display:block !important}
+    .chart-card,.totals-card,.table-card,.kpi{box-shadow:none;border:1px solid #bbb;break-inside:avoid}
+    .charts-grid{display:grid}
+    .table-scroll{max-height:none;overflow:visible}
+    .totals-table-wrap{overflow:visible}
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div class="brand-mark">Atlas</div>
+      <div class="brand-tag">Dynamic Dashboard / v1</div>
+    </div>
+    <div class="top-meta" id="topMeta">
+      <span class="pill" id="fileNamePill" style="display:none"></span>
+      <div class="loader" id="loader"><span>Parsing</span></div>
+      <button class="ghost export-btn" id="excelBtn" style="display:none">Excel</button>
+      <button class="ghost export-btn" id="pdfBtn" style="display:none">PDF</button>
+      <button class="ghost" id="resetBtn" style="display:none">↻ New file</button>
+      <button class="ghost theme-toggle" id="themeBtn" title="Toggle night mode">
+        <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <span id="themeLabel">Night</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- UPLOAD VIEW -->
+  <section class="upload-wrap" id="uploadView">
+    <div class="upload" id="dropZone">
+      <h1>Drop your data.<br/><em>See it move.</em></h1>
+      <p>Upload any CSV or Excel file. Atlas reads the structure, picks the right charts, builds filters from your categories, and lets you slice it live.</p>
+      <button class="upload-cta" id="browseBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0-12l-4 4m4-4l4 4M5 21h14"/></svg>
+        Choose file
+      </button>
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.tsv" style="display:none" />
+      <span class="upload-or">— or drag &amp; drop —</span>
+      <div>
+        <button class="sample-link" id="sampleBtn">Try with sample data</button>
+      </div>
+      <span class="upload-or">— or load a Google Sheet —</span>
+      <div class="sheet-load" id="sheetLoad">
+        <input type="text" id="sheetUrl" placeholder="Paste Google Sheet link (leave empty for the linked sheet)" />
+        <button class="ghost" id="sheetBtn">Load sheet</button>
+      </div>
+      <div class="upload-formats">CSV · TSV · XLSX · XLS · Google Sheets</div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD VIEW -->
+  <section class="dash" id="dashView">
+    <div id="errorBox"></div>
+
+    <div class="section-label">Filters</div>
+    <div class="filters-bar">
+      <div class="filters-row" id="filtersRow"></div>
+    </div>
+
+    <div class="section-label">Key metrics<button class="section-action" id="addMetricBtn">+ Add metric</button></div>
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="section-label">Visualizations<button class="section-action" id="addChartBtn">+ Add chart</button></div>
+    <div class="charts-grid" id="chartsGrid"></div>
+
+    <div class="section-label">Column totals</div>
+    <div class="totals-card">
+      <div class="table-head">
+        <div>
+          <div class="chart-title">Totals summary</div>
+          <div class="chart-sub" id="totalsSub"></div>
+        </div>
+        <div class="chart-controls" id="totalsControls"></div>
+      </div>
+      <div class="totals-table-wrap">
+        <table class="totals-table" id="totalsTable"></table>
+      </div>
+    </div>
+
+    <div class="section-label">Flexible pivot</div>
+    <div class="totals-card">
+      <div class="table-head">
+        <div>
+          <div class="chart-title">Custom pivot table</div>
+          <div class="chart-sub" id="pivotSub"></div>
+        </div>
+        <div class="chart-controls" id="pivotControls"></div>
+      </div>
+      <div class="totals-table-wrap">
+        <table class="totals-table" id="pivotTable"></table>
+      </div>
+    </div>
+
+    <div class="section-label">Data</div>
+    <div class="table-card">
+      <div class="table-head">
+        <div>
+          <div class="chart-title" id="tableTitle">Filtered records</div>
+          <div class="chart-sub" id="tableSub"></div>
+        </div>
+        <input type="text" class="table-search" id="tableSearch" placeholder="Search across all columns..." />
+      </div>
+      <div class="table-scroll" id="tableScroll">
+        <table id="dataTable"></table>
+      </div>
+      <div class="table-foot">
+        <span id="tableInfo"></span>
+        <div class="pager">
+          <button id="pagePrev">‹ Prev</button>
+          <span id="pageLabel" style="padding:4px 8px"></span>
+          <button id="pageNext">Next ›</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>Atlas Dashboard</span>
+      <span id="footMeta"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+/* =========================================================
+   STATE
+========================================================= */
+const state = {
+  rows: [],          // raw rows (array of objects)
+  columns: [],       // [{name, type:'number'|'date'|'category'|'text', uniqueCount, ...}]
+  filters: {},       // {colName: 'value' or '' for ALL, or {min,max} for numeric, or {start,end} for date}
+  activeFilterCols: [], // columns currently displayed as filter widgets
+  kpiConfigs: [],    // [{id, colName, agg}]
+  chartConfigs: [],  // [{id, type, span, ...type-specific configs}]
+  charts: {},        // chart instances by id
+  totalsConfig: {rowCol:'', dateCol:'', valueCol:'', granularity:'month'},
+  pivotConfig: {rowCol:'', colCol:'', valueCol:'__RECORDS__', agg:'count'},
+  page: 1,
+  perPage: 50,
+  sortKey: null,
+  sortDir: 1,
+  search: '',
+  fileName: ''
+};
+
+const fmt = {
+  num(v){
+    if(v===null||v===undefined||isNaN(v)) return '—';
+    const n = Number(v);
+    if(Math.abs(n) >= 1e9) return (n/1e9).toFixed(2)+'B';
+    if(Math.abs(n) >= 1e6) return (n/1e6).toFixed(2)+'M';
+    if(Math.abs(n) >= 1e3) return (n/1e3).toFixed(1)+'K';
+    if(Number.isInteger(n)) return n.toLocaleString();
+    return n.toLocaleString(undefined,{maximumFractionDigits:2});
+  },
+  full(v){
+    if(v===null||v===undefined||isNaN(v)) return '—';
+    return Number(v).toLocaleString(undefined,{maximumFractionDigits:2});
+  },
+  cell(v, type){
+    if(v===null||v===undefined||v==='') return '';
+    if(type==='number') return Number(v).toLocaleString(undefined,{maximumFractionDigits:4});
+    if(type==='date'){
+      const d = v instanceof Date ? v : new Date(v);
+      if(!isNaN(d)) return d.toISOString().slice(0,10);
+    }
+    return String(v);
+  }
+};
+
+const palette = ['#d2502a','#2b4a6f','#3f7d5b','#c08a2b','#7a3b6e','#456b7a','#a44b3a','#5e6b3a','#8c5a2b','#3a5a7a'];
+
+/* =========================================================
+   FILE INPUT
+========================================================= */
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const browseBtn = document.getElementById('browseBtn');
+const sampleBtn = document.getElementById('sampleBtn');
+const resetBtn = document.getElementById('resetBtn');
+const loader = document.getElementById('loader');
+const fileNamePill = document.getElementById('fileNamePill');
+const excelBtn = document.getElementById('excelBtn');
+const pdfBtn = document.getElementById('pdfBtn');
+const addMetricBtn = document.getElementById('addMetricBtn');
+const addChartBtn = document.getElementById('addChartBtn');
+
+browseBtn.addEventListener('click', e=>{ e.stopPropagation(); fileInput.click(); });
+dropZone.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();dropZone.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();dropZone.classList.remove('drag');}));
+dropZone.addEventListener('drop', e=>{ if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+resetBtn.addEventListener('click', ()=>{
+  state.rows=[]; state.columns=[]; state.filters={}; state.activeFilterCols=[]; state.kpiConfigs=[]; state.chartConfigs=[]; Object.values(state.charts).forEach(c=>c.destroy()); state.charts={};
+  document.getElementById('uploadView').style.display='flex';
+  document.getElementById('dashView').classList.remove('active');
+  fileNamePill.style.display='none';
+  excelBtn.style.display='none';
+  pdfBtn.style.display='none';
+  resetBtn.style.display='none';
+  fileInput.value='';
+});
+
+excelBtn.addEventListener('click', exportToExcel);
+pdfBtn.addEventListener('click', exportToPdf);
+addMetricBtn.addEventListener('click', addMetric);
+addChartBtn.addEventListener('click', addChart);
+
+sampleBtn.addEventListener('click', e=>{ e.stopPropagation(); loadSample(); });
+
+/* =========================================================
+   NIGHT MODE
+========================================================= */
+const themeBtn = document.getElementById('themeBtn');
+const themeLabel = document.getElementById('themeLabel');
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  themeLabel.textContent = theme === 'dark' ? 'Day' : 'Night';
+  try{ localStorage.setItem('atlas-theme', theme); }catch(e){}
+  if(state.rows.length) buildCharts(getFilteredRows());
+}
+themeLabel.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Day' : 'Night';
+themeBtn.addEventListener('click', ()=>{
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+
+/* =========================================================
+   GOOGLE SHEETS (Apps Script)
+========================================================= */
+const sheetLoad = document.getElementById('sheetLoad');
+const sheetUrl = document.getElementById('sheetUrl');
+const sheetBtn = document.getElementById('sheetBtn');
+['click','dragenter','dragover','drop'].forEach(ev => sheetLoad.addEventListener(ev, e => e.stopPropagation()));
+sheetUrl.addEventListener('keydown', e => { if(e.key === 'Enter') loadGoogleSheet(); });
+sheetBtn.addEventListener('click', loadGoogleSheet);
+
+function loadGoogleSheet(){
+  if(!(window.google && google.script && google.script.run)){
+    showSheetError('Google Sheets loading works only inside the Apps Script web app.');
+    return;
+  }
+  loader.classList.add('show');
+  google.script.run
+    .withSuccessHandler(res => {
+      loader.classList.remove('show');
+      if(!res || !res.rows || res.rows.length < 2){ showSheetError('No data found in the sheet.'); return; }
+      const headers = res.rows[0].map((h, i) => String(h).trim() || `Column ${i+1}`);
+      const data = res.rows.slice(1)
+        .filter(r => r.some(v => v !== '' && v !== null))
+        .map(r => Object.fromEntries(headers.map((h, i) => [h, r[i]])));
+      state.fileName = res.name;
+      ingest(data);
+    })
+    .withFailureHandler(err => {
+      loader.classList.remove('show');
+      showSheetError('Could not read the sheet: ' + (err && err.message ? err.message : err));
+    })
+    .getSheetData(sheetUrl.value.trim());
+}
+
+function showSheetError(msg){
+  // errorBox lives in the dashboard view, so use alert while on the upload screen
+  if(document.getElementById('dashView').classList.contains('active')) showError(msg);
+  else alert(msg);
+}
+
+function showError(msg){
+  const box = document.getElementById('errorBox');
+  box.innerHTML = `<div class="error">${msg}</div>`;
+  setTimeout(()=>{ box.innerHTML=''; }, 6000);
+}
+
+function handleFile(file){
+  state.fileName = file.name;
+  loader.classList.add('show');
+  const ext = file.name.split('.').pop().toLowerCase();
+  if(ext==='csv' || ext==='tsv' || ext==='txt'){
+    Papa.parse(file, {
+      header:true, skipEmptyLines:true, dynamicTyping:false,
+      complete:(res)=>{
+        loader.classList.remove('show');
+        if(!res.data.length){ showError('No data found in file.'); return; }
+        ingest(res.data);
+      },
+      error:(err)=>{ loader.classList.remove('show'); showError('Could not read CSV: '+err.message); }
+    });
+  } else if(ext==='xlsx' || ext==='xls'){
+    const reader = new FileReader();
+    reader.onload = e=>{
+      try{
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+        loader.classList.remove('show');
+        if(!data.length){ showError('No data found in spreadsheet.'); return; }
+        ingest(data);
+      } catch(err){ loader.classList.remove('show'); showError('Could not read Excel: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    loader.classList.remove('show');
+    showError('Unsupported file type. Please upload CSV, TSV, or Excel.');
+  }
+}
+
+/* =========================================================
+   DATA INGESTION & TYPE DETECTION
+========================================================= */
+function ingest(rawRows){
+  // Clean: strip empty columns, trim keys
+  const allKeys = new Set();
+  rawRows.forEach(r=> Object.keys(r).forEach(k=>{ if(k && k.trim()) allKeys.add(k); }));
+  const cleanRows = rawRows.map(r=>{
+    const o={};
+    allKeys.forEach(k=>{
+      let v = r[k];
+      if(typeof v === 'string') v = v.trim();
+      o[k] = (v===''||v===undefined||v===null) ? null : v;
+    });
+    return o;
+  });
+
+  // Detect column types
+  const cols = [];
+  allKeys.forEach(name=>{
+    const sample = cleanRows.map(r=>r[name]).filter(v=>v!==null);
+    if(sample.length === 0){ cols.push({name,type:'text',uniqueCount:0}); return; }
+
+    // Try numeric
+    let numeric = 0;
+    sample.forEach(v=>{
+      const n = Number(String(v).replace(/[, $€£%]/g,''));
+      if(!isNaN(n) && isFinite(n) && String(v).match(/[\d]/)) numeric++;
+    });
+
+    // Try date
+    let dates = 0;
+    sample.forEach(v=>{
+      if(v instanceof Date && !isNaN(v)){ dates++; return; }
+      const s = String(v);
+      // Match common date patterns
+      if(/^\d{4}-\d{2}-\d{2}/.test(s) || /^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(s) || /^\d{1,2}-[A-Za-z]{3}-\d{2,4}/.test(s)){
+        const d = new Date(s);
+        if(!isNaN(d)) dates++;
+      }
+    });
+
+    const uniq = new Set(sample.map(v=>String(v))).size;
+    let type;
+    if(dates / sample.length > 0.85) type='date';
+    else if(numeric / sample.length > 0.85) type='number';
+    else if(uniq <= Math.min(50, sample.length*0.5)) type='category';
+    else type='text';
+
+    cols.push({name, type, uniqueCount:uniq, sampleSize:sample.length});
+  });
+
+  // Coerce values
+  cleanRows.forEach(r=>{
+    cols.forEach(c=>{
+      let v = r[c.name];
+      if(v===null) return;
+      if(c.type==='number'){
+        const n = Number(String(v).replace(/[, $€£%]/g,''));
+        r[c.name] = isNaN(n) ? null : n;
+      } else if(c.type==='date'){
+        const d = v instanceof Date ? v : new Date(v);
+        r[c.name] = isNaN(d) ? null : d;
+      }
+    });
+  });
+
+  state.rows = cleanRows;
+  state.columns = cols;
+  state.filters = {};
+  
+  // Set default active filters (first few categories, dates, or low unique count texts)
+  const defaultFilterCols = cols.filter(c => c.type==='category' || c.type==='date' || (c.type==='text' && c.uniqueCount<=30 && c.uniqueCount>1));
+  state.activeFilterCols = defaultFilterCols.length > 0
+    ? defaultFilterCols.slice(0, 4).map(c => c.name)
+    : cols.slice(0, 3).map(c => c.name);
+
+  // Initialize default KPIs
+  state.kpiConfigs = [];
+  state.kpiConfigs.push({
+    id: 'kpi_' + Date.now() + '_rec',
+    colName: '__RECORDS__',
+    agg: 'count'
+  });
+  const numColsForKpi = cols.filter(c => c.type === 'number');
+  numColsForKpi.slice(0, 3).forEach((c, idx) => {
+    state.kpiConfigs.push({
+      id: 'kpi_' + Date.now() + '_' + idx,
+      colName: c.name,
+      agg: 'sum'
+    });
+  });
+  if (numColsForKpi.length === 0) {
+    const catCol = cols.find(c => c.type === 'category');
+    if (catCol) {
+      state.kpiConfigs.push({
+        id: 'kpi_' + Date.now() + '_cat',
+        colName: catCol.name,
+        agg: 'unique'
+      });
+    }
+  }
+
+  // Initialize default Charts
+  state.chartConfigs = [];
+  const catColsForChart = cols.filter(c => c.type === 'category' || (c.type === 'text' && c.uniqueCount <= 30));
+  const dateColsForChart = cols.filter(c => c.type === 'date');
+
+  // 1. Line Chart: date × first numeric
+  if (dateColsForChart.length && numColsForKpi.length) {
+    state.chartConfigs.push({
+      id: 'chart_' + Date.now() + '_line',
+      type: 'line',
+      span: 12,
+      dateCol: dateColsForChart[0].name,
+      valueCol: numColsForKpi[0].name,
+      granularity: 'month',
+      title: `${numColsForKpi[0].name} over time`,
+      sub: `Trended by ${dateColsForChart[0].name}`
+    });
+  }
+
+  // 2. Bar Chart: first category × first numeric
+  if (catColsForChart.length && numColsForKpi.length) {
+    state.chartConfigs.push({
+      id: 'chart_' + Date.now() + '_bar',
+      type: 'bar',
+      span: 6,
+      catCol: catColsForChart[0].name,
+      valueCol: numColsForKpi[0].name,
+      title: `${numColsForKpi[0].name} by ${catColsForChart[0].name}`,
+      sub: 'Aggregated sum',
+      agg: 'sum'
+    });
+  }
+
+  // 3. Doughnut Chart: first/second category distribution
+  const donutCatForChart = catColsForChart[1] || catColsForChart[0];
+  if (donutCatForChart) {
+    state.chartConfigs.push({
+      id: 'chart_' + Date.now() + '_doughnut',
+      type: 'doughnut',
+      span: 6,
+      catCol: donutCatForChart.name,
+      title: `Records by ${donutCatForChart.name}`,
+      sub: 'Share of total'
+    });
+  }
+
+  // 4. Bar Chart 2: second category × second numeric (or first numeric)
+  if (catColsForChart.length >= 2 && numColsForKpi.length) {
+    const v = numColsForKpi[1] || numColsForKpi[0];
+    state.chartConfigs.push({
+      id: 'chart_' + Date.now() + '_bar2',
+      type: 'bar',
+      span: 6,
+      catCol: catColsForChart[1].name,
+      valueCol: v.name,
+      title: `${v.name} by ${catColsForChart[1].name}`,
+      sub: 'Aggregated sum',
+      agg: 'sum'
+    });
+  }
+
+  // 5. Scatter Chart: two numerics
+  if (numColsForKpi.length >= 2) {
+    state.chartConfigs.push({
+      id: 'chart_' + Date.now() + '_scatter',
+      type: 'scatter',
+      span: 6,
+      xCol: numColsForKpi[0].name,
+      yCol: numColsForKpi[1].name,
+      title: `${numColsForKpi[0].name} vs ${numColsForKpi[1].name}`,
+      sub: 'Correlation view'
+    });
+  } else if (numColsForKpi.length === 1 && catColsForChart.length === 0) {
+    // Histogram
+    state.chartConfigs.push({
+      id: 'chart_' + Date.now() + '_histogram',
+      type: 'histogram',
+      span: 6,
+      valueCol: numColsForKpi[0].name,
+      title: `Distribution of ${numColsForKpi[0].name}`,
+      sub: 'Frequency by bin'
+    });
+  }
+
+  // Fallback if no numeric columns
+  if (numColsForKpi.length === 0 && catColsForChart.length) {
+    state.chartConfigs.push({
+      id: 'chart_' + Date.now() + '_barcount',
+      type: 'bar-count',
+      span: 12,
+      catCol: catColsForChart[0].name,
+      title: `Top values: ${catColsForChart[0].name}`,
+      sub: 'Record count'
+    });
+  }
+
+  state.page = 1;
+  state.search = '';
+  state.sortKey = null;
+
+  fileNamePill.textContent = state.fileName + ' · ' + cleanRows.length.toLocaleString() + ' rows';
+  fileNamePill.style.display='inline-block';
+  excelBtn.style.display='inline-block';
+  pdfBtn.style.display='inline-block';
+  resetBtn.style.display='inline-block';
+
+  document.getElementById('uploadView').style.display='none';
+  document.getElementById('dashView').classList.add('active');
+
+  buildDashboard();
+}
+
+/* =========================================================
+   SAMPLE DATA
+========================================================= */
+function loadSample(){
+  const regions = ['North','South','East','West','Central'];
+  const products = ['Aurora','Borealis','Cascade','Drift','Ember','Frost'];
+  const channels = ['Online','Retail','Wholesale','Partner'];
+  const segments = ['Consumer','Business','Enterprise'];
+  const rows = [];
+  const start = new Date(2023,0,1);
+  for(let i=0;i<500;i++){
+    const d = new Date(start.getTime() + Math.random()*1000*60*60*24*700);
+    rows.push({
+      'Order Date': d.toISOString().slice(0,10),
+      'Region': regions[Math.floor(Math.random()*regions.length)],
+      'Product': products[Math.floor(Math.random()*products.length)],
+      'Channel': channels[Math.floor(Math.random()*channels.length)],
+      'Segment': segments[Math.floor(Math.random()*segments.length)],
+      'Units': Math.floor(Math.random()*100)+1,
+      'Revenue': Math.round((Math.random()*8000+200)*100)/100,
+      'Profit': Math.round((Math.random()*1500-100)*100)/100,
+      'Discount': Math.round(Math.random()*30*100)/100
+    });
+  }
+  state.fileName = 'sample_sales.csv';
+  ingest(rows);
+}
+
+/* =========================================================
+   FILTERING
+========================================================= */
+function getFilteredRows(){
+  let rows = state.rows;
+  // Apply filters
+  Object.entries(state.filters).forEach(([col, val])=>{
+    const c = state.columns.find(x=>x.name===col);
+    if(!c) return;
+    if(c.type==='category' || c.type==='text'){
+      if(Array.isArray(val) && val.length && !val.includes('__ALL__')){
+        rows = rows.filter(r=> val.includes(String(r[col])));
+      } else if(val && val !== '__ALL__') {
+        rows = rows.filter(r=> String(r[col]) === val);
+      }
+    } else if(c.type==='number'){
+      if(val && (val.min !== '' || val.max !== '')){
+        rows = rows.filter(r=>{
+          const v = r[col];
+          if(v===null) return false;
+          if(val.min !== '' && v < Number(val.min)) return false;
+          if(val.max !== '' && v > Number(val.max)) return false;
+          return true;
+        });
+      }
+    } else if(c.type==='date'){
+      if(val && (val.start || val.end)){
+        rows = rows.filter(r=>{
+          const v = r[col];
+          if(!v) return false;
+          if(val.start && v < new Date(val.start)) return false;
+          if(val.end && v > new Date(val.end + 'T23:59:59')) return false;
+          return true;
+        });
+      }
+    }
+  });
+  // Search
+  if(state.search){
+    const q = state.search.toLowerCase();
+    rows = rows.filter(r => Object.values(r).some(v => v!==null && String(v).toLowerCase().includes(q)));
+  }
+  return rows;
+}
+
+/* =========================================================
+   BUILD DASHBOARD
+========================================================= */
+function buildDashboard(){
+  buildFilters();
+  refreshAll();
+}
+
+function exportToExcel(){
+  const rows = getFilteredRows();
+  if(!rows.length){ showError('No filtered data to export.'); return; }
+  const exportRows = rows.map(row => Object.fromEntries(state.columns.map(column => {
+    const value = row[column.name];
+    return [column.name, value instanceof Date ? value.toISOString().slice(0, 10) : value];
+  })));
+  const worksheet = XLSX.utils.json_to_sheet(exportRows);
+  worksheet['!autofilter'] = {ref: worksheet['!ref']};
+  worksheet['!cols'] = state.columns.map(column => ({wch: Math.min(32, Math.max(12, column.name.length + 3))}));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Filtered Data');
+  XLSX.writeFile(workbook, `atlas-dashboard-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function exportToPdf(){
+  if(!state.rows.length){ showError('Load data before exporting the report.'); return; }
+  window.print();
+}
+
+function addMetric(){
+  const rows = getFilteredRows();
+  const unusedNum = state.columns.find(column => column.type === 'number' && !state.kpiConfigs.some(config => config.colName === column.name));
+  state.kpiConfigs.push({
+    id: 'kpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    colName: unusedNum ? unusedNum.name : '__RECORDS__',
+    agg: unusedNum ? 'sum' : 'count'
+  });
+  buildKPIs(rows);
+}
+
+function addChart(){
+  const rows = getFilteredRows();
+  const numCols = state.columns.filter(column => column.type === 'number');
+  const allCols = state.columns;
+  const dateCol = state.columns.find(column => column.type === 'date');
+  const defaultCat = allCols[0]?.name || '';
+  const defaultVal = numCols[0]?.name || '';
+  state.chartConfigs.push({
+    id: 'chart_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    type: defaultVal ? 'bar' : 'bar-count',
+    span: 6,
+    catCol: defaultCat,
+    valueCol: defaultVal,
+    dateCol: dateCol?.name || '',
+    xCol: numCols[0]?.name || '',
+    yCol: numCols[1]?.name || numCols[0]?.name || '',
+    agg: 'sum',
+    title: defaultVal ? `${defaultVal} by ${defaultCat}` : `Count by ${defaultCat}`,
+    sub: defaultVal ? 'Aggregated sum' : 'Record count'
+  });
+  buildCharts(rows);
+}
+
+function buildFilters(){
+  const row = document.getElementById('filtersRow');
+  row.innerHTML = '';
+
+  state.activeFilterCols.forEach(colName => {
+    const col = state.columns.find(c => c.name === colName);
+    if(!col) return;
+
+    const wrap = document.createElement('div');
+    wrap.className='filter';
+
+    if(col.type==='category' || col.type==='text'){
+      const values = [...new Set(state.rows.map(r=>r[col.name]).filter(v=>v!==null))].sort();
+      const currentVal = Array.isArray(state.filters[col.name]) ? state.filters[col.name] : (state.filters[col.name] ? [state.filters[col.name]] : []);
+      wrap.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label style="margin-bottom:0">${col.name}</label>
+          <button class="remove-filter" data-col="${escapeHtml(col.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin:0">&times;</button>
+        </div>
+        <div class="multi-select-dropdown">
+          <button type="button" class="multi-select-trigger"><span>${currentVal.length ? `${currentVal.length} selected` : `All (${values.length})`}</span></button>
+          <div class="multi-select-menu">
+            <input type="search" class="multi-select-search" placeholder="Search values..." aria-label="Search ${escapeHtml(col.name)} values" />
+            <div class="multi-select-actions">
+              <button type="button" class="multi-select-action" data-action="select-all">Select all</button>
+              <button type="button" class="multi-select-action" data-action="clear-selection">Clear selection</button>
+            </div>
+            <div class="multi-select-options">
+              ${values.map(v=>{ const value = String(v); return `<label class="multi-select-option" data-label="${escapeHtml(value.toLowerCase())}"><input type="checkbox" value="${escapeHtml(value)}" ${currentVal.includes(value) ? 'checked' : ''} /> <span>${escapeHtml(value)}</span></label>`; }).join('')}
+            </div>
+          </div>
+        </div>`;
+      const dropdown = wrap.querySelector('.multi-select-dropdown');
+      const trigger = wrap.querySelector('.multi-select-trigger');
+      const triggerText = trigger.querySelector('span');
+      const searchInput = wrap.querySelector('.multi-select-search');
+      const checkboxes = [...dropdown.querySelectorAll('input[type="checkbox"]')];
+      const updateSelection = () => {
+        const selected = checkboxes.filter(input => input.checked).map(input => input.value);
+        state.filters[col.name] = selected;
+        triggerText.textContent = selected.length ? `${selected.length} selected` : `All (${values.length})`;
+        refreshAll();
+      };
+      trigger.addEventListener('click', e=>{
+        e.stopPropagation();
+        document.querySelectorAll('.multi-select-dropdown.open').forEach(openDropdown => { if(openDropdown !== dropdown) openDropdown.classList.remove('open'); });
+        dropdown.classList.toggle('open');
+        if(dropdown.classList.contains('open')) searchInput.focus();
+      });
+      checkboxes.forEach(input => input.addEventListener('change', updateSelection));
+      dropdown.querySelector('[data-action="select-all"]').addEventListener('click', e=>{
+        e.stopPropagation();
+        checkboxes.forEach(input => { input.checked = true; });
+        updateSelection();
+      });
+      dropdown.querySelector('[data-action="clear-selection"]').addEventListener('click', e=>{
+        e.stopPropagation();
+        checkboxes.forEach(input => { input.checked = false; });
+        updateSelection();
+      });
+      searchInput.addEventListener('input', e=>{
+        const query = e.target.value.toLowerCase().trim();
+        dropdown.querySelectorAll('.multi-select-option').forEach(option => { option.style.display = option.dataset.label.includes(query) ? 'flex' : 'none'; });
+      });
+    } else if(col.type==='date'){
+      const dates = state.rows.map(r=>r[col.name]).filter(v=>v instanceof Date);
+      if(!dates.length) return;
+      const min = new Date(Math.min(...dates)).toISOString().slice(0,10);
+      const max = new Date(Math.max(...dates)).toISOString().slice(0,10);
+      const currentVal = state.filters[col.name] || {start:'',end:''};
+      wrap.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label style="margin-bottom:0">${col.name} (range)</label>
+          <button class="remove-filter" data-col="${escapeHtml(col.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin:0">&times;</button>
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="date" data-col="${escapeHtml(col.name)}" data-bound="start" min="${min}" max="${max}" value="${currentVal.start || ''}" style="flex:1"/>
+          <input type="date" data-col="${escapeHtml(col.name)}" data-bound="end" min="${min}" max="${max}" value="${currentVal.end || ''}" style="flex:1"/>
+        </div>`;
+      wrap.querySelectorAll('input').forEach(inp=>{
+        inp.addEventListener('change', ()=>{
+          const cur = state.filters[col.name] || {start:'',end:''};
+          cur[inp.dataset.bound] = inp.value;
+          state.filters[col.name] = cur;
+          refreshAll();
+        });
+      });
+    } else if(col.type==='number'){
+      const vals = state.rows.map(r=>r[col.name]).filter(v=>v!==null && !isNaN(v));
+      const min = vals.length ? Math.min(...vals) : '';
+      const max = vals.length ? Math.max(...vals) : '';
+      const currentVal = state.filters[col.name] || {min:'',max:''};
+      wrap.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label style="margin-bottom:0">${col.name} (range)</label>
+          <button class="remove-filter" data-col="${escapeHtml(col.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin:0">&times;</button>
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="min" placeholder="Min" min="${min}" max="${max}" value="${currentVal.min || ''}" style="flex:1"/>
+          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="max" placeholder="Max" min="${min}" max="${max}" value="${currentVal.max || ''}" style="flex:1"/>
+        </div>`;
+      wrap.querySelectorAll('input').forEach(inp=>{
+        inp.addEventListener('input', ()=>{
+          const cur = state.filters[col.name] || {min:'',max:''};
+          cur[inp.dataset.bound] = inp.value;
+          state.filters[col.name] = cur;
+          refreshAll();
+        });
+      });
+    }
+
+    wrap.querySelector('.remove-filter').addEventListener('click', ()=>{
+      state.activeFilterCols = state.activeFilterCols.filter(name => name !== col.name);
+      delete state.filters[col.name];
+      buildFilters();
+      refreshAll();
+    });
+
+    row.appendChild(wrap);
+  });
+
+  // Add filter dropdown
+  const availableCols = state.columns.filter(c => !state.activeFilterCols.includes(c.name));
+  if(availableCols.length > 0){
+    const addWrap = document.createElement('div');
+    addWrap.className='filter';
+    addWrap.style.flex = '0 0 auto';
+    addWrap.style.minWidth = '160px';
+    addWrap.innerHTML = `
+      <label>&nbsp;</label>
+      <select id="addFilterSelect" style="border-style:dashed;border-color:var(--line-strong);cursor:pointer">
+        <option value="" disabled selected>+ Add Filter</option>
+        ${availableCols.map(c=>`<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} (${c.type})</option>`).join('')}
+      </select>`;
+    addWrap.querySelector('#addFilterSelect').addEventListener('change', e=>{
+      const colName = e.target.value;
+      if(colName){
+        state.activeFilterCols.push(colName);
+        buildFilters();
+        refreshAll();
+      }
+    });
+    row.appendChild(addWrap);
+  }
+
+  // Clear button
+  const clearWrap = document.createElement('div');
+  clearWrap.className='filter filter-clear';
+  clearWrap.style.flex = '0 0 auto';
+  clearWrap.style.minWidth = 'auto';
+  clearWrap.innerHTML = `<label>&nbsp;</label><button class="ghost" id="clearFilters">Clear all</button>`;
+  row.appendChild(clearWrap);
+  document.getElementById('clearFilters').addEventListener('click', ()=>{
+    state.filters = {};
+    buildFilters();
+    refreshAll();
+  });
+}
+
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.multi-select-dropdown')){
+    document.querySelectorAll('.multi-select-dropdown.open').forEach(dropdown => dropdown.classList.remove('open'));
+  }
+});
+
+function refreshAll(){
+  const rows = getFilteredRows();
+  buildKPIs(rows);
+  buildTotalsTable(rows);
+  buildFlexiblePivot(rows);
+  buildCharts(rows);
+  buildTable(rows);
+  document.getElementById('footMeta').textContent =
+    `${rows.length.toLocaleString()} of ${state.rows.length.toLocaleString()} rows · ${state.columns.length} columns`;
+}
+
+function buildFlexiblePivot(rows){
+  const table = document.getElementById('pivotTable');
+  const controls = document.getElementById('pivotControls');
+  const columns = state.columns;
+  const numericColumns = columns.filter(column => column.type === 'number');
+  const config = state.pivotConfig;
+
+  if(!columns.length){
+    controls.innerHTML = '';
+    table.innerHTML = '<tbody><tr><td class="empty-state">No columns available.</td></tr></tbody>';
+    return;
+  }
+
+  if(!columns.some(column => column.name === config.rowCol)) config.rowCol = columns[0].name;
+  if(!columns.some(column => column.name === config.colCol)) config.colCol = columns[Math.min(1, columns.length - 1)].name;
+  if(config.valueCol !== '__RECORDS__' && !numericColumns.some(column => column.name === config.valueCol)) config.valueCol = numericColumns[0]?.name || '__RECORDS__';
+  if(config.valueCol === '__RECORDS__') config.agg = 'count';
+
+  const makePivotSelect = (role, label, options, selected) => `
+    <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
+      ${label}<select data-pivot-role="${role}">${options.map(option => `<option value="${escapeHtml(option.value)}" ${option.value===selected?'selected':''}>${escapeHtml(option.label)}</option>`).join('')}</select>
+    </label>`;
+  const fieldOptions = columns.map(column => ({value:column.name, label:`${column.name} (${column.type})`}));
+  const valueOptions = [{value:'__RECORDS__', label:'Records'}, ...numericColumns.map(column => ({value:column.name, label:column.name}))];
+  const aggOptions = config.valueCol === '__RECORDS__'
+    ? [{value:'count', label:'Count'}]
+    : [{value:'sum', label:'Sum'}, {value:'avg', label:'Average'}, {value:'count', label:'Count'}];
+  controls.innerHTML = makePivotSelect('row', 'Rows', fieldOptions, config.rowCol)
+    + makePivotSelect('col', 'Columns', fieldOptions, config.colCol)
+    + makePivotSelect('value', 'Values', valueOptions, config.valueCol)
+    + makePivotSelect('agg', 'Aggregate', aggOptions, config.agg);
+  controls.querySelectorAll('select').forEach(select => select.addEventListener('change', () => {
+    const role = select.dataset.pivotRole;
+    if(role === 'row') config.rowCol = select.value;
+    if(role === 'col') config.colCol = select.value;
+    if(role === 'value') config.valueCol = select.value;
+    if(role === 'agg') config.agg = select.value;
+    buildFlexiblePivot(rows);
+  }));
+
+  const displayValue = value => value instanceof Date && !isNaN(value)
+    ? value.toISOString().slice(0, 10)
+    : String(value);
+  const groups = {};
+  const columnLabels = {};
+  rows.forEach(row => {
+    const rowValue = row[config.rowCol];
+    const colValue = row[config.colCol];
+    if(rowValue === null || rowValue === undefined || colValue === null || colValue === undefined) return;
+    const rowKey = displayValue(rowValue);
+    const colKey = displayValue(colValue);
+    columnLabels[colKey] = colKey;
+    if(!groups[rowKey]) groups[rowKey] = {};
+    if(!groups[rowKey][colKey]) groups[rowKey][colKey] = {sum:0, count:0};
+    const cell = groups[rowKey][colKey];
+    const numericValue = Number(row[config.valueCol]);
+    if(config.valueCol === '__RECORDS__' || config.agg === 'count') {
+      cell.count++;
+    } else if(Number.isFinite(numericValue)) {
+      cell.sum += numericValue;
+      cell.count++;
+    }
+  });
+
+  const colKeys = Object.keys(columnLabels).sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+  const rowKeys = Object.keys(groups).sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+  if(!colKeys.length || !rowKeys.length){
+    table.innerHTML = '<tbody><tr><td class="empty-state">No matching values for this pivot.</td></tr></tbody>';
+    document.getElementById('pivotSub').textContent = 'No data for the selected fields';
+    return;
+  }
+
+  const columnTotals = Object.fromEntries(colKeys.map(key => [key, 0]));
+  let grandTotal = 0;
+  const cellResult = cell => {
+    if(!cell || !cell.count) return null;
+    if(config.valueCol === '__RECORDS__' || config.agg === 'count') return cell.count;
+    if(config.agg === 'avg') return cell.sum / cell.count;
+    return cell.sum;
+  };
+  const bodyRows = rowKeys.map(rowKey => {
+    let rowTotal = 0;
+    const cells = colKeys.map(colKey => {
+      const result = cellResult(groups[rowKey][colKey]);
+      if(result !== null){ columnTotals[colKey] += result; rowTotal += result; }
+      return result;
+    });
+    grandTotal += rowTotal;
+    return `<tr><td>${escapeHtml(rowKey)}</td>${cells.map(value => `<td>${value === null ? '—' : escapeHtml(fmt.full(value))}</td>`).join('')}<td>${escapeHtml(fmt.full(rowTotal))}</td></tr>`;
+  }).join('');
+  table.innerHTML = `<thead><tr><th>${escapeHtml(config.rowCol)}</th>${colKeys.map(key => `<th>${escapeHtml(key)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${bodyRows}<tr class="totals-grand-row"><td>Grand Total</td>${colKeys.map(key => `<td>${escapeHtml(fmt.full(columnTotals[key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(grandTotal))}</td></tr></tbody>`;
+  document.getElementById('pivotSub').textContent = `${config.agg} of ${config.valueCol === '__RECORDS__' ? 'records' : config.valueCol} · ${rowKeys.length} rows · ${colKeys.length} columns`;
+}
+
+function buildTotalsTable(rows){
+  const table = document.getElementById('totalsTable');
+  const controls = document.getElementById('totalsControls');
+  const rowCols = state.columns.filter(c => c.type === 'category' || c.type === 'text');
+  const dateCols = state.columns.filter(c => c.type === 'date');
+  const valueCols = state.columns.filter(c => c.type === 'number');
+
+  if(!rowCols.length || !dateCols.length || !valueCols.length){
+    controls.innerHTML = '';
+    table.innerHTML = '<tbody><tr><td class="empty-state">Need a text column, date column, and numeric column.</td></tr></tbody>';
+    document.getElementById('totalsSub').textContent = 'Pivot summary unavailable for this data';
+    return;
+  }
+
+  const config = state.totalsConfig;
+  if(!rowCols.some(c => c.name === config.rowCol)) config.rowCol = rowCols[0].name;
+  if(!dateCols.some(c => c.name === config.dateCol)) config.dateCol = dateCols[0].name;
+  if(!valueCols.some(c => c.name === config.valueCol)) config.valueCol = valueCols[0].name;
+
+  const makeSelect = (role, label, columns, selected) => `
+    <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
+      ${label}
+      <select data-role="${role}">${columns.map(c => `<option value="${escapeHtml(c.name)}" ${c.name===selected?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
+    </label>`;
+  controls.innerHTML = makeSelect('row', 'Rows', rowCols, config.rowCol)
+    + makeSelect('date', 'Months', dateCols, config.dateCol)
+    + makeSelect('value', 'Values', valueCols, config.valueCol)
+    + `<label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
+      Group
+      <select data-role="granularity">
+        <option value="month" ${config.granularity === 'month' ? 'selected' : ''}>By month</option>
+        <option value="year" ${config.granularity === 'year' ? 'selected' : ''}>By year</option>
+      </select>
+    </label>`;
+  controls.querySelectorAll('select').forEach(select => {
+    select.addEventListener('change', () => {
+      if(select.dataset.role === 'granularity') config.granularity = select.value;
+      else config[select.dataset.role + 'Col'] = select.value;
+      buildTotalsTable(rows);
+    });
+  });
+
+  const monthFormatter = new Intl.DateTimeFormat('en-US', {month:'short'});
+  const granularity = config.granularity === 'year' ? 'year' : 'month';
+  const dateGroups = {};
+  rows.forEach(row => {
+    const date = row[config.dateCol];
+    if(!(date instanceof Date) || isNaN(date) || row[config.rowCol] === null) return;
+    const key = granularity === 'year'
+      ? String(date.getFullYear())
+      : `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2, '0')}`;
+    if(!dateGroups[key]) dateGroups[key] = {
+      year:date.getFullYear(),
+      label:granularity === 'year' ? String(date.getFullYear()) : monthFormatter.format(date)
+    };
+  });
+  const periods = Object.entries(dateGroups)
+    .sort((a,b) => a[0].localeCompare(b[0]))
+    .map(([key, group]) => ({key, ...group}));
+  const multipleYears = new Set(periods.map(period => period.year)).size > 1;
+  if(granularity === 'month') periods.forEach(period => { if(multipleYears) period.label += ` ${period.year}`; });
+
+  const groupRows = {};
+  rows.forEach(row => {
+    const rowValue = row[config.rowCol];
+    const date = row[config.dateCol];
+    const value = Number(row[config.valueCol]);
+    if(rowValue === null || !(date instanceof Date) || isNaN(date) || !Number.isFinite(value)) return;
+    const rowKey = String(rowValue);
+    const periodKey = granularity === 'year'
+      ? String(date.getFullYear())
+      : `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2, '0')}`;
+    if(!groupRows[rowKey]) groupRows[rowKey] = {};
+    groupRows[rowKey][periodKey] = (groupRows[rowKey][periodKey] || 0) + value;
+  });
+  const entries = Object.entries(groupRows).sort((a,b) => a[0].localeCompare(b[0]));
+  if(!periods.length || !entries.length){
+    table.innerHTML = '<tbody><tr><td class="empty-state">No matching values for this summary.</td></tr></tbody>';
+    document.getElementById('totalsSub').textContent = `${config.valueCol} grouped by ${config.rowCol}`;
+    return;
+  }
+
+  const periodTotals = Object.fromEntries(periods.map(period => [period.key, 0]));
+  const grandTotal = entries.reduce((total, [, values]) => {
+    return total + periods.reduce((rowTotal, period) => {
+      const value = values[period.key] || 0;
+      periodTotals[period.key] += value;
+      return rowTotal + value;
+    }, 0);
+  }, 0);
+
+  table.innerHTML = `
+    <thead><tr><th>${escapeHtml(config.rowCol)}</th>${periods.map(period => `<th>${escapeHtml(period.label)}</th>`).join('')}<th>Total</th></tr></thead>
+    <tbody>
+      ${entries.map(([rowLabel, values]) => {
+        const rowTotal = periods.reduce((sum, period) => sum + (values[period.key] || 0), 0);
+        return `<tr><td>${escapeHtml(rowLabel)}</td>${periods.map(period => `<td>${values[period.key] === undefined ? '—' : escapeHtml(fmt.full(values[period.key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(rowTotal))}</td></tr>`;
+      }).join('')}
+      <tr class="totals-grand-row"><td>Grand Total</td>${periods.map(period => `<td>${escapeHtml(fmt.full(periodTotals[period.key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(grandTotal))}</td></tr>
+    </tbody>`;
+  document.getElementById('totalsSub').textContent = `${config.valueCol} grouped by ${config.rowCol} · ${periods.length} ${granularity}${periods.length === 1 ? '' : 's'} · totals included`;
+}
+
+/* =========================================================
+   KPIs
+========================================================= */
+function calculateKpiValue(rows, colName, agg) {
+  if (colName === '__RECORDS__') {
+    return {
+      value: rows.length.toLocaleString(),
+      sub: `of ${state.rows.length.toLocaleString()} total`
+    };
+  }
+
+  const col = state.columns.find(c => c.name === colName);
+  if (!col) return { value: '—', sub: 'Field not found' };
+
+  let vals = rows.map(r => r[colName]).filter(v => v !== null && v !== undefined);
+
+  if (agg === 'count') {
+    return {
+      value: vals.length.toLocaleString(),
+      sub: `n=${vals.length}`
+    };
+  }
+  if (agg === 'unique') {
+    const uniq = new Set(vals.map(v => String(v))).size;
+    return {
+      value: uniq.toLocaleString(),
+      sub: `unique values`
+    };
+  }
+
+  if (col.type === 'number') {
+    const numVals = vals.map(v => Number(v)).filter(v => !isNaN(v));
+    if (numVals.length === 0) return { value: '—', sub: `n=0` };
+
+    if (agg === 'sum') {
+      const sum = numVals.reduce((a, b) => a + b, 0);
+      const avg = sum / numVals.length;
+      return {
+        value: fmt.num(sum),
+        sub: `avg ${fmt.num(avg)} · n=${numVals.length}`
+      };
+    }
+    if (agg === 'avg') {
+      const sum = numVals.reduce((a, b) => a + b, 0);
+      const avg = sum / numVals.length;
+      return {
+        value: fmt.num(avg),
+        sub: `sum ${fmt.num(sum)} · n=${numVals.length}`
+      };
+    }
+    if (agg === 'min') {
+      const min = Math.min(...numVals);
+      return {
+        value: fmt.num(min),
+        sub: `minimum value`
+      };
+    }
+    if (agg === 'max') {
+      const max = Math.max(...numVals);
+      return {
+        value: fmt.num(max),
+        sub: `maximum value`
+      };
+    }
+  }
+
+  if (col.type === 'date') {
+    const dateVals = vals.map(v => v instanceof Date ? v : new Date(v)).filter(d => !isNaN(d));
+    if (dateVals.length === 0) return { value: '—', sub: `n=0` };
+    if (agg === 'min') {
+      const minDate = new Date(Math.min(...dateVals));
+      return {
+        value: minDate.toISOString().slice(0, 10),
+        sub: `earliest date`
+      };
+    }
+    if (agg === 'max') {
+      const maxDate = new Date(Math.max(...dateVals));
+      return {
+        value: maxDate.toISOString().slice(0, 10),
+        sub: `latest date`
+      };
+    }
+  }
+
+  return { value: '—', sub: 'N/A' };
+}
+
+function buildKPIs(rows){
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML='';
+
+  state.kpiConfigs.forEach(config => {
+    const card = document.createElement('div');
+    card.className = 'kpi';
+
+    // Remove button
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'kpi-remove';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.title = 'Remove metric';
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.kpiConfigs = state.kpiConfigs.filter(cfg => cfg.id !== config.id);
+      buildKPIs(rows);
+    });
+    card.appendChild(removeBtn);
+
+    // Label row with selects
+    const labelRow = document.createElement('div');
+    labelRow.className = 'kpi-label-row';
+
+    // Column selector
+    const colSelect = document.createElement('select');
+    colSelect.className = 'kpi-select';
+    
+    let html = `<option value="__RECORDS__" ${config.colName === '__RECORDS__' ? 'selected' : ''}>[Records]</option>`;
+    state.columns.forEach(c => {
+      html += `<option value="${escapeHtml(c.name)}" ${config.colName === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`;
+    });
+    colSelect.innerHTML = html;
+
+    // Aggregation selector
+    const aggSelect = document.createElement('select');
+    aggSelect.className = 'kpi-select';
+
+    function updateAggOptions(colName) {
+      let aggs = [];
+      if (colName === '__RECORDS__') {
+        aggs = [{val:'count', label:'Count'}];
+      } else {
+        const col = state.columns.find(c => c.name === colName);
+        const type = col ? col.type : 'text';
+        if (type === 'number') {
+          aggs = [
+            {val:'sum', label:'Sum'},
+            {val:'avg', label:'Avg'},
+            {val:'min', label:'Min'},
+            {val:'max', label:'Max'},
+            {val:'count', label:'Count'},
+            {val:'unique', label:'Unique'}
+          ];
+        } else if (type === 'date') {
+          aggs = [
+            {val:'min', label:'Min (Earliest)'},
+            {val:'max', label:'Max (Latest)'},
+            {val:'count', label:'Count'},
+            {val:'unique', label:'Unique'}
+          ];
+        } else {
+          aggs = [
+            {val:'count', label:'Count'},
+            {val:'unique', label:'Unique'}
+          ];
+        }
+      }
+      aggSelect.innerHTML = aggs.map(a => `<option value="${a.val}" ${config.agg === a.val ? 'selected' : ''}>${a.label}</option>`).join('');
+    }
+
+    updateAggOptions(config.colName);
+
+    // Change listeners
+    colSelect.addEventListener('change', e => {
+      const newCol = e.target.value;
+      config.colName = newCol;
+      // validate / reset aggregation
+      if (newCol === '__RECORDS__') {
+        config.agg = 'count';
+      } else {
+        const col = state.columns.find(c => c.name === newCol);
+        const type = col ? col.type : 'text';
+        if (type === 'number') {
+          if (!['sum','avg','min','max','count','unique'].includes(config.agg)) config.agg = 'sum';
+        } else if (type === 'date') {
+          if (!['min','max','count','unique'].includes(config.agg)) config.agg = 'max';
+        } else {
+          if (!['count','unique'].includes(config.agg)) config.agg = 'unique';
+        }
+      }
+      updateAggOptions(newCol);
+      const res = calculateKpiValue(rows, config.colName, config.agg);
+      valDiv.textContent = res.value;
+      subDiv.textContent = res.sub;
+    });
+
+    aggSelect.addEventListener('change', e => {
+      config.agg = e.target.value;
+      const res = calculateKpiValue(rows, config.colName, config.agg);
+      valDiv.textContent = res.value;
+      subDiv.textContent = res.sub;
+    });
+
+    labelRow.appendChild(colSelect);
+    labelRow.appendChild(document.createTextNode(' · '));
+    labelRow.appendChild(aggSelect);
+    card.appendChild(labelRow);
+
+    // Value and Subtitle
+    const res = calculateKpiValue(rows, config.colName, config.agg);
+    const valDiv = document.createElement('div');
+    valDiv.className = 'kpi-value';
+    valDiv.textContent = res.value;
+    card.appendChild(valDiv);
+
+    const subDiv = document.createElement('div');
+    subDiv.className = 'kpi-sub';
+    subDiv.textContent = res.sub;
+    card.appendChild(subDiv);
+
+    grid.appendChild(card);
+  });
+
+  // Render the Add KPI card
+  const addCard = document.createElement('div');
+  addCard.className = 'kpi add-card';
+  addCard.innerHTML = `
+    <div class="kpi-add-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      Add Metric
+    </div>
+  `;
+  addCard.addEventListener('click', () => {
+    // Add default new KPI
+    const unusedNum = state.columns.find(c => c.type === 'number' && !state.kpiConfigs.some(cfg => cfg.colName === c.name));
+    const colName = unusedNum ? unusedNum.name : '__RECORDS__';
+    const agg = unusedNum ? 'sum' : 'count';
+    state.kpiConfigs.push({
+      id: 'kpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      colName: colName,
+      agg: agg
+    });
+    buildKPIs(rows);
+  });
+  grid.appendChild(addCard);
+}
+
+/* =========================================================
+   CHARTS
+========================================================= */
+function destroyCharts(){
+  Object.values(state.charts).forEach(c=>{ try{c.destroy();}catch(e){} });
+  state.charts={};
+}
+
+function buildCharts(rows){
+  destroyCharts();
+  const grid = document.getElementById('chartsGrid');
+  grid.innerHTML='';
+
+  if(rows.length === 0){
+    grid.innerHTML = '<div class="chart-card span-12"><div class="empty-state">No records match the current filters.</div></div>';
+    return;
+  }
+
+  state.chartConfigs.forEach((cfg) => {
+    renderChart(cfg, rows, grid);
+  });
+
+  // Render "+ Add Chart" card
+  const addCard = document.createElement('div');
+  addCard.className = 'chart-card add-card';
+  addCard.innerHTML = `
+    <div class="kpi-add-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      Add Chart
+    </div>
+  `;
+  addCard.addEventListener('click', () => {
+    const numCols = state.columns.filter(c => c.type === 'number');
+    const catCols = state.columns;
+    
+    let defaultType = 'bar';
+    let defaultCat = catCols[0] ? catCols[0].name : '';
+    let defaultVal = numCols[0] ? numCols[0].name : '';
+
+    if (!defaultCat && !defaultVal) {
+      defaultType = 'bar-count';
+      defaultCat = state.columns[0] ? state.columns[0].name : '';
+    } else if (!defaultVal) {
+      defaultType = 'doughnut';
+      defaultCat = catCols[0] ? catCols[0].name : '';
+    }
+
+    state.chartConfigs.push({
+      id: 'chart_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      type: defaultType,
+      span: 6,
+      catCol: defaultCat,
+      valueCol: defaultVal,
+      dateCol: state.columns.find(c => c.type === 'date')?.name || '',
+      xCol: numCols[0]?.name || '',
+      yCol: numCols[1]?.name || numCols[0]?.name || '',
+      agg: 'sum',
+      title: defaultVal ? `${defaultVal} by ${defaultCat}` : `Count by ${defaultCat}`,
+      sub: defaultVal ? 'Aggregated sum' : 'Record count'
+    });
+
+    buildCharts(rows);
+  });
+  grid.appendChild(addCard);
+}
+
+function renderChart(cfg, rows, grid){
+  const card = document.createElement('div');
+  card.className = `chart-card span-${cfg.span}`;
+  const canvasId = `canvas_${cfg.id}`;
+
+  const numCols = state.columns.filter(c=>c.type==='number');
+  const allCols = state.columns;
+  const catCols = allCols;
+  const dateCols = state.columns.filter(c=>c.type==='date');
+
+  // Chart type select
+  let typeSelectHtml = `
+    <select data-role="type">
+      <option value="bar" ${cfg.type==='bar'?'selected':''}>Bar</option>
+      <option value="line" ${cfg.type==='line'?'selected':''}>Line</option>
+      <option value="doughnut" ${cfg.type==='doughnut'?'selected':''}>Donut</option>
+      <option value="scatter" ${cfg.type==='scatter'?'selected':''}>Scatter</option>
+      <option value="histogram" ${cfg.type==='histogram'?'selected':''}>Hist</option>
+      <option value="bar-count" ${cfg.type==='bar-count'?'selected':''}>Counts</option>
+    </select>
+  `;
+
+  // Dynamic parameters based on chart type
+  let paramHtml = '';
+  if(cfg.type === 'line'){
+    paramHtml += `
+      <select data-role="date" title="Date Field">
+        ${dateCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.dateCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+      <select data-role="val" title="Value Field">
+        ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+      <select data-role="granularity" title="Time grouping">
+        <option value="month" ${(cfg.granularity || 'month')==='month'?'selected':''}>By month</option>
+        <option value="year" ${cfg.granularity==='year'?'selected':''}>By year</option>
+      </select>
+    `;
+  } else if(cfg.type === 'bar'){
+    paramHtml += `
+      <select data-role="cat" title="Category Field">
+        ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+      <select data-role="val" title="Value Field">
+        ${allCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)} (${c.type})</option>`).join('')}
+      </select>
+      <select data-role="agg" title="Aggregation">
+        <option value="sum" ${cfg.agg==='sum'?'selected':''}>Sum</option>
+        <option value="avg" ${cfg.agg==='avg'?'selected':''}>Avg</option>
+        <option value="count" ${cfg.agg==='count'?'selected':''}>Count</option>
+      </select>
+    `;
+  } else if(cfg.type === 'doughnut'){
+    paramHtml += `
+      <select data-role="cat" title="Category Field">
+        ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+    `;
+  } else if(cfg.type === 'scatter'){
+    paramHtml += `
+      <select data-role="x" title="X Field">
+        ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.xCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+      <select data-role="y" title="Y Field">
+        ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.yCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+    `;
+  } else if(cfg.type === 'histogram'){
+    paramHtml += `
+      <select data-role="val" title="Value Field">
+        ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+    `;
+  } else if(cfg.type === 'bar-count'){
+    paramHtml += `
+      <select data-role="cat" title="Category Field">
+        ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+    `;
+  }
+
+  const removeBtnHtml = `
+    <button class="chart-remove" title="Remove chart" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px;">&times;</button>
+  `;
+
+  card.innerHTML = `
+    <div class="chart-head">
+      <div>
+        <div class="chart-title">${escapeHtml(cfg.title)}</div>
+        <div class="chart-sub">${escapeHtml(cfg.sub||'')}</div>
+      </div>
+      <div class="chart-controls" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+        ${typeSelectHtml}
+        ${paramHtml}
+        ${removeBtnHtml}
+      </div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="${canvasId}"></canvas></div>`;
+  grid.appendChild(card);
+
+  // remove event
+  card.querySelector('.chart-remove').addEventListener('click', () => {
+    state.chartConfigs = state.chartConfigs.filter(x => x.id !== cfg.id);
+    buildCharts(rows);
+  });
+
+  // selector listeners
+  card.querySelectorAll('select').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const role = e.target.dataset.role;
+      const val = e.target.value;
+
+      if (role === 'type') {
+        cfg.type = val;
+        // defaults for the new chart type
+        if (val === 'line') {
+          cfg.dateCol = dateCols[0]?.name || state.columns.find(c => c.type === 'date')?.name || '';
+          cfg.valueCol = numCols[0]?.name || '';
+          cfg.granularity = 'month';
+          cfg.title = `${cfg.valueCol} over time`;
+          cfg.sub = `Trended by ${cfg.dateCol}`;
+        } else if (val === 'bar') {
+          cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
+          cfg.valueCol = numCols[0]?.name || '';
+          cfg.agg = 'sum';
+          cfg.title = `${cfg.valueCol} by ${cfg.catCol}`;
+          cfg.sub = 'Aggregated sum';
+        } else if (val === 'doughnut') {
+          cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
+          cfg.title = `Records by ${cfg.catCol}`;
+          cfg.sub = 'Share of total';
+        } else if (val === 'scatter') {
+          cfg.xCol = numCols[0]?.name || '';
+          cfg.yCol = numCols[1]?.name || numCols[0]?.name || '';
+          cfg.title = `${cfg.xCol} vs ${cfg.yCol}`;
+          cfg.sub = 'Correlation view';
+        } else if (val === 'histogram') {
+          cfg.valueCol = numCols[0]?.name || '';
+          cfg.title = `Distribution of ${cfg.valueCol}`;
+          cfg.sub = 'Frequency by bin';
+        } else if (val === 'bar-count') {
+          cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
+          cfg.title = `Top values: ${cfg.catCol}`;
+          cfg.sub = 'Record count';
+        }
+        buildCharts(rows);
+        return;
+      }
+
+      if (role === 'cat') cfg.catCol = val;
+      if (role === 'val') cfg.valueCol = val;
+      if (role === 'date') cfg.dateCol = val;
+      if (role === 'x') cfg.xCol = val;
+      if (role === 'y') cfg.yCol = val;
+      if (role === 'agg') cfg.agg = val;
+      if (role === 'granularity') cfg.granularity = val;
+
+      // Update title strings
+      if (cfg.type === 'line') {
+        cfg.title = `${cfg.valueCol} over time`;
+        cfg.sub = `Trended by ${cfg.dateCol}`;
+      } else if (cfg.type === 'bar') {
+        cfg.title = `${cfg.valueCol} by ${cfg.catCol}`;
+        cfg.sub = `Aggregated ${cfg.agg}`;
+      } else if (cfg.type === 'doughnut') {
+        cfg.title = `Records by ${cfg.catCol}`;
+        cfg.sub = 'Share of total';
+      } else if (cfg.type === 'scatter') {
+        cfg.title = `${cfg.xCol} vs ${cfg.yCol}`;
+        cfg.sub = 'Correlation view';
+      } else if (cfg.type === 'histogram') {
+        cfg.title = `Distribution of ${cfg.valueCol}`;
+        cfg.sub = 'Frequency by bin';
+      } else if (cfg.type === 'bar-count') {
+        cfg.title = `Top values: ${cfg.catCol}`;
+        cfg.sub = 'Record count';
+      }
+
+      card.querySelector('.chart-title').textContent = cfg.title;
+      card.querySelector('.chart-sub').textContent = cfg.sub || '';
+
+      try { state.charts[canvasId].destroy(); } catch(err) {}
+      drawChart(cfg, rows, canvasId);
+    });
+  });
+
+  drawChart(cfg, rows, canvasId);
+}
+
+function themeColor(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function drawChart(cfg, rows, canvasId){
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  const chartText = themeColor('--chart-text');
+  const baseOpts = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{labels:{font:{family:"'Geist', sans-serif", size:11}, color:chartText}},
+      tooltip:{
+        backgroundColor:themeColor('--tooltip-bg'), titleFont:{family:"'Geist', sans-serif",size:12}, bodyFont:{family:"'Geist Mono', monospace", size:11},
+        padding:10, cornerRadius:4
+      }
+    },
+    scales:{}
+  };
+  const gridStyle = {color:themeColor('--chart-grid'), drawBorder:false};
+  const tickStyle = {color:themeColor('--chart-tick'), font:{family:"'Geist Mono', monospace", size:10}};
+
+  let chart;
+
+  if(cfg.type==='bar' || cfg.type==='bar-count'){
+    const isCount = cfg.type==='bar-count';
+    const valueColumn = state.columns.find(column => column.name === cfg.valueCol);
+    const useCount = isCount || !valueColumn || valueColumn.type !== 'number' || cfg.agg === 'count';
+    const groups = {};
+    rows.forEach(r=>{
+      const k = r[cfg.catCol];
+      if(k===null) return;
+      const key = String(k);
+      if(!groups[key]) groups[key] = {sum:0, count:0};
+      if(!useCount && cfg.valueCol){
+        const v = r[cfg.valueCol];
+        if(v!==null && !isNaN(v)){ groups[key].sum += Number(v); groups[key].count++; }
+      } else {
+        groups[key].count++;
+      }
+    });
+    let entries = Object.entries(groups);
+    if(useCount){
+      entries = entries.map(([k,v])=>[k, v.count]);
+    } else if(cfg.agg==='avg'){
+      entries = entries.map(([k,v])=>[k, v.count? v.sum/v.count : 0]);
+    } else {
+      entries = entries.map(([k,v])=>[k, v.sum]);
+    }
+    entries.sort((a,b)=>b[1]-a[1]);
+    if(entries.length > 20) entries = entries.slice(0,20);
+
+    chart = new Chart(ctx,{
+      type:'bar',
+      data:{
+        labels: entries.map(e=>e[0]),
+        datasets:[{
+          label: useCount ? 'Count' : cfg.valueCol,
+          data: entries.map(e=>e[1]),
+          backgroundColor: palette[0],
+          borderRadius:3, borderSkipped:false,
+          maxBarThickness: 50
+        }]
+      },
+      options:{...baseOpts,
+        plugins:{...baseOpts.plugins, legend:{display:false}},
+        scales:{
+          x:{grid:{display:false}, ticks:{...tickStyle, maxRotation:45, minRotation:0}},
+          y:{grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}, beginAtZero:true}
+        }
+      }
+    });
+
+  } else if(cfg.type==='line'){
+    const granularity = cfg.granularity || 'month';
+    const buckets = {};
+    rows.forEach(r=>{
+      const d = r[cfg.dateCol];
+      const v = r[cfg.valueCol];
+      if(!(d instanceof Date) || isNaN(d) || v===null || isNaN(v)) return;
+      const key = granularity === 'year'
+        ? String(d.getFullYear())
+        : d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      if(!buckets[key]) buckets[key]={sum:0,count:0};
+      buckets[key].sum += v; buckets[key].count++;
+    });
+    const sorted = Object.entries(buckets).sort((a,b)=>a[0].localeCompare(b[0]));
+    chart = new Chart(ctx,{
+      type:'line',
+      data:{
+        labels:sorted.map(e=>e[0]),
+        datasets:[{
+          label:cfg.valueCol,
+          data:sorted.map(e=>e[1].sum),
+          borderColor:themeColor('--chart-line'), backgroundColor:themeColor('--chart-line-fill'),
+          tension:0.3, fill:true, pointRadius:3, pointBackgroundColor:themeColor('--chart-line'), pointBorderWidth:0,
+          borderWidth:2
+        }]
+      },
+      options:{...baseOpts,
+        plugins:{...baseOpts.plugins, legend:{display:false}},
+        scales:{
+          x:{grid:{display:false}, ticks:tickStyle},
+          y:{grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}, beginAtZero:true}
+        }
+      }
+    });
+
+  } else if(cfg.type==='doughnut'){
+    const groups = {};
+    rows.forEach(r=>{
+      const k = r[cfg.catCol];
+      if(k===null) return;
+      const key = String(k);
+      groups[key] = (groups[key]||0)+1;
+    });
+    let entries = Object.entries(groups).sort((a,b)=>b[1]-a[1]);
+    if(entries.length > 8){
+      const top = entries.slice(0,7);
+      const otherSum = entries.slice(7).reduce((s,e)=>s+e[1],0);
+      entries = [...top, ['Other', otherSum]];
+    }
+    chart = new Chart(ctx,{
+      type:'doughnut',
+      data:{
+        labels:entries.map(e=>e[0]),
+        datasets:[{data:entries.map(e=>e[1]), backgroundColor:palette, borderColor:themeColor('--panel'), borderWidth:2}]
+      },
+      options:{...baseOpts, cutout:'58%',
+        plugins:{...baseOpts.plugins, legend:{position:'bottom', labels:{...baseOpts.plugins.legend.labels, padding:10, boxWidth:10, boxHeight:10}}}
+      }
+    });
+
+  } else if(cfg.type==='scatter'){
+    const data = rows.filter(r=>r[cfg.xCol]!==null && r[cfg.yCol]!==null && !isNaN(r[cfg.xCol]) && !isNaN(r[cfg.yCol]))
+      .map(r=>({x:r[cfg.xCol], y:r[cfg.yCol]}));
+    chart = new Chart(ctx,{
+      type:'scatter',
+      data:{datasets:[{label:`${cfg.xCol} × ${cfg.yCol}`, data, backgroundColor:'rgba(210,80,42,0.55)', borderColor:palette[0], pointRadius:3.5, pointHoverRadius:5}]},
+      options:{...baseOpts,
+        plugins:{...baseOpts.plugins, legend:{display:false}},
+        scales:{
+          x:{title:{display:true,text:cfg.xCol,color:chartText,font:{family:"'Geist Mono', monospace",size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}},
+          y:{title:{display:true,text:cfg.yCol,color:chartText,font:{family:"'Geist Mono', monospace",size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}}
+        }
+      }
+    });
+
+  } else if(cfg.type==='histogram'){
+    const vals = rows.map(r=>r[cfg.valueCol]).filter(v=>v!==null && !isNaN(v)).sort((a,b)=>a-b);
+    if(vals.length===0){ return; }
+    const min = vals[0], max = vals[vals.length-1];
+    const bins = 14;
+    const step = (max-min)/bins || 1;
+    const counts = new Array(bins).fill(0);
+    vals.forEach(v=>{
+      let idx = Math.floor((v-min)/step);
+      if(idx>=bins) idx=bins-1;
+      counts[idx]++;
+    });
+    const labels = counts.map((_,i)=>fmt.num(min+i*step));
+    chart = new Chart(ctx,{
+      type:'bar',
+      data:{labels, datasets:[{data:counts, backgroundColor:palette[2], borderRadius:2, maxBarThickness:30}]},
+      options:{...baseOpts,
+        plugins:{...baseOpts.plugins, legend:{display:false}},
+        scales:{
+          x:{grid:{display:false}, ticks:{...tickStyle, maxRotation:0, autoSkip:true, maxTicksLimit:8}},
+          y:{grid:gridStyle, ticks:tickStyle, beginAtZero:true}
+        }
+      }
+    });
+  }
+
+  if(chart) state.charts[canvasId] = chart;
+}
+
+/* =========================================================
+   TABLE
+========================================================= */
+const tableSearch = document.getElementById('tableSearch');
+tableSearch.addEventListener('input', e=>{
+  state.search = e.target.value;
+  state.page = 1;
+  refreshAll();
+});
+
+document.getElementById('pagePrev').addEventListener('click', ()=>{ state.page--; refreshAll(); });
+document.getElementById('pageNext').addEventListener('click', ()=>{ state.page++; refreshAll(); });
+
+function buildTable(rows){
+  const table = document.getElementById('dataTable');
+  // Sort
+  if(state.sortKey){
+    const c = state.columns.find(x=>x.name===state.sortKey);
+    rows = [...rows].sort((a,b)=>{
+      let av=a[state.sortKey], bv=b[state.sortKey];
+      if(av===null) return 1;
+      if(bv===null) return -1;
+      if(c.type==='number' || c.type==='date'){ return (av-bv)*state.sortDir; }
+      return String(av).localeCompare(String(bv))*state.sortDir;
+    });
+  }
+
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total/state.perPage));
+  if(state.page > totalPages) state.page = totalPages;
+  if(state.page < 1) state.page = 1;
+  const startIdx = (state.page-1)*state.perPage;
+  const pageRows = rows.slice(startIdx, startIdx+state.perPage);
+
+  const cols = state.columns;
+  let html = '<thead><tr>';
+  cols.forEach(c=>{
+    const isSorted = state.sortKey === c.name;
+    html += `<th data-col="${escapeHtml(c.name)}" class="${isSorted?'sorted':''}">${escapeHtml(c.name)} <span class="sort-ind">${isSorted? (state.sortDir>0?'↑':'↓') : '↕'}</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+  pageRows.forEach(r=>{
+    html += '<tr>';
+    cols.forEach(c=>{
+      const v = r[c.name];
+      html += `<td class="${c.type==='number'?'num':''}">${escapeHtml(fmt.cell(v, c.type))}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+
+  // Sort handlers
+  table.querySelectorAll('th').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const k = th.dataset.col;
+      if(state.sortKey === k) state.sortDir *= -1;
+      else { state.sortKey = k; state.sortDir = 1; }
+      refreshAll();
+    });
+  });
+
+  document.getElementById('tableInfo').textContent =
+    total ? `Showing ${(startIdx+1).toLocaleString()}–${Math.min(startIdx+state.perPage, total).toLocaleString()} of ${total.toLocaleString()}` : 'No matching records';
+  document.getElementById('pageLabel').textContent = `${state.page} / ${totalPages}`;
+  document.getElementById('pagePrev').disabled = state.page<=1;
+  document.getElementById('pageNext').disabled = state.page>=totalPages;
+  document.getElementById('tableSub').textContent = `${cols.length} columns · live filtered`;
+}
+
+/* =========================================================
+   UTIL
+========================================================= */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>

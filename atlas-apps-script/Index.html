@@ -125,8 +125,21 @@
   .calc-item.inactive{opacity:.55}
   .calc-item em{font-style:normal;color:var(--muted);font-size:11px}
   .calc-error{color:var(--accent);font-size:12px;min-height:16px;margin-bottom:8px}
+  .calc-error.ok{color:var(--good)}
   .calc-actions{display:flex;gap:10px;justify-content:flex-end}
   .calc-actions .upload-cta{padding:10px 18px}
+  .info{background:var(--soft-bg);border:1px solid var(--good);color:var(--ink);padding:14px 18px;border-radius:var(--radius);margin-bottom:18px;font-size:13px}
+  .layout-save{display:flex;gap:8px;margin-bottom:12px}
+  .layout-save input{flex:1}
+  .layout-save .upload-cta{padding:9px 14px;white-space:nowrap}
+  .layout-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+  .layout-item .layout-name{flex:1;min-width:0;font-size:13px}
+  .layout-item .layout-name small{display:block;color:var(--muted);font-size:11px}
+  .layout-item button{background:none;border:1px solid transparent;border-radius:3px;color:var(--muted);cursor:pointer;font:inherit;font-size:12px;padding:3px 7px}
+  .layout-item button:hover{color:var(--accent);border-color:var(--line-strong)}
+  .layout-item .layout-star.on{color:var(--warn)}
+  .layout-item .layout-apply{color:var(--ink);border-color:var(--line-strong)}
+  .badge{display:inline-block;font-size:10px;color:var(--warn);margin-inline-start:6px}
   .totals-other-row td{color:var(--muted);font-style:italic}
   .theme-toggle{display:inline-flex;align-items:center;gap:6px}
   .theme-toggle svg{width:13px;height:13px}
@@ -293,8 +306,11 @@
   }
 
   /* Dynamic KPI and Chart styling */
-  .kpi-label-row{display:flex;align-items:center;gap:4px;margin-bottom:8px;position:relative}
-  .kpi-select{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed var(--line-strong);padding:0 2px;cursor:pointer;outline:none}
+  .kpi-label-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px;position:relative;padding-inline-end:18px;min-width:0}
+  .kpi-select{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed var(--line-strong);padding:0 2px;cursor:pointer;outline:none;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kpi-select.kpi-col{flex:1 1 0;width:0}
+  .kpi-select.kpi-agg{flex:0 0 auto}
+  .kpi-select option{text-transform:none;color:var(--ink);background:var(--panel)}
   .kpi-select:hover{color:var(--ink);border-bottom-color:var(--accent)}
   .kpi-remove{position:absolute;top:6px;inset-inline-end:8px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;opacity:0;transition:opacity .15s, color .15s;padding:0 4px;line-height:1;z-index:10}
   .kpi:hover .kpi-remove{opacity:1}
@@ -338,6 +354,7 @@
       <div class="loader" id="loader"><span id="loaderText" data-i18n="processing">جارٍ المعالجة</span></div>
       <button class="ghost export-btn" id="excelBtn" style="display:none" data-i18n="excel">إكسل</button>
       <button class="ghost export-btn" id="pdfBtn" style="display:none">PDF</button>
+      <button class="ghost" id="layoutsBtn" style="display:none" data-i18n="layoutsBtn">▦ التخطيطات</button>
       <button class="ghost" id="calcBtn" style="display:none" data-i18n="calcBtn">ƒx عمود محسوب</button>
       <button class="ghost" id="resetBtn" style="display:none" data-i18n="newFile">↻ ملف جديد</button>
       <button class="ghost theme-toggle" id="themeBtn" data-i18n-title="toggleTheme" title="تبديل الوضع الليلي">
@@ -446,6 +463,21 @@
     </div>
   </section>
 </main>
+
+<dialog class="calc-dialog" id="layoutsDialog">
+  <form id="layoutForm" novalidate>
+    <div class="chart-title" data-i18n="layoutsTitle">قوالب التخطيط</div>
+    <div class="chart-sub" data-i18n="layoutsHint"></div>
+    <div class="layout-save">
+      <input type="text" id="layoutName" autocomplete="off" data-i18n-placeholder="layoutNamePh" />
+      <button type="submit" class="upload-cta" data-i18n="layoutSave">حفظ التخطيط الحالي</button>
+    </div>
+    <div class="calc-error" id="layoutMsg"></div>
+    <div class="calc-list" id="layoutList"></div>
+    <div class="chart-sub" data-i18n="layoutDefaultNote" style="margin:-6px 0 16px"></div>
+    <div class="calc-actions"><button type="button" class="ghost" id="layoutClose" data-i18n="close">إغلاق</button></div>
+  </form>
+</dialog>
 
 <dialog class="calc-dialog" id="calcDialog">
   <form id="calcForm" novalidate>
@@ -566,7 +598,7 @@ const I18N = {
     calcBtn:'ƒx عمود محسوب', calcTitle:'عمود محسوب', calcHint:'أنشئ عمودًا جديدًا من عمودين رقميين أو عمود ورقم ثابت',
     calcName:'اسم العمود', calcConstPh:'الرقم الثابت', calcConstOpt:'رقم ثابت…', close:'إغلاق', calcAdd:'إضافة العمود',
     calcNeedNum:'لا توجد أعمدة رقمية في البيانات.', calcNeedName:'اكتب اسمًا للعمود.', calcNameTaken:'يوجد عمود بهذا الاسم.',
-    calcNeedConst:'اكتب الرقم الثابت.', calcExample:'مثال: ', calcDefaultName:'{a} {op} {b}', calcRemove:'حذف العمود', calcAdded:'تمت إضافة العمود «{n}» وحفظه تلقائيًا.', calcSavedNote:'الأعمدة المحسوبة تُحفظ تلقائيًا وتُطبَّق على أي ملف يحتوي نفس الأعمدة.', calcSkipped:'محفوظ، لكن أعمدته غير موجودة في هذا الملف'
+    calcNeedConst:'اكتب الرقم الثابت.', calcExample:'مثال: ', calcDefaultName:'{a} {op} {b}', calcRemove:'حذف العمود', calcAdded:'تمت إضافة العمود «{n}» وحفظه تلقائيًا.', calcSavedNote:'الأعمدة المحسوبة تُحفظ تلقائيًا وتُطبَّق على أي ملف يحتوي نفس الأعمدة.', calcSkipped:'محفوظ، لكن أعمدته غير موجودة في هذا الملف', calcExists:'الملف يحتوي عمودًا بنفس الاسم، فتُستخدم قيمه كما هي', layoutsBtn:'▦ التخطيطات', layoutsTitle:'قوالب التخطيط', layoutsHint:'احفظ المؤشرات والرسوم والفلاتر والجداول الحالية كقالب، وطبّقه على أي ملف.', layoutNamePh:'اسم القالب (مثال: تقرير المبيعات الشهري)', layoutSave:'حفظ التخطيط الحالي', layoutApply:'تطبيق', layoutDefault:'افتراضي', layoutMakeDefault:'اجعله القالب الافتراضي', layoutDelete:'حذف القالب', layoutMeta:'{k} مؤشر · {c} رسم · {f} فلتر', layoutDefaultNote:'القالب الافتراضي ★ يُطبَّق تلقائيًا عند رفع أي ملف جديد.', layoutEmpty:'لا توجد قوالب محفوظة بعد.', layoutNeedName:'اكتب اسمًا للقالب.', layoutSaved:'تم حفظ القالب «{n}».', layoutUpdated:'تم تحديث القالب «{n}».', layoutApplied:'تم تطبيق القالب «{n}».', layoutAppliedSkip:'تم تطبيق القالب «{n}»، وتُرك {s} عنصر لأن أعمدته غير موجودة في هذا الملف.', tPie:'دائري بقيمة', pieSub:'{agg} {v} حسب {c}', pieSplit:'{v} حسب {c}', pieSplitSub:'حلقة لكل قيمة من {c}', pieRings:'الحلقات من الخارج للداخل: {list}'
   },
   en: {
     docTitle:'Atlas — Dynamic Data Dashboard', brandTag:'Dynamic Dashboard / v1', processing:'Parsing', excel:'Excel',
@@ -608,7 +640,7 @@ const I18N = {
     calcBtn:'ƒx Calculated column', calcTitle:'Calculated column', calcHint:'Create a new column from two numeric columns, or a column and a fixed number',
     calcName:'Column name', calcConstPh:'Fixed number', calcConstOpt:'Fixed number…', close:'Close', calcAdd:'Add column',
     calcNeedNum:'There are no numeric columns in the data.', calcNeedName:'Enter a column name.', calcNameTaken:'A column with this name already exists.',
-    calcNeedConst:'Enter the fixed number.', calcExample:'Example: ', calcDefaultName:'{a} {op} {b}', calcRemove:'Remove column', calcAdded:'Column “{n}” added and saved automatically.', calcSavedNote:'Calculated columns are saved automatically and re-applied to any file with the same columns.', calcSkipped:'saved, but its columns are not in this file'
+    calcNeedConst:'Enter the fixed number.', calcExample:'Example: ', calcDefaultName:'{a} {op} {b}', calcRemove:'Remove column', calcAdded:'Column “{n}” added and saved automatically.', calcSavedNote:'Calculated columns are saved automatically and re-applied to any file with the same columns.', calcSkipped:'saved, but its columns are not in this file', calcExists:'the file already has a column with this name, so its values are used as-is', layoutsBtn:'▦ Layouts', layoutsTitle:'Layout templates', layoutsHint:'Save the current metrics, charts, filters and tables as a template, and apply it to any file.', layoutNamePh:'Template name (e.g. Monthly sales report)', layoutSave:'Save current layout', layoutApply:'Apply', layoutDefault:'Default', layoutMakeDefault:'Make default template', layoutDelete:'Delete template', layoutMeta:'{k} metrics · {c} charts · {f} filters', layoutDefaultNote:'The default template ★ is applied automatically whenever you load a new file.', layoutEmpty:'No saved templates yet.', layoutNeedName:'Enter a template name.', layoutSaved:'Template “{n}” saved.', layoutUpdated:'Template “{n}” updated.', layoutApplied:'Template “{n}” applied.', layoutAppliedSkip:'Template “{n}” applied; {s} item(s) skipped because their columns are not in this file.', tPie:'Pie by value', pieSub:'{agg} of {v} by {c}', pieSplit:'{v} by {c}', pieSplitSub:'One ring per {c} value', pieRings:'Rings, outer to inner: {list}'
   }
 };
 let lang = document.documentElement.getAttribute('lang') === 'en' ? 'en' : 'ar';
@@ -679,6 +711,7 @@ resetBtn.addEventListener('click', ()=>{
   pdfBtn.style.display='none';
   resetBtn.style.display='none';
   calcBtn.style.display='none';
+  layoutsBtn.style.display='none';
   state.calcColumns = [];
   fileInput.value='';
 });
@@ -719,6 +752,7 @@ function applyLang(next){
     refreshAll();
   }
   if(calcDialog.open) openCalcDialog();
+  if(layoutsDialog.open) renderLayoutList();
 }
 langBtn.textContent = t('langBtn');
 langBtn.addEventListener('click', () => applyLang(lang === 'ar' ? 'en' : 'ar'));
@@ -775,6 +809,12 @@ function loadGoogleSheet(){
       showError(t('readSheetFail') + (err && err.message ? err.message : err));
     })
     .finally(() => { sheetBtn.disabled = false; });
+}
+
+function showInfo(msg){
+  const box = document.getElementById('errorBox');
+  box.innerHTML = `<div class="info">${escapeHtml(msg)}</div>`;
+  setTimeout(()=>{ box.innerHTML=''; }, 6000);
 }
 
 function showError(msg){
@@ -1026,6 +1066,7 @@ function ingestNow(rawRows){
 
   fileNamePill.textContent = state.fileName + ' · ' + t('rowsPill', {n:n0(cleanRows.length)});
   calcBtn.style.display='inline-block';
+  layoutsBtn.style.display='inline-block';
   fileNamePill.style.display='inline-block';
   excelBtn.style.display='inline-block';
   pdfBtn.style.display='inline-block';
@@ -1035,6 +1076,7 @@ function ingestNow(rawRows){
   document.getElementById('dashView').classList.add('active');
 
   applySavedCalcColumns();
+  applyDefaultLayout();
   buildDashboard();
 }
 
@@ -1154,7 +1196,7 @@ function openCalcDialog(){
   if(keepB === '__CONST__' || numCols.some(c => c.name === keepB)) calcB.value = keepB;
   else if(numCols[1]) calcB.value = numCols[1].name;
   calcConstWrap.hidden = calcB.value !== '__CONST__';
-  calcError.textContent = numCols.length ? '' : t('calcNeedNum');
+  setMsg(calcError, numCols.length ? '' : t('calcNeedNum'));
   renderCalcList();
   updateCalcPreview();
   if(!calcDialog.open) calcDialog.showModal();
@@ -1195,33 +1237,39 @@ function renderCalcList(){
   const active = new Set(state.calcColumns.map(c => c.name));
   const items = [...state.calcColumns, ...loadSavedCalcs().filter(c => !active.has(c.name))];
   calcList.innerHTML = items.map(c =>
-    `<div class="calc-item${active.has(c.name) ? '' : ' inactive'}"><span><strong>${escapeHtml(c.name)}</strong> &nbsp;<code dir="ltr">= ${escapeHtml(calcFormula(c))}</code>${active.has(c.name) ? '' : ` &nbsp;<em>${escapeHtml(t('calcSkipped'))}</em>`}</span><button type="button" data-name="${escapeHtml(c.name)}" title="${escapeHtml(t('calcRemove'))}">&times;</button></div>`
+    `<div class="calc-item${active.has(c.name) ? '' : ' inactive'}"><span><strong>${escapeHtml(c.name)}</strong> &nbsp;<code dir="ltr">= ${escapeHtml(calcFormula(c))}</code>${active.has(c.name) ? '' : ` &nbsp;<em>${escapeHtml(t(state.columns.some(col => col.name === c.name) ? 'calcExists' : 'calcSkipped'))}</em>`}</span><button type="button" data-name="${escapeHtml(c.name)}" title="${escapeHtml(t('calcRemove'))}">&times;</button></div>`
   ).join('');
   calcList.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => removeCalcColumn(btn.dataset.name)));
 }
 
-// Saved definitions live in the browser and, inside Apps Script, in the script's properties
-const CALC_KEY = 'atlas-calc-columns';
+// Saved lists live in the browser and, inside Apps Script, in the script's properties
 const hasAppsScript = () => !!(window.google && google.script && google.script.run);
-function loadSavedCalcs(){
-  try{ const list = JSON.parse(localStorage.getItem(CALC_KEY)); return Array.isArray(list) ? list : []; }catch(e){ return []; }
-}
-function persistCalcs(list){
-  try{ localStorage.setItem(CALC_KEY, JSON.stringify(list)); }catch(e){}
-  if(hasAppsScript()) google.script.run.withFailureHandler(err => console.warn('calc save failed', err)).saveCalcColumns(JSON.stringify(list));
-}
-if(hasAppsScript()){
-  google.script.run.withSuccessHandler(json => {
-    let server = [];
-    try{ server = JSON.parse(json || '[]'); }catch(e){}
-    if(server.length){
-      try{ localStorage.setItem(CALC_KEY, JSON.stringify(server)); }catch(e){}
-      if(state.rows.length && applySavedCalcColumns()){ buildFilters(); refreshAll(); }
-    } else if(loadSavedCalcs().length){
-      persistCalcs(loadSavedCalcs());
-    }
-  }).getCalcColumns();
-}
+const store = {
+  load(name){
+    try{ const list = JSON.parse(localStorage.getItem('atlas-' + name)); return Array.isArray(list) ? list : []; }catch(e){ return []; }
+  },
+  save(name, list){
+    try{ localStorage.setItem('atlas-' + name, JSON.stringify(list)); }catch(e){}
+    if(hasAppsScript()) google.script.run.withFailureHandler(err => console.warn(name + ' save failed', err)).saveStored(name, JSON.stringify(list));
+  },
+  // Pull the server copy once; if the server is empty, push the browser copy up
+  sync(name, onUpdate){
+    if(!hasAppsScript()) return;
+    google.script.run.withSuccessHandler(json => {
+      let server = [];
+      try{ server = JSON.parse(json || '[]'); }catch(e){}
+      if(server.length){
+        try{ localStorage.setItem('atlas-' + name, JSON.stringify(server)); }catch(e){}
+        onUpdate();
+      } else if(store.load(name).length){
+        store.save(name, store.load(name));
+      }
+    }).getStored(name);
+  }
+};
+const loadSavedCalcs = () => store.load('calc-columns');
+const persistCalcs = list => store.save('calc-columns', list);
+store.sync('calc-columns', () => { if(state.rows.length && applySavedCalcColumns()){ buildFilters(); refreshAll(); } });
 
 function canApplyCalc(c){
   const numeric = name => state.columns.some(col => col.name === name && col.type === 'number');
@@ -1243,18 +1291,21 @@ function applySavedCalcColumns(){
   return added;
 }
 
+// Dialog status line: red for problems, green for success
+function setMsg(el, text, ok){ el.textContent = text; el.classList.toggle('ok', !!ok); }
+
 function saveCalcColumn(){
   const c = readCalcForm();
-  if(!c.a) { calcError.textContent = t('calcNeedNum'); return; }
-  if(!c.name) { calcError.textContent = t('calcNeedName'); return; }
-  if(state.columns.some(col => col.name === c.name)) { calcError.textContent = t('calcNameTaken'); return; }
-  if(c.b === '__CONST__' && (c.k === null || !Number.isFinite(c.k))) { calcError.textContent = t('calcNeedConst'); return; }
+  if(!c.a) { setMsg(calcError, t('calcNeedNum')); return; }
+  if(!c.name) { setMsg(calcError, t('calcNeedName')); return; }
+  if(state.columns.some(col => col.name === c.name)) { setMsg(calcError, t('calcNameTaken')); return; }
+  if(c.b === '__CONST__' && (c.k === null || !Number.isFinite(c.k))) { setMsg(calcError, t('calcNeedConst')); return; }
   addCalcToState(c);
   persistCalcs([...loadSavedCalcs().filter(saved => saved.name !== c.name), c]);
   calcNameTouched = false;
   calcName.value = '';
   openCalcDialog();  // refresh dropdowns so the new column can be used right away
-  calcError.textContent = t('calcAdded', {n:c.name});
+  setMsg(calcError, t('calcAdded', {n:c.name}), true);
   buildFilters();
   refreshAll();
 }
@@ -1272,6 +1323,109 @@ function removeCalcColumn(name){
   openCalcDialog();
   buildFilters();
   refreshAll();
+}
+
+/* =========================================================
+   LAYOUT TEMPLATES
+========================================================= */
+const layoutsDialog = document.getElementById('layoutsDialog');
+const layoutName = document.getElementById('layoutName');
+const layoutMsg = document.getElementById('layoutMsg');
+const layoutList = document.getElementById('layoutList');
+const layoutsBtn = document.getElementById('layoutsBtn');
+const loadLayouts = () => store.load('layouts');
+const saveLayouts = list => store.save('layouts', list);
+store.sync('layouts', () => { if(layoutsDialog.open) renderLayoutList(); });
+
+layoutsBtn.addEventListener('click', () => { setMsg(layoutMsg, ''); renderLayoutList(); layoutsDialog.showModal(); });
+document.getElementById('layoutClose').addEventListener('click', () => layoutsDialog.close());
+document.getElementById('layoutForm').addEventListener('submit', e => { e.preventDefault(); saveCurrentLayout(); });
+
+const stripId = ({id, ...rest}) => rest;
+function chartColumns(cfg){
+  const cols = {line:[cfg.dateCol, cfg.valueCol], bar:[cfg.catCol, cfg.valueCol], doughnut:[cfg.catCol], pie:[cfg.catCol, cfg.valueCol],
+    scatter:[cfg.xCol, cfg.yCol], histogram:[cfg.valueCol], 'bar-count':[cfg.catCol]}[cfg.type] || [];
+  return cols.filter(Boolean);
+}
+
+function saveCurrentLayout(){
+  const name = layoutName.value.trim();
+  if(!name){ setMsg(layoutMsg, t('layoutNeedName')); return; }
+  const list = loadLayouts();
+  const existing = list.find(l => l.name === name);
+  const layout = {
+    name,
+    isDefault: existing ? !!existing.isDefault : list.length === 0,
+    filters: [...state.activeFilterCols],
+    kpis: state.kpiConfigs.map(stripId),
+    charts: state.chartConfigs.map(stripId),
+    pivot: {...state.pivotConfig},
+    totals: {...state.totalsConfig}
+  };
+  saveLayouts(existing ? list.map(l => l.name === name ? layout : l) : [...list, layout]);
+  setMsg(layoutMsg, t(existing ? 'layoutUpdated' : 'layoutSaved', {n:name}), true);
+  layoutName.value = '';
+  renderLayoutList();
+}
+
+// Applies what fits the current file; returns how many items were skipped
+function applyLayout(layout){
+  const has = name => name === '__RECORDS__' || state.columns.some(c => c.name === name);
+  let skipped = 0;
+  const keep = (ok) => { if(!ok) skipped++; return ok; };
+  const stamp = Date.now();
+  state.activeFilterCols = layout.filters.filter(name => keep(has(name)));
+  state.filters = {};
+  state.kpiConfigs = layout.kpis.filter(k => keep(has(k.colName))).map((k, i) => ({...k, id:`kpi_${stamp}_${i}`}));
+  state.chartConfigs = layout.charts.filter(cfg => keep(chartColumns(cfg).every(has))).map((cfg, i) => ({...cfg, id:`chart_${stamp}_${i}`}));
+  if(layout.pivot && has(layout.pivot.rowCol) && has(layout.pivot.colCol)) state.pivotConfig = {...layout.pivot};
+  if(layout.totals && has(layout.totals.rowCol)) state.totalsConfig = {...layout.totals};
+  state.page = 1;
+  return skipped;
+}
+
+function applyLayoutAndRefresh(layout){
+  const skipped = applyLayout(layout);
+  buildFilters();
+  refreshAll();
+  return skipped;
+}
+
+function renderLayoutList(){
+  const list = loadLayouts();
+  layoutList.innerHTML = list.length ? list.map((l, i) => `
+    <div class="layout-item">
+      <button type="button" class="layout-star${l.isDefault ? ' on' : ''}" data-act="default" data-i="${i}" title="${escapeHtml(t('layoutMakeDefault'))}">${l.isDefault ? '★' : '☆'}</button>
+      <div class="layout-name"><strong>${escapeHtml(l.name)}</strong>${l.isDefault ? `<span class="badge">${t('layoutDefault')}</span>` : ''}
+        <small>${escapeHtml(t('layoutMeta', {k:l.kpis.length, c:l.charts.length, f:l.filters.length}))}</small></div>
+      <button type="button" class="layout-apply" data-act="apply" data-i="${i}">${t('layoutApply')}</button>
+      <button type="button" data-act="delete" data-i="${i}" title="${escapeHtml(t('layoutDelete'))}">&times;</button>
+    </div>`).join('') : `<div class="chart-sub">${t('layoutEmpty')}</div>`;
+  layoutList.querySelectorAll('button[data-act]').forEach(btn => btn.addEventListener('click', () => {
+    const list = loadLayouts();
+    const layout = list[+btn.dataset.i];
+    if(btn.dataset.act === 'apply'){
+      const skipped = applyLayoutAndRefresh(layout);
+      setMsg(layoutMsg, skipped ? t('layoutAppliedSkip', {n:layout.name, s:skipped}) : t('layoutApplied', {n:layout.name}), true);
+    } else if(btn.dataset.act === 'default'){
+      const makeDefault = !layout.isDefault;
+      saveLayouts(list.map(l => ({...l, isDefault: makeDefault && l.name === layout.name})));
+    } else if(btn.dataset.act === 'delete'){
+      saveLayouts(list.filter(l => l.name !== layout.name));
+    }
+    renderLayoutList();
+  }));
+}
+
+// Default template on every new file (only if something in it fits)
+function applyDefaultLayout(){
+  const layout = loadLayouts().find(l => l.isDefault);
+  if(!layout) return;
+  const has = name => name === '__RECORDS__' || state.columns.some(c => c.name === name);
+  const fits = layout.kpis.some(k => k.colName !== '__RECORDS__' && has(k.colName)) || layout.charts.some(cfg => chartColumns(cfg).every(has));
+  if(!fits) return;
+  const skipped = applyLayout(layout);
+  setTimeout(() => showInfo(skipped ? t('layoutAppliedSkip', {n:layout.name, s:skipped}) : t('layoutApplied', {n:layout.name})), 0);
 }
 
 function buildDashboard(){
@@ -1917,7 +2071,8 @@ function buildKPIs(rows){
 
     // Column selector
     const colSelect = document.createElement('select');
-    colSelect.className = 'kpi-select';
+    colSelect.className = 'kpi-select kpi-col';
+    colSelect.title = config.colName === '__RECORDS__' ? t('records') : config.colName;
     
     let html = `<option value="__RECORDS__" ${config.colName === '__RECORDS__' ? 'selected' : ''}>[${t('records')}]</option>`;
     state.columns.forEach(c => {
@@ -1927,7 +2082,7 @@ function buildKPIs(rows){
 
     // Aggregation selector
     const aggSelect = document.createElement('select');
-    aggSelect.className = 'kpi-select';
+    aggSelect.className = 'kpi-select kpi-agg';
 
     function updateAggOptions(colName) {
       let aggs = [];
@@ -1968,6 +2123,7 @@ function buildKPIs(rows){
     colSelect.addEventListener('change', e => {
       const newCol = e.target.value;
       config.colName = newCol;
+      colSelect.title = newCol === '__RECORDS__' ? t('records') : newCol;
       // validate / reset aggregation
       if (newCol === '__RECORDS__') {
         config.agg = 'count';
@@ -2108,6 +2264,7 @@ function chartTitle(cfg){
     case 'line': return t('overTime', {v:cfg.valueCol});
     case 'bar': return cfg.valueCol ? t('vBy', {v:cfg.valueCol, c:cfg.catCol}) : t('countBy', {c:cfg.catCol});
     case 'doughnut': return t('recordsBy', {c:cfg.catCol});
+    case 'pie': return t('pieSplit', {v:cfg.valueCol, c:cfg.catCol});
     case 'scatter': return t('vs', {x:cfg.xCol, y:cfg.yCol});
     case 'histogram': return t('distOf', {v:cfg.valueCol});
     case 'bar-count': return t('topValues', {c:cfg.catCol});
@@ -2120,6 +2277,9 @@ function chartSub(cfg){
     case 'line': return t('byDate', {d:cfg.dateCol});
     case 'bar': return cfg.valueCol ? t('aggSub', {agg:aggLabel(cfg.agg || 'sum')}) : t('recordCount');
     case 'doughnut': return t('share');
+    case 'pie': return state.columns.some(c => c.name === cfg.valueCol && c.type === 'number')
+      ? t('pieSub', {agg:aggLabel(cfg.agg || 'sum'), v:cfg.valueCol, c:cfg.catCol})
+      : t('pieSplitSub', {c:cfg.catCol});
     case 'scatter': return t('correlation');
     case 'histogram': return t('freqBin');
     case 'bar-count': return t('recordCount');
@@ -2143,6 +2303,7 @@ function renderChart(cfg, rows, grid){
       <option value="bar" ${cfg.type==='bar'?'selected':''}>${t('tBar')}</option>
       <option value="line" ${cfg.type==='line'?'selected':''}>${t('tLine')}</option>
       <option value="doughnut" ${cfg.type==='doughnut'?'selected':''}>${t('tDoughnut')}</option>
+      <option value="pie" ${cfg.type==='pie'?'selected':''}>${t('tPie')}</option>
       <option value="scatter" ${cfg.type==='scatter'?'selected':''}>${t('tScatter')}</option>
       <option value="histogram" ${cfg.type==='histogram'?'selected':''}>${t('tHist')}</option>
       <option value="bar-count" ${cfg.type==='bar-count'?'selected':''}>${t('tCounts')}</option>
@@ -2183,6 +2344,19 @@ function renderChart(cfg, rows, grid){
       <select data-role="cat" title="${t('catField')}">
         ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
+    `;
+  } else if(cfg.type === 'pie'){
+    const valueIsNumber = numCols.some(c => c.name === cfg.valueCol);
+    paramHtml += `
+      <select data-role="cat" title="${t('catField')}">
+        ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+      <select data-role="val" title="${t('valueField')}">
+        ${allCols.filter(c=>c.name!==cfg.catCol).map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)} (${typeLabel(c.type)})</option>`).join('')}
+      </select>
+      ${valueIsNumber ? `<select data-role="agg" title="${t('aggregation')}">
+        ${['sum','avg','count'].map(a=>`<option value="${a}" ${cfg.agg===a?'selected':''}>${aggLabel(a)}</option>`).join('')}
+      </select>` : ''}
     `;
   } else if(cfg.type === 'scatter'){
     paramHtml += `
@@ -2251,6 +2425,11 @@ function renderChart(cfg, rows, grid){
           cfg.agg = 'sum';
         } else if (val === 'doughnut') {
           cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
+        } else if (val === 'pie') {
+          const cats = state.columns.filter(c => c.type === 'category');
+          cfg.catCol = cats[0]?.name || state.columns[0]?.name || '';
+          cfg.valueCol = numCols.find(c => !looksLikeId(c))?.name || cats[1]?.name || '';
+          cfg.agg = 'sum';
         } else if (val === 'scatter') {
           cfg.xCol = numCols[0]?.name || '';
           cfg.yCol = numCols[1]?.name || numCols[0]?.name || '';
@@ -2265,6 +2444,7 @@ function renderChart(cfg, rows, grid){
 
       if (role === 'cat') cfg.catCol = val;
       if (role === 'val') cfg.valueCol = val;
+      if (cfg.type === 'pie' && (role === 'val' || role === 'cat')) { buildCharts(rows); return; }
       if (role === 'date') cfg.dateCol = val;
       if (role === 'x') cfg.xCol = val;
       if (role === 'y') cfg.yCol = val;
@@ -2415,6 +2595,62 @@ function drawChart(cfg, rows, canvasId){
       }
     });
 
+  } else if(cfg.type==='pie'){
+    // Numeric value: one pie, slices = categories, size = sum/avg/count of the value.
+    // Text value (e.g. grade by gender): one ring per category, slices = value counts.
+    const valueColumn = state.columns.find(c => c.name === cfg.valueCol);
+    const legendOpts = {position:'bottom', labels:{...baseOpts.plugins.legend.labels, padding:10, boxWidth:10, boxHeight:10}};
+    const pct = (value, data) => { const total = data.reduce((a, b) => a + (b || 0), 0); return total ? ` (${(value / total * 100).toFixed(1)}%)` : ''; };
+    const topN = (entries, n) => entries.length > n ? [...entries.slice(0, n - 1), [t('other'), entries.slice(n - 1).reduce((s, e) => s + e[1], 0)]] : entries;
+    if(valueColumn && valueColumn.type === 'number'){
+      const groups = {};
+      rows.forEach(r => {
+        const k = r[cfg.catCol];
+        if(k === null || k === undefined) return;
+        const key = String(k);
+        if(!groups[key]) groups[key] = {sum:0, count:0};
+        const v = r[cfg.valueCol];
+        if(cfg.agg === 'count'){ if(v !== null) groups[key].count++; }
+        else if(v !== null && !isNaN(v)){ groups[key].sum += Number(v); groups[key].count++; }
+      });
+      const value = g => cfg.agg === 'count' ? g.count : cfg.agg === 'avg' ? (g.count ? g.sum / g.count : 0) : g.sum;
+      let entries = Object.entries(groups).map(([k, g]) => [k, value(g)]).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+      entries = topN(entries, 10);
+      chart = new Chart(ctx, {
+        type:'pie',
+        data:{labels:entries.map(e => e[0]), datasets:[{label:cfg.valueCol, data:entries.map(e => e[1]), backgroundColor:palette, borderColor:themeColor('--panel'), borderWidth:2}]},
+        options:{...baseOpts, plugins:{...baseOpts.plugins, legend:legendOpts,
+          tooltip:{...baseOpts.plugins.tooltip, callbacks:{label:c => ` ${c.label}: ${fmt.full(c.parsed)}${cfg.agg === 'avg' ? '' : pct(c.parsed, c.dataset.data)}`}}}}
+      });
+    } else if(valueColumn){
+      const rings = {}, sliceTotals = {};
+      rows.forEach(r => {
+        const ring = r[cfg.catCol], slice = r[cfg.valueCol];
+        if(ring === null || ring === undefined || slice === null || slice === undefined) return;
+        const rk = String(ring), sk = slice instanceof Date ? slice.toISOString().slice(0, 10) : String(slice);
+        if(!rings[rk]) rings[rk] = {};
+        rings[rk][sk] = (rings[rk][sk] || 0) + 1;
+        sliceTotals[sk] = (sliceTotals[sk] || 0) + 1;
+      });
+      const sliceKeys = Object.entries(sliceTotals).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+      const shown = sliceKeys.length > 10 ? sliceKeys.slice(0, 9) : sliceKeys;
+      const hasOther = sliceKeys.length > shown.length;
+      const labels = hasOther ? [...shown, t('other')] : shown;
+      const ringKeys = Object.entries(rings).sort((a, b) => Object.values(b[1]).reduce((s, x) => s + x, 0) - Object.values(a[1]).reduce((s, x) => s + x, 0)).map(e => e[0]).slice(0, 6);
+      chart = new Chart(ctx, {
+        type:'doughnut',
+        data:{labels, datasets:ringKeys.map(rk => {
+          const counts = rings[rk];
+          const data = shown.map(sk => counts[sk] || 0);
+          if(hasOther) data.push(Object.entries(counts).filter(([sk]) => !shown.includes(sk)).reduce((s, [, n]) => s + n, 0));
+          return {label:rk, data, backgroundColor:palette, borderColor:themeColor('--panel'), borderWidth:2};
+        })},
+        options:{...baseOpts, cutout:ringKeys.length > 1 ? '22%' : '50%', plugins:{...baseOpts.plugins, legend:legendOpts,
+          tooltip:{...baseOpts.plugins.tooltip, callbacks:{label:c => ` ${c.dataset.label} · ${c.label}: ${fmt.full(c.parsed)}${pct(c.parsed, c.dataset.data)}`}}}}
+      });
+      const subEl = ctx.canvas.closest('.chart-card')?.querySelector('.chart-sub');
+      if(subEl && ringKeys.length > 1) subEl.textContent = t('pieRings', {list:ringKeys.join(' · ')});
+    }
   } else if(cfg.type==='scatter'){
     const data = rows.filter(r=>r[cfg.xCol]!==null && r[cfg.yCol]!==null && !isNaN(r[cfg.xCol]) && !isNaN(r[cfg.yCol]))
       .map(r=>({x:r[cfg.xCol], y:r[cfg.yCol]}));

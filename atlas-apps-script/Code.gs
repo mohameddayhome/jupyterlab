@@ -50,12 +50,39 @@ function getSheetChunk(url, gid, start, count) {
   return JSON.stringify(sheet.getRange(start, 1, n, lastCol).getDisplayValues());
 }
 
-/** Saved calculated-column definitions (JSON string), kept in script properties. */
-function getCalcColumns() {
-  return PropertiesService.getScriptProperties().getProperty('atlasCalcColumns') || '[]';
+/**
+ * Saved lists (calculated columns, layout templates) as JSON strings in script properties.
+ * Values are split into chunks because one property holds at most ~9 KB.
+ */
+var STORE_KEYS_ = { 'calc-columns': 'atlasCalcColumns', 'layouts': 'atlasLayouts' };
+var CHUNK_ = 8000;
+
+function storeKey_(name) {
+  var key = STORE_KEYS_[name];
+  if (!key) throw new Error('Unknown store: ' + name);
+  return key;
 }
 
-function saveCalcColumns(json) {
+function getStored(name) {
+  var key = storeKey_(name);
+  var props = PropertiesService.getScriptProperties();
+  var count = Number(props.getProperty(key + '_n') || 0);
+  if (!count) return props.getProperty(key) || '[]'; // single value (older saves)
+  var parts = [];
+  for (var i = 0; i < count; i++) parts.push(props.getProperty(key + '_' + i) || '');
+  return parts.join('');
+}
+
+function saveStored(name, json) {
+  var key = storeKey_(name);
   JSON.parse(json); // reject malformed input
-  PropertiesService.getScriptProperties().setProperty('atlasCalcColumns', json);
+  var props = PropertiesService.getScriptProperties();
+  var oldCount = Number(props.getProperty(key + '_n') || 0);
+  var values = {};
+  var count = Math.ceil(json.length / CHUNK_) || 1;
+  for (var i = 0; i < count; i++) values[key + '_' + i] = json.slice(i * CHUNK_, (i + 1) * CHUNK_);
+  values[key + '_n'] = String(count);
+  props.setProperties(values);
+  for (var j = count; j < oldCount; j++) props.deleteProperty(key + '_' + j);
+  props.deleteProperty(key);
 }

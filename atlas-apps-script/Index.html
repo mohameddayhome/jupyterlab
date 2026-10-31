@@ -16,6 +16,11 @@
     try{ t = localStorage.getItem('atlas-theme'); }catch(e){}
     if(!t) t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', t);
+    var l = null;
+    try{ l = localStorage.getItem('atlas-lang'); }catch(e){}
+    l = l === 'en' ? 'en' : 'ar';
+    document.documentElement.setAttribute('lang', l);
+    document.documentElement.setAttribute('dir', l === 'ar' ? 'rtl' : 'ltr');
   })();
 </script>
 <style>
@@ -99,6 +104,28 @@
   input[type=number],input[type=date]{direction:ltr;text-align:end}
   .filter input{min-width:0}
   .filter:has(input[type=date]){max-width:300px;flex-basis:260px}
+  .lang-toggle{min-width:54px}
+  .calc-dialog{border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--panel);color:var(--ink);padding:24px 26px;width:min(560px,calc(100vw - 32px));box-shadow:var(--shadow)}
+  .calc-dialog::backdrop{background:rgba(10,20,24,.45);backdrop-filter:blur(2px)}
+  .calc-dialog .chart-sub{margin-bottom:18px}
+  .calc-field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;font-size:12px;color:var(--muted);font-weight:600}
+  .calc-dialog input,.calc-dialog select{font:inherit;font-size:13px;padding:9px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);min-width:0}
+  .calc-dialog input:focus,.calc-dialog select:focus{outline:none;border-color:var(--accent)}
+  .calc-formula{display:grid;grid-template-columns:1fr 64px 1fr;gap:8px;margin-bottom:8px}
+  .calc-formula select#calcOp{text-align:center;font-weight:700;font-size:16px;padding:6px}
+  .calc-const{margin-bottom:8px}
+  .calc-preview{font-size:12px;color:var(--ink-soft);min-height:18px;margin:6px 0 14px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;direction:ltr;text-align:start}
+  [dir="rtl"] .calc-preview{text-align:end}
+  .calc-list{border-top:1px solid var(--line);padding-top:12px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px}
+  .calc-list:empty{display:none}
+  .calc-item{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+  .calc-item code{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;color:var(--muted);font-size:11px}
+  .calc-item button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
+  .calc-item button:hover{color:var(--accent)}
+  .calc-error{color:var(--accent);font-size:12px;min-height:16px;margin-bottom:8px}
+  .calc-actions{display:flex;gap:10px;justify-content:flex-end}
+  .calc-actions .upload-cta{padding:10px 18px}
+  .totals-other-row td{color:var(--muted);font-style:italic}
   .theme-toggle{display:inline-flex;align-items:center;gap:6px}
   .theme-toggle svg{width:13px;height:13px}
   .theme-toggle .ico-sun{display:none}
@@ -284,7 +311,7 @@
   @media print{
     @page{size:auto;margin:12mm}
     body{background:#fff;color:#000}
-    .theme-toggle,.sheet-load{display:none !important}
+    .theme-toggle,.lang-toggle,.sheet-load,.calc-dialog{display:none !important}
     .grain,header.top,.filters-bar,.section-action,.chart-controls,.chart-remove,.kpi-remove,.table-search,.table-foot,.upload-wrap{display:none !important}
     main{max-width:none;padding:0}
     .dash{display:block !important}
@@ -302,19 +329,21 @@
   <div class="top-inner">
     <div class="brand">
       <div class="brand-mark">Atlas</div>
-      <div class="brand-tag">لوحة بيانات تفاعلية</div>
+      <div class="brand-tag" data-i18n="brandTag">لوحة بيانات تفاعلية</div>
     </div>
     <div class="top-meta" id="topMeta">
       <span class="pill" id="fileNamePill" style="display:none"></span>
-      <div class="loader" id="loader"><span id="loaderText">جارٍ المعالجة</span></div>
-      <button class="ghost export-btn" id="excelBtn" style="display:none">إكسل</button>
+      <div class="loader" id="loader"><span id="loaderText" data-i18n="processing">جارٍ المعالجة</span></div>
+      <button class="ghost export-btn" id="excelBtn" style="display:none" data-i18n="excel">إكسل</button>
       <button class="ghost export-btn" id="pdfBtn" style="display:none">PDF</button>
-      <button class="ghost" id="resetBtn" style="display:none">↻ ملف جديد</button>
-      <button class="ghost theme-toggle" id="themeBtn" title="تبديل الوضع الليلي">
+      <button class="ghost" id="calcBtn" style="display:none" data-i18n="calcBtn">ƒx عمود محسوب</button>
+      <button class="ghost" id="resetBtn" style="display:none" data-i18n="newFile">↻ ملف جديد</button>
+      <button class="ghost theme-toggle" id="themeBtn" data-i18n-title="toggleTheme" title="تبديل الوضع الليلي">
         <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
         <span id="themeLabel">ليلي</span>
       </button>
+      <button class="ghost lang-toggle" id="langBtn" title="English / عربي">EN</button>
     </div>
   </div>
 </header>
@@ -323,21 +352,21 @@
   <!-- UPLOAD VIEW -->
   <section class="upload-wrap" id="uploadView">
     <div class="upload" id="dropZone">
-      <h1>أسقط بياناتك هنا.<br/><em>وشاهدها تتحرك.</em></h1>
-      <p>ارفع أي ملف CSV أو Excel، وسيقرأ أطلس بنيته، ويختار الرسوم المناسبة، ويبني الفلاتر من فئاتك، لتحلّل بياناتك مباشرة.</p>
+      <h1><span data-i18n="heroTitle">أسقط بياناتك هنا.</span><br/><em data-i18n="heroEm">وشاهدها تتحرك.</em></h1>
+      <p data-i18n="heroText">ارفع أي ملف CSV أو Excel، وسيقرأ أطلس بنيته، ويختار الرسوم المناسبة، ويبني الفلاتر من فئاتك، لتحلّل بياناتك مباشرة.</p>
       <button class="upload-cta" id="browseBtn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0-12l-4 4m4-4l4 4M5 21h14"/></svg>
-        اختر ملفًا
+        <span data-i18n="chooseFile">اختر ملفًا</span>
       </button>
       <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.tsv" style="display:none" />
-      <span class="upload-or">— أو اسحب الملف وأفلته هنا —</span>
+      <span class="upload-or" data-i18n="orDrag">— أو اسحب الملف وأفلته هنا —</span>
       <div>
-        <button class="sample-link" id="sampleBtn">جرّب ببيانات تجريبية</button>
+        <button class="sample-link" id="sampleBtn" data-i18n="sample">جرّب ببيانات تجريبية</button>
       </div>
-      <span class="upload-or">— أو حمّل جدول Google —</span>
+      <span class="upload-or" data-i18n="orSheet">— أو حمّل جدول Google —</span>
       <div class="sheet-load" id="sheetLoad">
-        <input type="text" id="sheetUrl" placeholder="الصق رابط Google Sheet (اتركه فارغًا للجدول المرتبط)" />
-        <button class="ghost" id="sheetBtn">تحميل الجدول</button>
+        <input type="text" id="sheetUrl" data-i18n-placeholder="sheetPh" placeholder="الصق رابط Google Sheet (اتركه فارغًا للجدول المرتبط)" />
+        <button class="ghost" id="sheetBtn" data-i18n="loadSheet">تحميل الجدول</button>
       </div>
       <div class="upload-formats">CSV · TSV · XLSX · XLS · Google Sheets</div>
       <div class="upload-error" id="uploadError"></div>
@@ -348,22 +377,22 @@
   <section class="dash" id="dashView">
     <div id="errorBox"></div>
 
-    <div class="section-label">الفلاتر</div>
+    <div class="section-label"><span data-i18n="filters">الفلاتر</span></div>
     <div class="filters-bar">
       <div class="filters-row" id="filtersRow"></div>
     </div>
 
-    <div class="section-label">المؤشرات الرئيسية<button class="section-action" id="addMetricBtn">+ إضافة مؤشر</button></div>
+    <div class="section-label"><span data-i18n="kpis">المؤشرات الرئيسية</span><button class="section-action" id="addMetricBtn" data-i18n="addMetricPlus">+ إضافة مؤشر</button></div>
     <div class="kpi-grid" id="kpiGrid"></div>
 
-    <div class="section-label">الرسوم البيانية<button class="section-action" id="addChartBtn">+ إضافة رسم</button></div>
+    <div class="section-label"><span data-i18n="charts">الرسوم البيانية</span><button class="section-action" id="addChartBtn" data-i18n="addChartPlus">+ إضافة رسم</button></div>
     <div class="charts-grid" id="chartsGrid"></div>
 
-    <div class="section-label">إجماليات الأعمدة</div>
+    <div class="section-label"><span data-i18n="colTotals">إجماليات الأعمدة</span></div>
     <div class="totals-card">
       <div class="table-head">
         <div>
-          <div class="chart-title">ملخص الإجماليات</div>
+          <div class="chart-title" data-i18n="totalsSummary">ملخص الإجماليات</div>
           <div class="chart-sub" id="totalsSub"></div>
         </div>
         <div class="chart-controls" id="totalsControls"></div>
@@ -373,11 +402,11 @@
       </div>
     </div>
 
-    <div class="section-label">الجدول المحوري</div>
+    <div class="section-label"><span data-i18n="pivot">الجدول المحوري</span></div>
     <div class="totals-card">
       <div class="table-head">
         <div>
-          <div class="chart-title">جدول محوري مخصص</div>
+          <div class="chart-title" data-i18n="pivotTitle">جدول محوري مخصص</div>
           <div class="chart-sub" id="pivotSub"></div>
         </div>
         <div class="chart-controls" id="pivotControls"></div>
@@ -387,14 +416,14 @@
       </div>
     </div>
 
-    <div class="section-label">البيانات</div>
+    <div class="section-label"><span data-i18n="data">البيانات</span><button class="section-action" id="addCalcBtn" data-i18n="calcBtn">ƒx عمود محسوب</button></div>
     <div class="table-card">
       <div class="table-head">
         <div>
-          <div class="chart-title" id="tableTitle">السجلات بعد الفلترة</div>
+          <div class="chart-title" id="tableTitle" data-i18n="filtered">السجلات بعد الفلترة</div>
           <div class="chart-sub" id="tableSub"></div>
         </div>
-        <input type="text" class="table-search" id="tableSearch" placeholder="ابحث في كل الأعمدة..." />
+        <input type="text" class="table-search" id="tableSearch" data-i18n-placeholder="searchAll" placeholder="ابحث في كل الأعمدة..." />
       </div>
       <div class="table-scroll" id="tableScroll">
         <table id="dataTable"></table>
@@ -402,19 +431,45 @@
       <div class="table-foot">
         <span id="tableInfo"></span>
         <div class="pager">
-          <button id="pagePrev">› السابق</button>
+          <button id="pagePrev" data-i18n="prev">› السابق</button>
           <span id="pageLabel" style="padding:4px 8px"></span>
-          <button id="pageNext">التالي ‹</button>
+          <button id="pageNext" data-i18n="next">التالي ‹</button>
         </div>
       </div>
     </div>
 
     <div class="footer">
-      <span>لوحة أطلس</span>
+      <span data-i18n="footer">لوحة أطلس</span>
       <span id="footMeta"></span>
     </div>
   </section>
 </main>
+
+<dialog class="calc-dialog" id="calcDialog">
+  <form id="calcForm" novalidate>
+    <div class="chart-title" data-i18n="calcTitle">عمود محسوب</div>
+    <div class="chart-sub" data-i18n="calcHint">أنشئ عمودًا جديدًا من عمودين رقميين أو عمود ورقم ثابت</div>
+    <label class="calc-field"><span data-i18n="calcName">اسم العمود</span><input type="text" id="calcName" autocomplete="off" /></label>
+    <div class="calc-formula">
+      <select id="calcA" aria-label="A"></select>
+      <select id="calcOp" aria-label="op">
+        <option value="+">+</option>
+        <option value="-">−</option>
+        <option value="*">×</option>
+        <option value="/">÷</option>
+      </select>
+      <select id="calcB" aria-label="B"></select>
+    </div>
+    <div class="calc-const" id="calcConstWrap" hidden><input type="number" step="any" id="calcConst" data-i18n-placeholder="calcConstPh" placeholder="الرقم الثابت" style="width:100%" /></div>
+    <div class="calc-preview" id="calcPreview"></div>
+    <div class="calc-error" id="calcError"></div>
+    <div class="calc-list" id="calcList"></div>
+    <div class="calc-actions">
+      <button type="button" class="ghost" id="calcCancel" data-i18n="close">إغلاق</button>
+      <button type="submit" class="upload-cta" data-i18n="calcAdd">إضافة العمود</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
 /* =========================================================
@@ -435,7 +490,8 @@ const state = {
   sortKey: null,
   sortDir: 1,
   search: '',
-  fileName: ''
+  fileName: '',
+  calcColumns: []  // [{name, a, op, b, k}] b === '__CONST__' means fixed number k
 };
 
 const fmt = {
@@ -463,11 +519,117 @@ const fmt = {
   }
 };
 
-const TYPE_AR = {number:'رقم', date:'تاريخ', category:'فئة', text:'نص'};
-const AGG_AR = {sum:'مجموع', avg:'متوسط', count:'عدد', min:'أدنى', max:'أعلى', unique:'قيم فريدة'};
+/* =========================================================
+   LANGUAGE (Arabic / English)
+========================================================= */
+const I18N = {
+  ar: {
+    docTitle:'أطلس — لوحة البيانات التفاعلية', brandTag:'لوحة بيانات تفاعلية', processing:'جارٍ المعالجة', excel:'إكسل',
+    newFile:'↻ ملف جديد', toggleTheme:'تبديل الوضع الليلي', night:'ليلي', day:'نهاري', langBtn:'EN',
+    heroTitle:'أسقط بياناتك هنا.', heroEm:'وشاهدها تتحرك.',
+    heroText:'ارفع أي ملف CSV أو Excel، وسيقرأ أطلس بنيته، ويختار الرسوم المناسبة، ويبني الفلاتر من فئاتك، لتحلّل بياناتك مباشرة.',
+    chooseFile:'اختر ملفًا', orDrag:'— أو اسحب الملف وأفلته هنا —', sample:'جرّب ببيانات تجريبية', orSheet:'— أو حمّل جدول Google —',
+    sheetPh:'الصق رابط Google Sheet (اتركه فارغًا للجدول المرتبط)', loadSheet:'تحميل الجدول',
+    filters:'الفلاتر', kpis:'المؤشرات الرئيسية', addMetricPlus:'+ إضافة مؤشر', charts:'الرسوم البيانية', addChartPlus:'+ إضافة رسم',
+    colTotals:'إجماليات الأعمدة', totalsSummary:'ملخص الإجماليات', pivot:'الجدول المحوري', pivotTitle:'جدول محوري مخصص',
+    data:'البيانات', filtered:'السجلات بعد الفلترة', searchAll:'ابحث في كل الأعمدة...', prev:'› السابق', next:'التالي ‹', footer:'لوحة أطلس',
+    sheetOnlyInApp:'تحميل Google Sheets يعمل فقط داخل تطبيق Apps Script المنشور.', connecting:'جارٍ الاتصال بالجدول',
+    noSheetData:'لا توجد بيانات في الجدول.', loadingRows:'تحميل {a} من {b} صف', colN:'عمود {n}', readSheetFail:'تعذّرت قراءة الجدول: ',
+    noFileData:'لا توجد بيانات في الملف.', csvFail:'تعذّرت قراءة ملف CSV: ', noSpreadsheetData:'لا توجد بيانات في جدول البيانات.',
+    excelFail:'تعذّرت قراءة ملف Excel: ', unsupported:'نوع الملف غير مدعوم. ارفع ملف CSV أو TSV أو Excel.',
+    preparing:'جارٍ تجهيز {n} صف', processFail:'تعذّرت معالجة البيانات: ', rowsPill:'{n} صف',
+    overTime:'{v} عبر الزمن', byDate:'حسب {d}', vBy:'{v} حسب {c}', countBy:'العدد حسب {c}', aggSub:'تجميع: {agg}',
+    recordsBy:'السجلات حسب {c}', share:'النسبة من الإجمالي', vs:'{x} مقابل {y}', correlation:'عرض الارتباط',
+    distOf:'توزيع {v}', freqBin:'التكرار حسب الفئة', topValues:'أكثر القيم: {c}', recordCount:'عدد السجلات',
+    sampleName:'بيانات_تجريبية', noExport:'لا توجد بيانات للتصدير.', exportSheet:'البيانات المفلترة', loadFirst:'حمّل البيانات أولًا قبل تصدير التقرير.',
+    nSelected:'{n} محدد', allN:'الكل ({n})', searchValues:'ابحث في القيم...', searchValuesOf:'بحث في قيم {c}', selectAll:'تحديد الكل',
+    clearSel:'إلغاء التحديد', showingOf:'عرض {a} من {b} — استخدم البحث', range:'نطاق', from:'من', to:'إلى', addFilter:'+ إضافة فلتر', clearAll:'مسح الكل',
+    footMeta:'{a} من {b} صف · {c} عمود', noColumns:'لا توجد أعمدة.', records:'السجلات',
+    rows:'الصفوف', columns:'الأعمدة', values:'القيم', aggregate:'التجميع', dateLbl:'التاريخ', group:'التجميع', monthly:'شهري', yearly:'سنوي',
+    noPivotMatch:'لا توجد قيم مطابقة لهذا الجدول.', noPivotData:'لا توجد بيانات للحقول المختارة',
+    needCols:'يلزم عمود نصي وعمود تاريخ وعمود رقمي.', totalsNA:'الملخص غير متاح لهذه البيانات', noTotalsMatch:'لا توجد قيم مطابقة لهذا الملخص.',
+    total:'الإجمالي', grandTotal:'الإجمالي العام', otherRows:'باقي الصفوف ({n})', otherCols:'أخرى ({n})',
+    pivotSub:'{agg} {v} · {r} صف · {c} عمود', cappedNote:' · معروض {r} من {R} صف و{c} من {C} عمود، والإجماليات من كل البيانات',
+    totalsSub:'{v} حسب {r} · {n} {unit}', totalsCapped:' · معروض {r} من {R} صف، والإجماليات من كل البيانات', unitMonth:'شهر', unitYear:'سنة',
+    ofTotal:'من إجمالي {n}', fieldNotFound:'الحقل غير موجود', uniqueVals:'قيم فريدة', avgN:'المتوسط {a} · العدد {n}', sumN:'المجموع {a} · العدد {n}',
+    minVal:'أدنى قيمة', maxVal:'أعلى قيمة', earliest:'أقدم تاريخ', latest:'أحدث تاريخ', na:'غير متاح', removeMetric:'حذف المؤشر',
+    addMetric:'إضافة مؤشر', addChart:'إضافة رسم', noRecordsFilters:'لا توجد سجلات تطابق الفلاتر الحالية.',
+    tBar:'أعمدة', tLine:'خطي', tDoughnut:'دائري', tScatter:'انتشار', tHist:'توزيع', tCounts:'تكرارات',
+    dateField:'حقل التاريخ', valueField:'حقل القيمة', timeGroup:'التجميع الزمني', catField:'حقل الفئة', aggregation:'التجميع',
+    xField:'المحور الأفقي', yField:'المحور الرأسي', removeChart:'حذف الرسم', countLbl:'العدد', other:'أخرى',
+    tableInfo:'عرض {a}–{b} من {n}', noMatch:'لا توجد سجلات مطابقة', tableSub:'{n} عمود · فلترة مباشرة',
+    type_number:'رقم', type_date:'تاريخ', type_category:'فئة', type_text:'نص',
+    agg_sum:'مجموع', agg_avg:'متوسط', agg_count:'عدد', agg_min:'أدنى', agg_max:'أعلى', agg_unique:'قيم فريدة', agg_earliest:'الأقدم', agg_latest:'الأحدث',
+    calcBtn:'ƒx عمود محسوب', calcTitle:'عمود محسوب', calcHint:'أنشئ عمودًا جديدًا من عمودين رقميين أو عمود ورقم ثابت',
+    calcName:'اسم العمود', calcConstPh:'الرقم الثابت', calcConstOpt:'رقم ثابت…', close:'إغلاق', calcAdd:'إضافة العمود',
+    calcNeedNum:'لا توجد أعمدة رقمية في البيانات.', calcNeedName:'اكتب اسمًا للعمود.', calcNameTaken:'يوجد عمود بهذا الاسم.',
+    calcNeedConst:'اكتب الرقم الثابت.', calcExample:'مثال: ', calcDefaultName:'{a} {op} {b}', calcRemove:'حذف العمود', calcAdded:'تمت إضافة العمود «{n}».'
+  },
+  en: {
+    docTitle:'Atlas — Dynamic Data Dashboard', brandTag:'Dynamic Dashboard / v1', processing:'Parsing', excel:'Excel',
+    newFile:'↻ New file', toggleTheme:'Toggle night mode', night:'Night', day:'Day', langBtn:'عربي',
+    heroTitle:'Drop your data.', heroEm:'See it move.',
+    heroText:'Upload any CSV or Excel file. Atlas reads the structure, picks the right charts, builds filters from your categories, and lets you slice it live.',
+    chooseFile:'Choose file', orDrag:'— or drag & drop —', sample:'Try with sample data', orSheet:'— or load a Google Sheet —',
+    sheetPh:'Paste Google Sheet link (leave empty for the linked sheet)', loadSheet:'Load sheet',
+    filters:'Filters', kpis:'Key metrics', addMetricPlus:'+ Add metric', charts:'Visualizations', addChartPlus:'+ Add chart',
+    colTotals:'Column totals', totalsSummary:'Totals summary', pivot:'Flexible pivot', pivotTitle:'Custom pivot table',
+    data:'Data', filtered:'Filtered records', searchAll:'Search across all columns...', prev:'‹ Prev', next:'Next ›', footer:'Atlas Dashboard',
+    sheetOnlyInApp:'Google Sheets loading works only inside the deployed Apps Script web app.', connecting:'Connecting to sheet',
+    noSheetData:'No data found in the sheet.', loadingRows:'Loading {a} of {b} rows', colN:'Column {n}', readSheetFail:'Could not read the sheet: ',
+    noFileData:'No data found in file.', csvFail:'Could not read CSV: ', noSpreadsheetData:'No data found in spreadsheet.',
+    excelFail:'Could not read Excel: ', unsupported:'Unsupported file type. Please upload CSV, TSV, or Excel.',
+    preparing:'Preparing {n} rows', processFail:'Could not process the data: ', rowsPill:'{n} rows',
+    overTime:'{v} over time', byDate:'Trended by {d}', vBy:'{v} by {c}', countBy:'Count by {c}', aggSub:'Aggregated {agg}',
+    recordsBy:'Records by {c}', share:'Share of total', vs:'{x} vs {y}', correlation:'Correlation view',
+    distOf:'Distribution of {v}', freqBin:'Frequency by bin', topValues:'Top values: {c}', recordCount:'Record count',
+    sampleName:'sample_sales.csv', noExport:'No filtered data to export.', exportSheet:'Filtered Data', loadFirst:'Load data before exporting the report.',
+    nSelected:'{n} selected', allN:'All ({n})', searchValues:'Search values...', searchValuesOf:'Search {c} values', selectAll:'Select all',
+    clearSel:'Clear selection', showingOf:'Showing {a} of {b} — use search', range:'range', from:'Min', to:'Max', addFilter:'+ Add Filter', clearAll:'Clear all',
+    footMeta:'{a} of {b} rows · {c} columns', noColumns:'No columns available.', records:'Records',
+    rows:'Rows', columns:'Columns', values:'Values', aggregate:'Aggregate', dateLbl:'Months', group:'Group', monthly:'By month', yearly:'By year',
+    noPivotMatch:'No matching values for this pivot.', noPivotData:'No data for the selected fields',
+    needCols:'Need a text column, date column, and numeric column.', totalsNA:'Pivot summary unavailable for this data', noTotalsMatch:'No matching values for this summary.',
+    total:'Total', grandTotal:'Grand Total', otherRows:'Other rows ({n})', otherCols:'Other ({n})',
+    pivotSub:'{agg} of {v} · {r} rows · {c} columns', cappedNote:' · showing {r} of {R} rows and {c} of {C} columns; totals use all data',
+    totalsSub:'{v} grouped by {r} · {n} {unit}', totalsCapped:' · showing {r} of {R} rows; totals use all data', unitMonth:'months', unitYear:'years',
+    ofTotal:'of {n} total', fieldNotFound:'Field not found', uniqueVals:'unique values', avgN:'avg {a} · n={n}', sumN:'sum {a} · n={n}',
+    minVal:'minimum value', maxVal:'maximum value', earliest:'earliest date', latest:'latest date', na:'N/A', removeMetric:'Remove metric',
+    addMetric:'Add Metric', addChart:'Add Chart', noRecordsFilters:'No records match the current filters.',
+    tBar:'Bar', tLine:'Line', tDoughnut:'Donut', tScatter:'Scatter', tHist:'Hist', tCounts:'Counts',
+    dateField:'Date Field', valueField:'Value Field', timeGroup:'Time grouping', catField:'Category Field', aggregation:'Aggregation',
+    xField:'X Field', yField:'Y Field', removeChart:'Remove chart', countLbl:'Count', other:'Other',
+    tableInfo:'Showing {a}–{b} of {n}', noMatch:'No matching records', tableSub:'{n} columns · live filtered',
+    type_number:'number', type_date:'date', type_category:'category', type_text:'text',
+    agg_sum:'Sum', agg_avg:'Avg', agg_count:'Count', agg_min:'Min', agg_max:'Max', agg_unique:'Unique', agg_earliest:'Min (Earliest)', agg_latest:'Max (Latest)',
+    calcBtn:'ƒx Calculated column', calcTitle:'Calculated column', calcHint:'Create a new column from two numeric columns, or a column and a fixed number',
+    calcName:'Column name', calcConstPh:'Fixed number', calcConstOpt:'Fixed number…', close:'Close', calcAdd:'Add column',
+    calcNeedNum:'There are no numeric columns in the data.', calcNeedName:'Enter a column name.', calcNameTaken:'A column with this name already exists.',
+    calcNeedConst:'Enter the fixed number.', calcExample:'Example: ', calcDefaultName:'{a} {op} {b}', calcRemove:'Remove column', calcAdded:'Column “{n}” added.'
+  }
+};
+let lang = document.documentElement.getAttribute('lang') === 'en' ? 'en' : 'ar';
+function t(key, vars){
+  let str = (I18N[lang] && I18N[lang][key]) ?? I18N.ar[key] ?? key;
+  if(vars) str = str.replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m);
+  return str;
+}
+const isRTL = () => lang === 'ar';
+const typeLabel = type => t('type_' + type);
+const aggLabel = agg => t('agg_' + agg);
+const n0 = n => Number(n).toLocaleString();
+
+function applyStaticText(){
+  document.title = t('docTitle');
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+}
 const LIMITS = {pivotRows:200, pivotCols:40, totalsRows:200, scatterPoints:3000, filterOptions:300, sheetChunk:20000};
 const collator = new Intl.Collator('ar', {numeric:true, sensitivity:'base'});
 // Loop-based min/max: Math.min(...arr) overflows the call stack on ~100k values
+// Identifier-like numeric columns (ID, Code…): summing them is meaningless
+const looksLikeId = c => /^(id|#|no\.?|code|رقم|الرقم|كود|م)$|[_ ]id$|^id[_ ]/i.test(c.name.trim());
 function minMax(arr){
   let min = Infinity, max = -Infinity;
   for(const v of arr){ const n = +v; if(n < min) min = n; if(n > max) max = n; }
@@ -495,6 +657,7 @@ const excelBtn = document.getElementById('excelBtn');
 const pdfBtn = document.getElementById('pdfBtn');
 const addMetricBtn = document.getElementById('addMetricBtn');
 const addChartBtn = document.getElementById('addChartBtn');
+const calcBtn = document.getElementById('calcBtn');
 
 browseBtn.addEventListener('click', e=>{ e.stopPropagation(); fileInput.click(); });
 dropZone.addEventListener('click', ()=> fileInput.click());
@@ -512,6 +675,8 @@ resetBtn.addEventListener('click', ()=>{
   excelBtn.style.display='none';
   pdfBtn.style.display='none';
   resetBtn.style.display='none';
+  calcBtn.style.display='none';
+  state.calcColumns = [];
   fileInput.value='';
 });
 
@@ -525,15 +690,35 @@ sampleBtn.addEventListener('click', e=>{ e.stopPropagation(); loadSample(); });
 /* =========================================================
    NIGHT MODE
 ========================================================= */
+applyStaticText();
 const themeBtn = document.getElementById('themeBtn');
 const themeLabel = document.getElementById('themeLabel');
 function applyTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
-  themeLabel.textContent = theme === 'dark' ? 'نهاري' : 'ليلي';
+  themeLabel.textContent = theme === 'dark' ? t('day') : t('night');
   try{ localStorage.setItem('atlas-theme', theme); }catch(e){}
   if(state.rows.length) buildCharts(getFilteredRows());
 }
-themeLabel.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'نهاري' : 'ليلي';
+themeLabel.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? t('day') : t('night');
+
+const langBtn = document.getElementById('langBtn');
+function applyLang(next){
+  lang = next;
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('dir', isRTL() ? 'rtl' : 'ltr');
+  try{ localStorage.setItem('atlas-lang', lang); }catch(e){}
+  applyStaticText();
+  langBtn.textContent = t('langBtn');
+  themeLabel.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? t('day') : t('night');
+  if(state.rows.length){
+    fileNamePill.textContent = state.fileName + ' · ' + t('rowsPill', {n:n0(state.rows.length)});
+    buildFilters();
+    refreshAll();
+  }
+  if(calcDialog.open) openCalcDialog();
+}
+langBtn.textContent = t('langBtn');
+langBtn.addEventListener('click', () => applyLang(lang === 'ar' ? 'en' : 'ar'));
 themeBtn.addEventListener('click', ()=>{
   applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 });
@@ -550,7 +735,7 @@ sheetBtn.addEventListener('click', loadGoogleSheet);
 
 function loadGoogleSheet(){
   if(!(window.google && google.script && google.script.run)){
-    showError('تحميل Google Sheets يعمل فقط داخل تطبيق Apps Script المنشور.');
+    showError(t('sheetOnlyInApp'));
     return;
   }
   const url = sheetUrl.value.trim();
@@ -558,19 +743,19 @@ function loadGoogleSheet(){
     google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
   });
   loader.classList.add('show');
-  setLoaderText('جارٍ الاتصال بالجدول');
+  setLoaderText(t('connecting'));
   sheetBtn.disabled = true;
 
   // Large sheets are fetched in chunks: one big google.script.run response can exceed its size limit
   (async () => {
     const info = await call('getSheetInfo', url);
-    if(info.rows < 2) throw new Error('لا توجد بيانات في الجدول.');
+    if(info.rows < 2) throw new Error(t('noSheetData'));
     let headers = null;
     const data = [];
     for(let start = 1; start <= info.rows; start += LIMITS.sheetChunk){
-      setLoaderText(`تحميل ${Math.min(start - 1, info.rows).toLocaleString()} من ${info.rows.toLocaleString()} صف`);
+      setLoaderText(t('loadingRows', {a:n0(Math.min(start - 1, info.rows)), b:n0(info.rows)}));
       const chunk = JSON.parse(await call('getSheetChunk', url, info.gid, start, LIMITS.sheetChunk));
-      if(!headers) headers = chunk.shift().map((h, i) => String(h).trim() || `عمود ${i+1}`);
+      if(!headers) headers = chunk.shift().map((h, i) => String(h).trim() || t('colN', {n:i+1}));
       for(const r of chunk){
         if(!r.some(v => v !== '')) continue;
         const o = {};
@@ -578,13 +763,13 @@ function loadGoogleSheet(){
         data.push(o);
       }
     }
-    if(!data.length) throw new Error('لا توجد بيانات في الجدول.');
+    if(!data.length) throw new Error(t('noSheetData'));
     state.fileName = info.name;
     ingest(data);
   })()
     .catch(err => {
       loader.classList.remove('show');
-      showError('تعذّرت قراءة الجدول: ' + (err && err.message ? err.message : err));
+      showError(t('readSheetFail') + (err && err.message ? err.message : err));
     })
     .finally(() => { sheetBtn.disabled = false; });
 }
@@ -605,10 +790,10 @@ function handleFile(file){
       header:true, skipEmptyLines:true, dynamicTyping:false,
       complete:(res)=>{
         loader.classList.remove('show');
-        if(!res.data.length){ showError('لا توجد بيانات في الملف.'); return; }
+        if(!res.data.length){ showError(t('noFileData')); return; }
         ingest(res.data);
       },
-      error:(err)=>{ loader.classList.remove('show'); showError('تعذّرت قراءة ملف CSV: '+err.message); }
+      error:(err)=>{ loader.classList.remove('show'); showError(t('csvFail')+err.message); }
     });
   } else if(ext==='xlsx' || ext==='xls'){
     const reader = new FileReader();
@@ -618,14 +803,14 @@ function handleFile(file){
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
         loader.classList.remove('show');
-        if(!data.length){ showError('لا توجد بيانات في جدول البيانات.'); return; }
+        if(!data.length){ showError(t('noSpreadsheetData')); return; }
         ingest(data);
-      } catch(err){ loader.classList.remove('show'); showError('تعذّرت قراءة ملف Excel: '+err.message); }
+      } catch(err){ loader.classList.remove('show'); showError(t('excelFail')+err.message); }
     };
     reader.readAsArrayBuffer(file);
   } else {
     loader.classList.remove('show');
-    showError('نوع الملف غير مدعوم. ارفع ملف CSV أو TSV أو Excel.');
+    showError(t('unsupported'));
   }
 }
 
@@ -634,11 +819,11 @@ function handleFile(file){
 ========================================================= */
 function ingest(rawRows){
   loader.classList.add('show');
-  setLoaderText('جارٍ تجهيز ' + rawRows.length.toLocaleString() + ' صف');
+  setLoaderText(t('preparing', {n:n0(rawRows.length)}));
   setTimeout(() => {
     try{ ingestNow(rawRows); }
-    catch(err){ console.error(err); showError('تعذّرت معالجة البيانات: ' + err.message); }
-    finally{ loader.classList.remove('show'); setLoaderText('جارٍ المعالجة'); }
+    catch(err){ console.error(err); showError(t('processFail') + err.message); }
+    finally{ loader.classList.remove('show'); setLoaderText(t('processing')); }
   }, 30);
 }
 
@@ -715,6 +900,7 @@ function ingestNow(rawRows){
 
   state.rows = cleanRows;
   state.columns = cols;
+  state.calcColumns = [];
   state.filters = {};
   
   // Set default active filters (first few categories, dates, or low unique count texts)
@@ -730,8 +916,6 @@ function ingestNow(rawRows){
     colName: '__RECORDS__',
     agg: 'count'
   });
-  // Identifier-like numeric columns (ID, Code…) go last: summing them is meaningless
-  const looksLikeId = c => /^(id|#|no\.?|code|رقم|الرقم|كود|م)$|[_ ]id$|^id[_ ]/i.test(c.name.trim());
   const numColsForKpi = cols.filter(c => c.type === 'number').sort((a, b) => looksLikeId(a) - looksLikeId(b));
   numColsForKpi.slice(0, 3).forEach((c, idx) => {
     state.kpiConfigs.push({
@@ -765,8 +949,6 @@ function ingestNow(rawRows){
       dateCol: dateColsForChart[0].name,
       valueCol: numColsForKpi[0].name,
       granularity: 'month',
-      title: `${numColsForKpi[0].name} عبر الزمن`,
-      sub: `حسب ${dateColsForChart[0].name}`
     });
   }
 
@@ -778,8 +960,6 @@ function ingestNow(rawRows){
       span: 6,
       catCol: catColsForChart[0].name,
       valueCol: numColsForKpi[0].name,
-      title: `${numColsForKpi[0].name} حسب ${catColsForChart[0].name}`,
-      sub: 'مجموع مجمّع',
       agg: 'sum'
     });
   }
@@ -792,8 +972,6 @@ function ingestNow(rawRows){
       type: 'doughnut',
       span: 6,
       catCol: donutCatForChart.name,
-      title: `السجلات حسب ${donutCatForChart.name}`,
-      sub: 'النسبة من الإجمالي'
     });
   }
 
@@ -806,8 +984,6 @@ function ingestNow(rawRows){
       span: 6,
       catCol: catColsForChart[1].name,
       valueCol: v.name,
-      title: `${v.name} حسب ${catColsForChart[1].name}`,
-      sub: 'مجموع مجمّع',
       agg: 'sum'
     });
   }
@@ -820,8 +996,6 @@ function ingestNow(rawRows){
       span: 6,
       xCol: numColsForKpi[0].name,
       yCol: numColsForKpi[1].name,
-      title: `${numColsForKpi[0].name} مقابل ${numColsForKpi[1].name}`,
-      sub: 'عرض الارتباط'
     });
   } else if (numColsForKpi.length === 1 && catColsForChart.length === 0) {
     // Histogram
@@ -830,8 +1004,6 @@ function ingestNow(rawRows){
       type: 'histogram',
       span: 6,
       valueCol: numColsForKpi[0].name,
-      title: `توزيع ${numColsForKpi[0].name}`,
-      sub: 'التكرار حسب الفئة'
     });
   }
 
@@ -842,8 +1014,6 @@ function ingestNow(rawRows){
       type: 'bar-count',
       span: 12,
       catCol: catColsForChart[0].name,
-      title: `أكثر القيم: ${catColsForChart[0].name}`,
-      sub: 'عدد السجلات'
     });
   }
 
@@ -851,7 +1021,8 @@ function ingestNow(rawRows){
   state.search = '';
   state.sortKey = null;
 
-  fileNamePill.textContent = state.fileName + ' · ' + cleanRows.length.toLocaleString() + ' صف';
+  fileNamePill.textContent = state.fileName + ' · ' + t('rowsPill', {n:n0(cleanRows.length)});
+  calcBtn.style.display='inline-block';
   fileNamePill.style.display='inline-block';
   excelBtn.style.display='inline-block';
   pdfBtn.style.display='inline-block';
@@ -867,27 +1038,31 @@ function ingestNow(rawRows){
    SAMPLE DATA
 ========================================================= */
 function loadSample(){
-  const regions = ['الشمال','الجنوب','الشرق','الغرب','الوسط'];
-  const products = ['فجر','شفق','شلال','نسيم','جمرة','صقيع'];
-  const channels = ['أونلاين','تجزئة','جملة','شركاء'];
-  const segments = ['أفراد','شركات صغيرة','مؤسسات'];
+  const ar = isRTL();
+  const regions = ar ? ['الشمال','الجنوب','الشرق','الغرب','الوسط'] : ['North','South','East','West','Central'];
+  const products = ar ? ['فجر','شفق','شلال','نسيم','جمرة','صقيع'] : ['Aurora','Borealis','Cascade','Drift','Ember','Frost'];
+  const channels = ar ? ['أونلاين','تجزئة','جملة','شركاء'] : ['Online','Retail','Wholesale','Partner'];
+  const segments = ar ? ['أفراد','شركات صغيرة','مؤسسات'] : ['Consumer','Business','Enterprise'];
+  const K = ar
+    ? ['تاريخ الطلب','المنطقة','المنتج','القناة','الشريحة','الوحدات','الإيرادات','الربح','الخصم']
+    : ['Order Date','Region','Product','Channel','Segment','Units','Revenue','Profit','Discount'];
   const rows = [];
   const start = new Date(2023,0,1);
   for(let i=0;i<500;i++){
     const d = new Date(start.getTime() + Math.random()*1000*60*60*24*700);
     rows.push({
-      'تاريخ الطلب': d.toISOString().slice(0,10),
-      'المنطقة': regions[Math.floor(Math.random()*regions.length)],
-      'المنتج': products[Math.floor(Math.random()*products.length)],
-      'القناة': channels[Math.floor(Math.random()*channels.length)],
-      'الشريحة': segments[Math.floor(Math.random()*segments.length)],
-      'الوحدات': Math.floor(Math.random()*100)+1,
-      'الإيرادات': Math.round((Math.random()*8000+200)*100)/100,
-      'الربح': Math.round((Math.random()*1500-100)*100)/100,
-      'الخصم': Math.round(Math.random()*30*100)/100
+      [K[0]]: d.toISOString().slice(0,10),
+      [K[1]]: regions[Math.floor(Math.random()*regions.length)],
+      [K[2]]: products[Math.floor(Math.random()*products.length)],
+      [K[3]]: channels[Math.floor(Math.random()*channels.length)],
+      [K[4]]: segments[Math.floor(Math.random()*segments.length)],
+      [K[5]]: Math.floor(Math.random()*100)+1,
+      [K[6]]: Math.round((Math.random()*8000+200)*100)/100,
+      [K[7]]: Math.round((Math.random()*1500-100)*100)/100,
+      [K[8]]: Math.round(Math.random()*30*100)/100
     });
   }
-  state.fileName = 'بيانات_تجريبية';
+  state.fileName = t('sampleName');
   ingest(rows);
 }
 
@@ -940,6 +1115,118 @@ function getFilteredRows(){
 /* =========================================================
    BUILD DASHBOARD
 ========================================================= */
+/* =========================================================
+   CALCULATED COLUMNS
+========================================================= */
+const calcDialog = document.getElementById('calcDialog');
+const calcForm = document.getElementById('calcForm');
+const calcName = document.getElementById('calcName');
+const calcA = document.getElementById('calcA');
+const calcOp = document.getElementById('calcOp');
+const calcB = document.getElementById('calcB');
+const calcConst = document.getElementById('calcConst');
+const calcConstWrap = document.getElementById('calcConstWrap');
+const calcPreview = document.getElementById('calcPreview');
+const calcError = document.getElementById('calcError');
+const calcList = document.getElementById('calcList');
+const OP_SYMBOL = {'+':'+', '-':'−', '*':'×', '/':'÷'};
+let calcNameTouched = false;
+
+calcBtn.addEventListener('click', openCalcDialog);
+document.getElementById('addCalcBtn').addEventListener('click', openCalcDialog);
+document.getElementById('calcCancel').addEventListener('click', () => calcDialog.close());
+calcName.addEventListener('input', () => { calcNameTouched = true; });
+[calcA, calcOp, calcB, calcConst].forEach(el => el.addEventListener('input', updateCalcPreview));
+calcB.addEventListener('change', () => { calcConstWrap.hidden = calcB.value !== '__CONST__'; updateCalcPreview(); });
+calcForm.addEventListener('submit', e => { e.preventDefault(); saveCalcColumn(); });
+
+function openCalcDialog(){
+  const numCols = state.columns.filter(c => c.type === 'number');
+  const keepA = calcA.value, keepB = calcB.value;
+  const opts = numCols.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('');
+  calcA.innerHTML = opts;
+  calcB.innerHTML = opts + `<option value="__CONST__">${escapeHtml(t('calcConstOpt'))}</option>`;
+  if(numCols.some(c => c.name === keepA)) calcA.value = keepA;
+  if(keepB === '__CONST__' || numCols.some(c => c.name === keepB)) calcB.value = keepB;
+  else if(numCols[1]) calcB.value = numCols[1].name;
+  calcConstWrap.hidden = calcB.value !== '__CONST__';
+  calcError.textContent = numCols.length ? '' : t('calcNeedNum');
+  renderCalcList();
+  updateCalcPreview();
+  if(!calcDialog.open) calcDialog.showModal();
+}
+
+function calcOperand(c){ return c.b === '__CONST__' ? fmt.full(c.k) : c.b; }
+function calcFormula(c){ return `${c.a} ${OP_SYMBOL[c.op]} ${calcOperand(c)}`; }
+
+function readCalcForm(){
+  return {name:calcName.value.trim(), a:calcA.value, op:calcOp.value, b:calcB.value, k:calcConst.value === '' ? null : Number(calcConst.value)};
+}
+
+function computeCalc(row, c){
+  const a = row[c.a];
+  const b = c.b === '__CONST__' ? c.k : row[c.b];
+  if(a === null || a === undefined || b === null || b === undefined) return null;
+  const x = Number(a), y = Number(b);
+  if(!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  let v;
+  if(c.op === '+') v = x + y;
+  else if(c.op === '-') v = x - y;
+  else if(c.op === '*') v = x * y;
+  else v = y === 0 ? null : x / y;
+  return v === null ? null : Math.round(v * 1e10) / 1e10;  // trim float noise (0.1+0.2)
+}
+
+function updateCalcPreview(){
+  const c = readCalcForm();
+  if(!c.a || !c.b){ calcPreview.textContent = ''; return; }
+  if(!calcNameTouched) calcName.value = t('calcDefaultName', {a:c.a, op:OP_SYMBOL[c.op], b:c.b === '__CONST__' ? (c.k ?? '?') : c.b});
+  const sample = state.rows.find(r => computeCalc(r, c) !== null);
+  calcPreview.textContent = sample
+    ? `${t('calcExample')}${fmt.full(sample[c.a])} ${OP_SYMBOL[c.op]} ${fmt.full(c.b === '__CONST__' ? c.k : sample[c.b])} = ${fmt.full(computeCalc(sample, c))}`
+    : '';
+}
+
+function renderCalcList(){
+  calcList.innerHTML = state.calcColumns.map((c, i) =>
+    `<div class="calc-item"><span><strong>${escapeHtml(c.name)}</strong> &nbsp;<code dir="ltr">= ${escapeHtml(calcFormula(c))}</code></span><button type="button" data-i="${i}" title="${escapeHtml(t('calcRemove'))}">&times;</button></div>`
+  ).join('');
+  calcList.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => removeCalcColumn(state.calcColumns[+btn.dataset.i].name)));
+}
+
+function saveCalcColumn(){
+  const c = readCalcForm();
+  if(!c.a) { calcError.textContent = t('calcNeedNum'); return; }
+  if(!c.name) { calcError.textContent = t('calcNeedName'); return; }
+  if(state.columns.some(col => col.name === c.name)) { calcError.textContent = t('calcNameTaken'); return; }
+  if(c.b === '__CONST__' && (c.k === null || !Number.isFinite(c.k))) { calcError.textContent = t('calcNeedConst'); return; }
+  for(const row of state.rows) row[c.name] = computeCalc(row, c);
+  state.calcColumns.push(c);
+  state.columns.push({name:c.name, type:'number', uniqueCount:0, calc:true});
+  calcError.textContent = t('calcAdded', {n:c.name});
+  calcNameTouched = false;
+  calcName.value = '';
+  renderCalcList();
+  updateCalcPreview();
+  buildFilters();
+  refreshAll();
+}
+
+function removeCalcColumn(name){
+  state.calcColumns = state.calcColumns.filter(c => c.name !== name);
+  state.columns = state.columns.filter(c => c.name !== name);
+  for(const row of state.rows) delete row[name];
+  delete state.filters[name];
+  state.activeFilterCols = state.activeFilterCols.filter(n => n !== name);
+  state.kpiConfigs = state.kpiConfigs.filter(k => k.colName !== name);
+  state.chartConfigs = state.chartConfigs.filter(cfg => ![cfg.catCol, cfg.valueCol, cfg.dateCol, cfg.xCol, cfg.yCol].includes(name));
+  if(state.sortKey === name) state.sortKey = null;
+  calcError.textContent = '';
+  renderCalcList();
+  buildFilters();
+  refreshAll();
+}
+
 function buildDashboard(){
   buildFilters();
   refreshAll();
@@ -947,7 +1234,7 @@ function buildDashboard(){
 
 function exportToExcel(){
   const rows = getFilteredRows();
-  if(!rows.length){ showError('لا توجد بيانات للتصدير.'); return; }
+  if(!rows.length){ showError(t('noExport')); return; }
   const exportRows = rows.map(row => Object.fromEntries(state.columns.map(column => {
     const value = row[column.name];
     return [column.name, value instanceof Date ? value.toISOString().slice(0, 10) : value];
@@ -956,12 +1243,12 @@ function exportToExcel(){
   worksheet['!autofilter'] = {ref: worksheet['!ref']};
   worksheet['!cols'] = state.columns.map(column => ({wch: Math.min(32, Math.max(12, column.name.length + 3))}));
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'البيانات المفلترة');
+  XLSX.utils.book_append_sheet(workbook, worksheet, t('exportSheet'));
   XLSX.writeFile(workbook, `atlas-dashboard-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function exportToPdf(){
-  if(!state.rows.length){ showError('حمّل البيانات أولًا قبل تصدير التقرير.'); return; }
+  if(!state.rows.length){ showError(t('loadFirst')); return; }
   window.print();
 }
 
@@ -993,8 +1280,6 @@ function addChart(){
     xCol: numCols[0]?.name || '',
     yCol: numCols[1]?.name || numCols[0]?.name || '',
     agg: 'sum',
-    title: defaultVal ? `${defaultVal} حسب ${defaultCat}` : `العدد حسب ${defaultCat}`,
-    sub: defaultVal ? 'مجموع مجمّع' : 'عدد السجلات'
   });
   buildCharts(rows);
 }
@@ -1021,12 +1306,12 @@ function buildFilters(){
           <button class="remove-filter" data-col="${escapeHtml(col.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin:0">&times;</button>
         </div>
         <div class="multi-select-dropdown">
-          <button type="button" class="multi-select-trigger"><span>${currentVal.length ? `${currentVal.length} محدد` : `الكل (${values.length.toLocaleString()})`}</span></button>
+          <button type="button" class="multi-select-trigger"><span>${currentVal.length ? t('nSelected', {n:n0(currentVal.length)}) : t('allN', {n:n0(values.length)})}</span></button>
           <div class="multi-select-menu">
-            <input type="search" class="multi-select-search" placeholder="ابحث في القيم..." aria-label="بحث في قيم ${escapeHtml(col.name)}" />
+            <input type="search" class="multi-select-search" placeholder="${t('searchValues')}" aria-label="${escapeHtml(t('searchValuesOf', {c:col.name}))}" />
             <div class="multi-select-actions">
-              <button type="button" class="multi-select-action" data-action="select-all">تحديد الكل</button>
-              <button type="button" class="multi-select-action" data-action="clear-selection">إلغاء التحديد</button>
+              <button type="button" class="multi-select-action" data-action="select-all">${t('selectAll')}</button>
+              <button type="button" class="multi-select-action" data-action="clear-selection">${t('clearSel')}</button>
             </div>
             <div class="multi-select-options"></div>
             <div class="multi-select-more"></div>
@@ -1045,12 +1330,12 @@ function buildFilters(){
         matches = query ? values.filter(v => v.toLowerCase().includes(query)) : values;
         const shown = matches.slice(0, LIMITS.filterOptions);
         optionsBox.innerHTML = shown.map(value => `<label class="multi-select-option"><input type="checkbox" value="${escapeHtml(value)}" ${selectedSet.has(value) ? 'checked' : ''} /> <span>${escapeHtml(value)}</span></label>`).join('');
-        moreBox.textContent = matches.length > shown.length ? `عرض ${shown.length} من ${matches.length.toLocaleString()} — استخدم البحث` : '';
+        moreBox.textContent = matches.length > shown.length ? t('showingOf', {a:shown.length, b:n0(matches.length)}) : '';
       };
       const updateSelection = () => {
         const selected = [...selectedSet];
         state.filters[col.name] = selected;
-        triggerText.textContent = selected.length ? `${selected.length.toLocaleString()} محدد` : `الكل (${values.length.toLocaleString()})`;
+        triggerText.textContent = selected.length ? t('nSelected', {n:n0(selected.length)}) : t('allN', {n:n0(values.length)});
         refreshAll();
       };
       renderOptions();
@@ -1087,7 +1372,7 @@ function buildFilters(){
       const currentVal = state.filters[col.name] || {start:'',end:''};
       wrap.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <label style="margin-bottom:0">${escapeHtml(col.name)} (نطاق)</label>
+          <label style="margin-bottom:0">${escapeHtml(col.name)} (${t('range')})</label>
           <button class="remove-filter" data-col="${escapeHtml(col.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin:0">&times;</button>
         </div>
         <div style="display:flex;gap:6px">
@@ -1110,12 +1395,12 @@ function buildFilters(){
       const currentVal = state.filters[col.name] || {min:'',max:''};
       wrap.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <label style="margin-bottom:0">${escapeHtml(col.name)} (نطاق)</label>
+          <label style="margin-bottom:0">${escapeHtml(col.name)} (${t('range')})</label>
           <button class="remove-filter" data-col="${escapeHtml(col.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin:0">&times;</button>
         </div>
         <div style="display:flex;gap:6px">
-          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="min" placeholder="من" min="${min}" max="${max}" value="${currentVal.min || ''}" style="flex:1"/>
-          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="max" placeholder="إلى" min="${min}" max="${max}" value="${currentVal.max || ''}" style="flex:1"/>
+          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="min" placeholder="${t('from')}" min="${min}" max="${max}" value="${currentVal.min || ''}" style="flex:1"/>
+          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="max" placeholder="${t('to')}" min="${min}" max="${max}" value="${currentVal.max || ''}" style="flex:1"/>
         </div>`;
       wrap.querySelectorAll('input').forEach(inp=>{
         inp.addEventListener('input', ()=>{
@@ -1147,8 +1432,8 @@ function buildFilters(){
     addWrap.innerHTML = `
       <label>&nbsp;</label>
       <select id="addFilterSelect" style="border-style:dashed;border-color:var(--line-strong);cursor:pointer">
-        <option value="" disabled selected>+ إضافة فلتر</option>
-        ${availableCols.map(c=>`<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} (${TYPE_AR[c.type]})</option>`).join('')}
+        <option value="" disabled selected>${t('addFilter')}</option>
+        ${availableCols.map(c=>`<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} (${typeLabel(c.type)})</option>`).join('')}
       </select>`;
     addWrap.querySelector('#addFilterSelect').addEventListener('change', e=>{
       const colName = e.target.value;
@@ -1166,7 +1451,7 @@ function buildFilters(){
   clearWrap.className='filter filter-clear';
   clearWrap.style.flex = '0 0 auto';
   clearWrap.style.minWidth = 'auto';
-  clearWrap.innerHTML = `<label>&nbsp;</label><button class="ghost" id="clearFilters">مسح الكل</button>`;
+  clearWrap.innerHTML = `<label>&nbsp;</label><button class="ghost" id="clearFilters">${t('clearAll')}</button>`;
   row.appendChild(clearWrap);
   document.getElementById('clearFilters').addEventListener('click', ()=>{
     state.filters = {};
@@ -1189,7 +1474,7 @@ function refreshAll(){
   buildCharts(rows);
   buildTable(rows);
   document.getElementById('footMeta').textContent =
-    `${rows.length.toLocaleString()} من ${state.rows.length.toLocaleString()} صف · ${state.columns.length} عمود`;
+    t('footMeta', {a:n0(rows.length), b:n0(state.rows.length), c:state.columns.length});
 }
 
 function buildFlexiblePivot(rows){
@@ -1201,7 +1486,7 @@ function buildFlexiblePivot(rows){
 
   if(!columns.length){
     controls.innerHTML = '';
-    table.innerHTML = '<tbody><tr><td class="empty-state">لا توجد أعمدة.</td></tr></tbody>';
+    table.innerHTML = `<tbody><tr><td class="empty-state">${t('noColumns')}</td></tr></tbody>`;
     return;
   }
 
@@ -1215,15 +1500,15 @@ function buildFlexiblePivot(rows){
     <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
       ${label}<select data-pivot-role="${role}">${options.map(option => `<option value="${escapeHtml(option.value)}" ${option.value===selected?'selected':''}>${escapeHtml(option.label)}</option>`).join('')}</select>
     </label>`;
-  const fieldOptions = columns.map(column => ({value:column.name, label:`${column.name} (${TYPE_AR[column.type]})`}));
-  const valueOptions = [{value:'__RECORDS__', label:'السجلات'}, ...numericColumns.map(column => ({value:column.name, label:column.name}))];
+  const fieldOptions = columns.map(column => ({value:column.name, label:`${column.name} (${typeLabel(column.type)})`}));
+  const valueOptions = [{value:'__RECORDS__', label:t('records')}, ...numericColumns.map(column => ({value:column.name, label:column.name}))];
   const aggOptions = config.valueCol === '__RECORDS__'
-    ? [{value:'count', label:'عدد'}]
-    : [{value:'sum', label:'مجموع'}, {value:'avg', label:'متوسط'}, {value:'count', label:'عدد'}];
-  controls.innerHTML = makePivotSelect('row', 'الصفوف', fieldOptions, config.rowCol)
-    + makePivotSelect('col', 'الأعمدة', fieldOptions, config.colCol)
-    + makePivotSelect('value', 'القيم', valueOptions, config.valueCol)
-    + makePivotSelect('agg', 'التجميع', aggOptions, config.agg);
+    ? [{value:'count', label:aggLabel('count')}]
+    : ['sum', 'avg', 'count'].map(value => ({value, label:aggLabel(value)}));
+  controls.innerHTML = makePivotSelect('row', t('rows'), fieldOptions, config.rowCol)
+    + makePivotSelect('col', t('columns'), fieldOptions, config.colCol)
+    + makePivotSelect('value', t('values'), valueOptions, config.valueCol)
+    + makePivotSelect('agg', t('aggregate'), aggOptions, config.agg);
   controls.querySelectorAll('select').forEach(select => select.addEventListener('change', () => {
     const role = select.dataset.pivotRole;
     if(role === 'row') config.rowCol = select.value;
@@ -1263,31 +1548,76 @@ function buildFlexiblePivot(rows){
   const colKeys = colKeysAll.slice(0, LIMITS.pivotCols);
   const rowKeys = rowKeysAll.slice(0, LIMITS.pivotRows);
   if(!colKeys.length || !rowKeys.length){
-    table.innerHTML = '<tbody><tr><td class="empty-state">لا توجد قيم مطابقة لهذا الجدول.</td></tr></tbody>';
-    document.getElementById('pivotSub').textContent = 'لا توجد بيانات للحقول المختارة';
+    table.innerHTML = `<tbody><tr><td class="empty-state">${t('noPivotMatch')}</td></tr></tbody>`;
+    document.getElementById('pivotSub').textContent = t('noPivotData');
     return;
   }
 
-  const columnTotals = Object.fromEntries(colKeys.map(key => [key, 0]));
-  let grandTotal = 0;
+  // Totals are aggregated over ALL rows/columns; only the grid itself is capped.
+  // Hidden rows/columns are folded into "Other" so the visible numbers add up.
+  const isCount = config.valueCol === '__RECORDS__' || config.agg === 'count';
+  const blank = () => ({sum:0, count:0});
+  const addTo = (acc, cell) => { if(cell){ acc.sum += cell.sum; acc.count += cell.count; } };
   const cellResult = cell => {
     if(!cell || !cell.count) return null;
-    if(config.valueCol === '__RECORDS__' || config.agg === 'count') return cell.count;
+    if(isCount) return cell.count;
     if(config.agg === 'avg') return cell.sum / cell.count;
     return cell.sum;
   };
+  const shownCols = new Set(colKeys);
+  const hiddenColCount = colKeysAll.length - colKeys.length;
+  const hiddenRowKeys = rowKeysAll.slice(rowKeys.length);
+  const columnAcc = Object.fromEntries(colKeys.map(key => [key, blank()]));
+  const otherColAcc = blank();
+  const grandAcc = blank();
+
+  const rowAccs = rowKey => {
+    const cells = colKeys.map(colKey => groups[rowKey][colKey]);
+    const rowAcc = blank(), otherAcc = blank();
+    for(const [colKey, cell] of Object.entries(groups[rowKey])){
+      addTo(rowAcc, cell);
+      if(!shownCols.has(colKey)) addTo(otherAcc, cell);
+    }
+    return {cells, rowAcc, otherAcc};
+  };
+  const renderRow = (label, cells, otherAcc, rowAcc, cls) =>
+    `<tr${cls ? ` class="${cls}"` : ''}><td>${escapeHtml(label)}</td>${cells.map(cell => { const v = cellResult(cell); return `<td>${v === null ? '—' : escapeHtml(fmt.full(v))}</td>`; }).join('')}`
+    + (hiddenColCount ? `<td>${cellResult(otherAcc) === null ? '—' : escapeHtml(fmt.full(cellResult(otherAcc)))}</td>` : '')
+    + `<td>${escapeHtml(fmt.full(cellResult(rowAcc) ?? 0))}</td></tr>`;
+
   const bodyRows = rowKeys.map(rowKey => {
-    let rowTotal = 0;
-    const cells = colKeys.map(colKey => {
-      const result = cellResult(groups[rowKey][colKey]);
-      if(result !== null){ columnTotals[colKey] += result; rowTotal += result; }
-      return result;
-    });
-    grandTotal += rowTotal;
-    return `<tr><td>${escapeHtml(rowKey)}</td>${cells.map(value => `<td>${value === null ? '—' : escapeHtml(fmt.full(value))}</td>`).join('')}<td>${escapeHtml(fmt.full(rowTotal))}</td></tr>`;
+    const {cells, rowAcc, otherAcc} = rowAccs(rowKey);
+    colKeys.forEach((colKey, i) => addTo(columnAcc[colKey], cells[i]));
+    addTo(otherColAcc, otherAcc);
+    addTo(grandAcc, rowAcc);
+    return renderRow(rowKey, cells, otherAcc, rowAcc);
   }).join('');
-  table.innerHTML = `<thead><tr><th>${escapeHtml(config.rowCol)}</th>${colKeys.map(key => `<th>${escapeHtml(key)}</th>`).join('')}<th>الإجمالي</th></tr></thead><tbody>${bodyRows}<tr class="totals-grand-row"><td>الإجمالي العام</td>${colKeys.map(key => `<td>${escapeHtml(fmt.full(columnTotals[key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(grandTotal))}</td></tr></tbody>`;
-  document.getElementById('pivotSub').textContent = `${AGG_AR[config.agg] || config.agg} ${config.valueCol === '__RECORDS__' ? 'السجلات' : config.valueCol} · ${rowKeys.length} صف · ${colKeys.length} عمود${(rowKeysAll.length > rowKeys.length || colKeysAll.length > colKeys.length) ? ` · معروض جزء من ${rowKeysAll.length.toLocaleString()} × ${colKeysAll.length.toLocaleString()}` : ''}`;
+
+  let otherRowHtml = '';
+  if(hiddenRowKeys.length){
+    const cells = colKeys.map(blank), rowAcc = blank(), otherAcc = blank();
+    for(const rowKey of hiddenRowKeys){
+      for(const [colKey, cell] of Object.entries(groups[rowKey])){
+        addTo(rowAcc, cell);
+        const i = colKeys.indexOf(colKey);
+        if(i >= 0 && shownCols.has(colKey)) addTo(cells[i], cell); else addTo(otherAcc, cell);
+      }
+    }
+    colKeys.forEach((colKey, i) => addTo(columnAcc[colKey], cells[i]));
+    addTo(otherColAcc, otherAcc);
+    addTo(grandAcc, rowAcc);
+    otherRowHtml = renderRow(t('otherRows', {n:n0(hiddenRowKeys.length)}), cells, otherAcc, rowAcc, 'totals-other-row');
+  }
+
+  const fmtAcc = acc => escapeHtml(fmt.full(cellResult(acc) ?? 0));
+  table.innerHTML = `<thead><tr><th>${escapeHtml(config.rowCol)}</th>${colKeys.map(key => `<th>${escapeHtml(key)}</th>`).join('')}`
+    + (hiddenColCount ? `<th>${escapeHtml(t('otherCols', {n:n0(hiddenColCount)}))}</th>` : '')
+    + `<th>${t('total')}</th></tr></thead><tbody>${bodyRows}${otherRowHtml}<tr class="totals-grand-row"><td>${t('grandTotal')}</td>${colKeys.map(key => `<td>${fmtAcc(columnAcc[key])}</td>`).join('')}`
+    + (hiddenColCount ? `<td>${fmtAcc(otherColAcc)}</td>` : '')
+    + `<td>${fmtAcc(grandAcc)}</td></tr></tbody>`;
+  const capped = rowKeysAll.length > rowKeys.length || colKeysAll.length > colKeys.length;
+  document.getElementById('pivotSub').textContent = t('pivotSub', {agg:aggLabel(config.agg), v:config.valueCol === '__RECORDS__' ? t('records') : config.valueCol, r:n0(rowKeysAll.length), c:n0(colKeysAll.length)})
+    + (capped ? t('cappedNote', {r:rowKeys.length, R:n0(rowKeysAll.length), c:colKeys.length, C:n0(colKeysAll.length)}) : '');
 }
 
 function buildTotalsTable(rows){
@@ -1299,29 +1629,29 @@ function buildTotalsTable(rows){
 
   if(!rowCols.length || !dateCols.length || !valueCols.length){
     controls.innerHTML = '';
-    table.innerHTML = '<tbody><tr><td class="empty-state">يلزم عمود نصي وعمود تاريخ وعمود رقمي.</td></tr></tbody>';
-    document.getElementById('totalsSub').textContent = 'الملخص غير متاح لهذه البيانات';
+    table.innerHTML = `<tbody><tr><td class="empty-state">${t('needCols')}</td></tr></tbody>`;
+    document.getElementById('totalsSub').textContent = t('totalsNA');
     return;
   }
 
   const config = state.totalsConfig;
   if(!rowCols.some(c => c.name === config.rowCol)) config.rowCol = rowCols[0].name;
   if(!dateCols.some(c => c.name === config.dateCol)) config.dateCol = dateCols[0].name;
-  if(!valueCols.some(c => c.name === config.valueCol)) config.valueCol = valueCols[0].name;
+  if(!valueCols.some(c => c.name === config.valueCol)) config.valueCol = (valueCols.find(c => !looksLikeId(c)) || valueCols[0]).name;
 
   const makeSelect = (role, label, columns, selected) => `
     <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
       ${label}
       <select data-role="${role}">${columns.map(c => `<option value="${escapeHtml(c.name)}" ${c.name===selected?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
     </label>`;
-  controls.innerHTML = makeSelect('row', 'الصفوف', rowCols, config.rowCol)
-    + makeSelect('date', 'التاريخ', dateCols, config.dateCol)
-    + makeSelect('value', 'القيم', valueCols, config.valueCol)
+  controls.innerHTML = makeSelect('row', t('rows'), rowCols, config.rowCol)
+    + makeSelect('date', t('dateLbl'), dateCols, config.dateCol)
+    + makeSelect('value', t('values'), valueCols, config.valueCol)
     + `<label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
-      التجميع
+      ${t('group')}
       <select data-role="granularity">
-        <option value="month" ${config.granularity === 'month' ? 'selected' : ''}>شهري</option>
-        <option value="year" ${config.granularity === 'year' ? 'selected' : ''}>سنوي</option>
+        <option value="month" ${config.granularity === 'month' ? 'selected' : ''}>${t('monthly')}</option>
+        <option value="year" ${config.granularity === 'year' ? 'selected' : ''}>${t('yearly')}</option>
       </select>
     </label>`;
   controls.querySelectorAll('select').forEach(select => {
@@ -1332,7 +1662,7 @@ function buildTotalsTable(rows){
     });
   });
 
-  const monthFormatter = new Intl.DateTimeFormat('ar', {month:'long'});
+  const monthFormatter = new Intl.DateTimeFormat(lang, {month: isRTL() ? 'long' : 'short'});
   const granularity = config.granularity === 'year' ? 'year' : 'month';
   const dateGroups = {};
   rows.forEach(row => {
@@ -1368,13 +1698,20 @@ function buildTotalsTable(rows){
   const entriesAll = Object.entries(groupRows).sort((a,b) => collator.compare(a[0], b[0]));
   const entries = entriesAll.slice(0, LIMITS.totalsRows);
   if(!periods.length || !entries.length){
-    table.innerHTML = '<tbody><tr><td class="empty-state">لا توجد قيم مطابقة لهذا الملخص.</td></tr></tbody>';
-    document.getElementById('totalsSub').textContent = `${config.valueCol} حسب ${config.rowCol}`;
+    table.innerHTML = `<tbody><tr><td class="empty-state">${t('noTotalsMatch')}</td></tr></tbody>`;
+    document.getElementById('totalsSub').textContent = t('vBy', {v:config.valueCol, c:config.rowCol});
     return;
   }
 
   const periodTotals = Object.fromEntries(periods.map(period => [period.key, 0]));
-  const grandTotal = entries.reduce((total, [, values]) => {
+  // Totals over every row, including rows beyond the display cap
+  const hiddenEntries = entriesAll.slice(entries.length);
+  const otherValues = {};
+  hiddenEntries.forEach(([, values]) => periods.forEach(period => {
+    if(values[period.key] !== undefined) otherValues[period.key] = (otherValues[period.key] || 0) + values[period.key];
+  }));
+  const shownEntries = hiddenEntries.length ? [...entries, [t('otherRows', {n:n0(hiddenEntries.length)}), otherValues, true]] : entries;
+  const grandTotal = shownEntries.reduce((total, [, values]) => {
     return total + periods.reduce((rowTotal, period) => {
       const value = values[period.key] || 0;
       periodTotals[period.key] += value;
@@ -1383,15 +1720,16 @@ function buildTotalsTable(rows){
   }, 0);
 
   table.innerHTML = `
-    <thead><tr><th>${escapeHtml(config.rowCol)}</th>${periods.map(period => `<th>${escapeHtml(period.label)}</th>`).join('')}<th>الإجمالي</th></tr></thead>
+    <thead><tr><th>${escapeHtml(config.rowCol)}</th>${periods.map(period => `<th>${escapeHtml(period.label)}</th>`).join('')}<th>${t('total')}</th></tr></thead>
     <tbody>
-      ${entries.map(([rowLabel, values]) => {
+      ${shownEntries.map(([rowLabel, values, isOther]) => {
         const rowTotal = periods.reduce((sum, period) => sum + (values[period.key] || 0), 0);
-        return `<tr><td>${escapeHtml(rowLabel)}</td>${periods.map(period => `<td>${values[period.key] === undefined ? '—' : escapeHtml(fmt.full(values[period.key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(rowTotal))}</td></tr>`;
+        return `<tr${isOther ? ' class="totals-other-row"' : ''}><td>${escapeHtml(rowLabel)}</td>${periods.map(period => `<td>${values[period.key] === undefined ? '—' : escapeHtml(fmt.full(values[period.key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(rowTotal))}</td></tr>`;
       }).join('')}
-      <tr class="totals-grand-row"><td>الإجمالي العام</td>${periods.map(period => `<td>${escapeHtml(fmt.full(periodTotals[period.key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(grandTotal))}</td></tr>
+      <tr class="totals-grand-row"><td>${t('grandTotal')}</td>${periods.map(period => `<td>${escapeHtml(fmt.full(periodTotals[period.key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(grandTotal))}</td></tr>
     </tbody>`;
-  document.getElementById('totalsSub').textContent = `${config.valueCol} حسب ${config.rowCol} · ${periods.length} ${granularity === 'year' ? 'سنة' : 'شهر'}${entriesAll.length > entries.length ? ` · عرض أول ${entries.length} من ${entriesAll.length.toLocaleString()} صف` : ''}`;
+  document.getElementById('totalsSub').textContent = t('totalsSub', {v:config.valueCol, r:config.rowCol, n:periods.length, unit:t(granularity === 'year' ? 'unitYear' : 'unitMonth')})
+    + (hiddenEntries.length ? t('totalsCapped', {r:entries.length, R:n0(entriesAll.length)}) : '');
 }
 
 /* =========================================================
@@ -1401,12 +1739,12 @@ function calculateKpiValue(rows, colName, agg) {
   if (colName === '__RECORDS__') {
     return {
       value: rows.length.toLocaleString(),
-      sub: `من إجمالي ${state.rows.length.toLocaleString()}`
+      sub: t('ofTotal', {n:n0(state.rows.length)})
     };
   }
 
   const col = state.columns.find(c => c.name === colName);
-  if (!col) return { value: '—', sub: 'الحقل غير موجود' };
+  if (!col) return { value: '—', sub: t('fieldNotFound') };
 
   let vals = rows.map(r => r[colName]).filter(v => v !== null && v !== undefined);
 
@@ -1420,7 +1758,7 @@ function calculateKpiValue(rows, colName, agg) {
     const uniq = new Set(vals.map(v => String(v))).size;
     return {
       value: uniq.toLocaleString(),
-      sub: `قيم فريدة`
+      sub: t('uniqueVals')
     };
   }
 
@@ -1433,7 +1771,7 @@ function calculateKpiValue(rows, colName, agg) {
       const avg = sum / numVals.length;
       return {
         value: fmt.num(sum),
-        sub: `المتوسط ${fmt.num(avg)} · العدد ${numVals.length}`
+        sub: t('avgN', {a:fmt.num(avg), n:numVals.length})
       };
     }
     if (agg === 'avg') {
@@ -1441,21 +1779,21 @@ function calculateKpiValue(rows, colName, agg) {
       const avg = sum / numVals.length;
       return {
         value: fmt.num(avg),
-        sub: `المجموع ${fmt.num(sum)} · العدد ${numVals.length}`
+        sub: t('sumN', {a:fmt.num(sum), n:numVals.length})
       };
     }
     if (agg === 'min') {
       const min = minMax(numVals).min;
       return {
         value: fmt.num(min),
-        sub: `أدنى قيمة`
+        sub: t('minVal')
       };
     }
     if (agg === 'max') {
       const max = minMax(numVals).max;
       return {
         value: fmt.num(max),
-        sub: `أعلى قيمة`
+        sub: t('maxVal')
       };
     }
   }
@@ -1467,19 +1805,19 @@ function calculateKpiValue(rows, colName, agg) {
       const minDate = new Date(minMax(dateVals).min);
       return {
         value: minDate.toISOString().slice(0, 10),
-        sub: `أقدم تاريخ`
+        sub: t('earliest')
       };
     }
     if (agg === 'max') {
       const maxDate = new Date(minMax(dateVals).max);
       return {
         value: maxDate.toISOString().slice(0, 10),
-        sub: `أحدث تاريخ`
+        sub: t('latest')
       };
     }
   }
 
-  return { value: '—', sub: 'غير متاح' };
+  return { value: '—', sub: t('na') };
 }
 
 function buildKPIs(rows){
@@ -1494,7 +1832,7 @@ function buildKPIs(rows){
     const removeBtn = document.createElement('button');
     removeBtn.className = 'kpi-remove';
     removeBtn.innerHTML = '&times;';
-    removeBtn.title = 'حذف المؤشر';
+    removeBtn.title = t('removeMetric');
     removeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       state.kpiConfigs = state.kpiConfigs.filter(cfg => cfg.id !== config.id);
@@ -1510,7 +1848,7 @@ function buildKPIs(rows){
     const colSelect = document.createElement('select');
     colSelect.className = 'kpi-select';
     
-    let html = `<option value="__RECORDS__" ${config.colName === '__RECORDS__' ? 'selected' : ''}>[السجلات]</option>`;
+    let html = `<option value="__RECORDS__" ${config.colName === '__RECORDS__' ? 'selected' : ''}>[${t('records')}]</option>`;
     state.columns.forEach(c => {
       html += `<option value="${escapeHtml(c.name)}" ${config.colName === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`;
     });
@@ -1523,30 +1861,30 @@ function buildKPIs(rows){
     function updateAggOptions(colName) {
       let aggs = [];
       if (colName === '__RECORDS__') {
-        aggs = [{val:'count', label:'عدد'}];
+        aggs = [{val:'count', label:aggLabel('count')}];
       } else {
         const col = state.columns.find(c => c.name === colName);
         const type = col ? col.type : 'text';
         if (type === 'number') {
           aggs = [
-            {val:'sum', label:'مجموع'},
-            {val:'avg', label:'متوسط'},
-            {val:'min', label:'أدنى'},
-            {val:'max', label:'أعلى'},
-            {val:'count', label:'عدد'},
-            {val:'unique', label:'قيم فريدة'}
+            {val:'sum', label:aggLabel('sum')},
+            {val:'avg', label:aggLabel('avg')},
+            {val:'min', label:aggLabel('min')},
+            {val:'max', label:aggLabel('max')},
+            {val:'count', label:aggLabel('count')},
+            {val:'unique', label:aggLabel('unique')}
           ];
         } else if (type === 'date') {
           aggs = [
-            {val:'min', label:'الأقدم'},
-            {val:'max', label:'الأحدث'},
-            {val:'count', label:'عدد'},
-            {val:'unique', label:'قيم فريدة'}
+            {val:'min', label:aggLabel('earliest')},
+            {val:'max', label:aggLabel('latest')},
+            {val:'count', label:aggLabel('count')},
+            {val:'unique', label:aggLabel('unique')}
           ];
         } else {
           aggs = [
-            {val:'count', label:'عدد'},
-            {val:'unique', label:'قيم فريدة'}
+            {val:'count', label:aggLabel('count')},
+            {val:'unique', label:aggLabel('unique')}
           ];
         }
       }
@@ -1612,7 +1950,7 @@ function buildKPIs(rows){
   addCard.innerHTML = `
     <div class="kpi-add-btn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      إضافة مؤشر
+      ${t('addMetric')}
     </div>
   `;
   addCard.addEventListener('click', () => {
@@ -1644,7 +1982,7 @@ function buildCharts(rows){
   grid.innerHTML='';
 
   if(rows.length === 0){
-    grid.innerHTML = '<div class="chart-card span-12"><div class="empty-state">لا توجد سجلات تطابق الفلاتر الحالية.</div></div>';
+    grid.innerHTML = `<div class="chart-card span-12"><div class="empty-state">${t('noRecordsFilters')}</div></div>`;
     return;
   }
 
@@ -1658,7 +1996,7 @@ function buildCharts(rows){
   addCard.innerHTML = `
     <div class="kpi-add-btn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      إضافة رسم
+      ${t('addChart')}
     </div>
   `;
   addCard.addEventListener('click', () => {
@@ -1687,13 +2025,35 @@ function buildCharts(rows){
       xCol: numCols[0]?.name || '',
       yCol: numCols[1]?.name || numCols[0]?.name || '',
       agg: 'sum',
-      title: defaultVal ? `${defaultVal} حسب ${defaultCat}` : `العدد حسب ${defaultCat}`,
-      sub: defaultVal ? 'مجموع مجمّع' : 'عدد السجلات'
     });
 
     buildCharts(rows);
   });
   grid.appendChild(addCard);
+}
+
+function chartTitle(cfg){
+  switch(cfg.type){
+    case 'line': return t('overTime', {v:cfg.valueCol});
+    case 'bar': return cfg.valueCol ? t('vBy', {v:cfg.valueCol, c:cfg.catCol}) : t('countBy', {c:cfg.catCol});
+    case 'doughnut': return t('recordsBy', {c:cfg.catCol});
+    case 'scatter': return t('vs', {x:cfg.xCol, y:cfg.yCol});
+    case 'histogram': return t('distOf', {v:cfg.valueCol});
+    case 'bar-count': return t('topValues', {c:cfg.catCol});
+  }
+  return '';
+}
+
+function chartSub(cfg){
+  switch(cfg.type){
+    case 'line': return t('byDate', {d:cfg.dateCol});
+    case 'bar': return cfg.valueCol ? t('aggSub', {agg:aggLabel(cfg.agg || 'sum')}) : t('recordCount');
+    case 'doughnut': return t('share');
+    case 'scatter': return t('correlation');
+    case 'histogram': return t('freqBin');
+    case 'bar-count': return t('recordCount');
+  }
+  return '';
 }
 
 function renderChart(cfg, rows, grid){
@@ -1709,12 +2069,12 @@ function renderChart(cfg, rows, grid){
   // Chart type select
   let typeSelectHtml = `
     <select data-role="type">
-      <option value="bar" ${cfg.type==='bar'?'selected':''}>أعمدة</option>
-      <option value="line" ${cfg.type==='line'?'selected':''}>خطي</option>
-      <option value="doughnut" ${cfg.type==='doughnut'?'selected':''}>دائري</option>
-      <option value="scatter" ${cfg.type==='scatter'?'selected':''}>انتشار</option>
-      <option value="histogram" ${cfg.type==='histogram'?'selected':''}>توزيع</option>
-      <option value="bar-count" ${cfg.type==='bar-count'?'selected':''}>تكرارات</option>
+      <option value="bar" ${cfg.type==='bar'?'selected':''}>${t('tBar')}</option>
+      <option value="line" ${cfg.type==='line'?'selected':''}>${t('tLine')}</option>
+      <option value="doughnut" ${cfg.type==='doughnut'?'selected':''}>${t('tDoughnut')}</option>
+      <option value="scatter" ${cfg.type==='scatter'?'selected':''}>${t('tScatter')}</option>
+      <option value="histogram" ${cfg.type==='histogram'?'selected':''}>${t('tHist')}</option>
+      <option value="bar-count" ${cfg.type==='bar-count'?'selected':''}>${t('tCounts')}</option>
     </select>
   `;
 
@@ -1722,69 +2082,69 @@ function renderChart(cfg, rows, grid){
   let paramHtml = '';
   if(cfg.type === 'line'){
     paramHtml += `
-      <select data-role="date" title="حقل التاريخ">
+      <select data-role="date" title="${t('dateField')}">
         ${dateCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.dateCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select data-role="val" title="حقل القيمة">
+      <select data-role="val" title="${t('valueField')}">
         ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select data-role="granularity" title="التجميع الزمني">
-        <option value="month" ${(cfg.granularity || 'month')==='month'?'selected':''}>شهري</option>
-        <option value="year" ${cfg.granularity==='year'?'selected':''}>سنوي</option>
+      <select data-role="granularity" title="${t('timeGroup')}">
+        <option value="month" ${(cfg.granularity || 'month')==='month'?'selected':''}>${t('monthly')}</option>
+        <option value="year" ${cfg.granularity==='year'?'selected':''}>${t('yearly')}</option>
       </select>
     `;
   } else if(cfg.type === 'bar'){
     paramHtml += `
-      <select data-role="cat" title="حقل الفئة">
+      <select data-role="cat" title="${t('catField')}">
         ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select data-role="val" title="حقل القيمة">
-        ${allCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)} (${TYPE_AR[c.type]})</option>`).join('')}
+      <select data-role="val" title="${t('valueField')}">
+        ${allCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)} (${typeLabel(c.type)})</option>`).join('')}
       </select>
-      <select data-role="agg" title="التجميع">
-        <option value="sum" ${cfg.agg==='sum'?'selected':''}>مجموع</option>
-        <option value="avg" ${cfg.agg==='avg'?'selected':''}>متوسط</option>
-        <option value="count" ${cfg.agg==='count'?'selected':''}>عدد</option>
+      <select data-role="agg" title="${t('aggregation')}">
+        <option value="sum" ${cfg.agg==='sum'?'selected':''}>${aggLabel('sum')}</option>
+        <option value="avg" ${cfg.agg==='avg'?'selected':''}>${aggLabel('avg')}</option>
+        <option value="count" ${cfg.agg==='count'?'selected':''}>${aggLabel('count')}</option>
       </select>
     `;
   } else if(cfg.type === 'doughnut'){
     paramHtml += `
-      <select data-role="cat" title="حقل الفئة">
+      <select data-role="cat" title="${t('catField')}">
         ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
     `;
   } else if(cfg.type === 'scatter'){
     paramHtml += `
-      <select data-role="x" title="المحور الأفقي">
+      <select data-role="x" title="${t('xField')}">
         ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.xCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select data-role="y" title="المحور الرأسي">
+      <select data-role="y" title="${t('yField')}">
         ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.yCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
     `;
   } else if(cfg.type === 'histogram'){
     paramHtml += `
-      <select data-role="val" title="حقل القيمة">
+      <select data-role="val" title="${t('valueField')}">
         ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
     `;
   } else if(cfg.type === 'bar-count'){
     paramHtml += `
-      <select data-role="cat" title="حقل الفئة">
+      <select data-role="cat" title="${t('catField')}">
         ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
     `;
   }
 
   const removeBtnHtml = `
-    <button class="chart-remove" title="حذف الرسم" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px;">&times;</button>
+    <button class="chart-remove" title="${t('removeChart')}" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px;">&times;</button>
   `;
 
   card.innerHTML = `
     <div class="chart-head">
       <div>
-        <div class="chart-title">${escapeHtml(cfg.title)}</div>
-        <div class="chart-sub">${escapeHtml(cfg.sub||'')}</div>
+        <div class="chart-title">${escapeHtml(chartTitle(cfg))}</div>
+        <div class="chart-sub">${escapeHtml(chartSub(cfg))}</div>
       </div>
       <div class="chart-controls" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
         ${typeSelectHtml}
@@ -1814,31 +2174,19 @@ function renderChart(cfg, rows, grid){
           cfg.dateCol = dateCols[0]?.name || state.columns.find(c => c.type === 'date')?.name || '';
           cfg.valueCol = numCols[0]?.name || '';
           cfg.granularity = 'month';
-          cfg.title = `${cfg.valueCol} عبر الزمن`;
-          cfg.sub = `حسب ${cfg.dateCol}`;
         } else if (val === 'bar') {
           cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
           cfg.valueCol = numCols[0]?.name || '';
           cfg.agg = 'sum';
-          cfg.title = `${cfg.valueCol} حسب ${cfg.catCol}`;
-          cfg.sub = 'مجموع مجمّع';
         } else if (val === 'doughnut') {
           cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
-          cfg.title = `السجلات حسب ${cfg.catCol}`;
-          cfg.sub = 'النسبة من الإجمالي';
         } else if (val === 'scatter') {
           cfg.xCol = numCols[0]?.name || '';
           cfg.yCol = numCols[1]?.name || numCols[0]?.name || '';
-          cfg.title = `${cfg.xCol} مقابل ${cfg.yCol}`;
-          cfg.sub = 'عرض الارتباط';
         } else if (val === 'histogram') {
           cfg.valueCol = numCols[0]?.name || '';
-          cfg.title = `توزيع ${cfg.valueCol}`;
-          cfg.sub = 'التكرار حسب الفئة';
         } else if (val === 'bar-count') {
           cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
-          cfg.title = `أكثر القيم: ${cfg.catCol}`;
-          cfg.sub = 'عدد السجلات';
         }
         buildCharts(rows);
         return;
@@ -1852,29 +2200,8 @@ function renderChart(cfg, rows, grid){
       if (role === 'agg') cfg.agg = val;
       if (role === 'granularity') cfg.granularity = val;
 
-      // Update title strings
-      if (cfg.type === 'line') {
-        cfg.title = `${cfg.valueCol} عبر الزمن`;
-        cfg.sub = `حسب ${cfg.dateCol}`;
-      } else if (cfg.type === 'bar') {
-        cfg.title = `${cfg.valueCol} حسب ${cfg.catCol}`;
-        cfg.sub = `تجميع: ${AGG_AR[cfg.agg] || cfg.agg}`;
-      } else if (cfg.type === 'doughnut') {
-        cfg.title = `السجلات حسب ${cfg.catCol}`;
-        cfg.sub = 'النسبة من الإجمالي';
-      } else if (cfg.type === 'scatter') {
-        cfg.title = `${cfg.xCol} مقابل ${cfg.yCol}`;
-        cfg.sub = 'عرض الارتباط';
-      } else if (cfg.type === 'histogram') {
-        cfg.title = `توزيع ${cfg.valueCol}`;
-        cfg.sub = 'التكرار حسب الفئة';
-      } else if (cfg.type === 'bar-count') {
-        cfg.title = `أكثر القيم: ${cfg.catCol}`;
-        cfg.sub = 'عدد السجلات';
-      }
-
-      card.querySelector('.chart-title').textContent = cfg.title;
-      card.querySelector('.chart-sub').textContent = cfg.sub || '';
+      card.querySelector('.chart-title').textContent = chartTitle(cfg);
+      card.querySelector('.chart-sub').textContent = chartSub(cfg);
 
       try { state.charts[canvasId].destroy(); } catch(err) {}
       drawChart(cfg, rows, canvasId);
@@ -1894,9 +2221,9 @@ function drawChart(cfg, rows, canvasId){
   const baseOpts = {
     responsive:true, maintainAspectRatio:false,
     plugins:{
-      legend:{rtl:true, textDirection:'rtl', labels:{font:{family:"'Geist','IBM Plex Sans Arabic', sans-serif", size:11}, color:chartText}},
+      legend:{rtl:isRTL(), textDirection:isRTL() ? 'rtl' : 'ltr', labels:{font:{family:"'Geist','IBM Plex Sans Arabic', sans-serif", size:11}, color:chartText}},
       tooltip:{
-        rtl:true, textDirection:'rtl',
+        rtl:isRTL(), textDirection:isRTL() ? 'rtl' : 'ltr',
         backgroundColor:themeColor('--tooltip-bg'), titleFont:{family:"'Geist','IBM Plex Sans Arabic', sans-serif",size:12}, bodyFont:{family:"'Geist Mono','IBM Plex Sans Arabic', monospace", size:11},
         padding:10, cornerRadius:4
       }
@@ -1941,7 +2268,7 @@ function drawChart(cfg, rows, canvasId){
       data:{
         labels: entries.map(e=>e[0]),
         datasets:[{
-          label: useCount ? 'العدد' : cfg.valueCol,
+          label: useCount ? t('countLbl') : cfg.valueCol,
           data: entries.map(e=>e[1]),
           backgroundColor: palette[0],
           borderRadius:3, borderSkipped:false,
@@ -2004,7 +2331,7 @@ function drawChart(cfg, rows, canvasId){
     if(entries.length > 8){
       const top = entries.slice(0,7);
       const otherSum = entries.slice(7).reduce((s,e)=>s+e[1],0);
-      entries = [...top, ['أخرى', otherSum]];
+      entries = [...top, [t('other'), otherSum]];
     }
     chart = new Chart(ctx,{
       type:'doughnut',
@@ -2130,11 +2457,11 @@ function buildTable(rows){
   });
 
   document.getElementById('tableInfo').textContent =
-    total ? `عرض ${(startIdx+1).toLocaleString()}–${Math.min(startIdx+state.perPage, total).toLocaleString()} من ${total.toLocaleString()}` : 'لا توجد سجلات مطابقة';
+    total ? t('tableInfo', {a:n0(startIdx+1), b:n0(Math.min(startIdx+state.perPage, total)), n:n0(total)}) : t('noMatch');
   document.getElementById('pageLabel').textContent = `${state.page} / ${totalPages}`;
   document.getElementById('pagePrev').disabled = state.page<=1;
   document.getElementById('pageNext').disabled = state.page>=totalPages;
-  document.getElementById('tableSub').textContent = `${cols.length} عمود · فلترة مباشرة`;
+  document.getElementById('tableSub').textContent = t('tableSub', {n:cols.length});
 }
 
 /* =========================================================

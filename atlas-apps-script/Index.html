@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Atlas — Dynamic Data Dashboard</title>
+<title>أطلس — لوحة البيانات التفاعلية</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -89,6 +89,16 @@
     color-scheme:dark;
   }
   html,body,.filters-bar,.kpi,.chart-card,.table-card,.totals-card,.upload,th,td,select,input,button{transition:background-color .25s,border-color .25s,color .25s}
+  /* ---------- ARABIC / RTL ---------- */
+  [dir="rtl"] *{letter-spacing:0 !important}
+  [dir="rtl"] .upload h1 em,[dir="rtl"] .empty-state{font-style:normal}
+  .upload h1{line-height:1.35 !important}
+  .section-label,.kpi-label,.chart-sub,.filter label,th,.kpi-select,.chart-controls select,.multi-select-action,.upload-formats,.upload-or,.footer,.brand-tag,.top-meta{font-size:12px !important}
+  .multi-select-more{font-size:11px;color:var(--muted);padding:6px 4px 0}
+  .upload-error:not(:empty){margin-top:18px}
+  input[type=number],input[type=date]{direction:ltr;text-align:end}
+  .filter input{min-width:0}
+  .filter:has(input[type=date]){max-width:300px;flex-basis:260px}
   .theme-toggle{display:inline-flex;align-items:center;gap:6px}
   .theme-toggle svg{width:13px;height:13px}
   .theme-toggle .ico-sun{display:none}
@@ -100,19 +110,19 @@
   .sheet-load button{white-space:nowrap}
   @media (max-width:680px){.sheet-load{flex-direction:column}}
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Geist',-apple-system,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Geist','IBM Plex Sans Arabic',-apple-system,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
   .grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:var(--grain-opacity);mix-blend-mode:var(--grain-blend);
     background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
   header.top{position:sticky;top:0;z-index:50;background:var(--header-bg);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
   .top-inner{display:flex;align-items:baseline;justify-content:space-between;padding:18px 28px;max-width:1600px;margin:0 auto}
   .brand{display:flex;align-items:baseline;gap:12px}
-  .brand-mark{font-family:'Fraunces',serif;font-weight:500;font-size:28px;letter-spacing:-0.02em;font-style:italic}
+  .brand-mark{font-family:'Fraunces','Noto Naskh Arabic',serif;font-weight:500;font-size:28px;letter-spacing:-0.02em;font-style:italic}
   .brand-mark::after{content:"●";color:var(--accent);margin-left:4px;font-style:normal;font-size:18px;vertical-align:middle}
-  .brand-tag{font-family:'Geist Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
-  .top-meta{display:flex;gap:18px;align-items:center;font-family:'Geist Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-soft)}
+  .brand-tag{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .top-meta{display:flex;gap:18px;align-items:center;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-soft)}
   .pill{padding:4px 10px;border:1px solid var(--line-strong);border-radius:999px;background:var(--panel)}
-  button.ghost{background:transparent;border:1px solid var(--line-strong);padding:6px 12px;font-family:'Geist Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;cursor:pointer;border-radius:4px;color:var(--ink);transition:all .15s}
+  button.ghost{background:transparent;border:1px solid var(--line-strong);padding:6px 12px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;cursor:pointer;border-radius:4px;color:var(--ink);transition:all .15s}
   button.ghost:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 
   main{max-width:1600px;margin:0 auto;padding:32px 28px 80px;position:relative;z-index:2}
@@ -122,35 +132,35 @@
   .upload{width:100%;max-width:760px;background:var(--panel);border:1.5px dashed var(--line-strong);border-radius:var(--radius);padding:64px 40px;text-align:center;transition:all .2s;cursor:pointer;position:relative;overflow:hidden}
   .upload:hover{border-color:var(--accent);background:var(--upload-hover)}
   .upload.drag{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.005)}
-  .upload h1{font-family:'Fraunces',serif;font-weight:400;font-size:48px;line-height:1.05;letter-spacing:-0.02em;margin:0 0 12px}
+  .upload h1{font-family:'Fraunces','Noto Naskh Arabic',serif;font-weight:400;font-size:48px;line-height:1.05;letter-spacing:-0.02em;margin:0 0 12px}
   .upload h1 em{font-style:italic;color:var(--accent)}
   .upload p{color:var(--ink-soft);max-width:480px;margin:0 auto 28px;font-size:15px}
-  .upload-cta{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:var(--bg);padding:12px 22px;border-radius:4px;font-family:'Geist Mono',monospace;font-size:12px;text-transform:uppercase;letter-spacing:0.16em;border:none;cursor:pointer;transition:all .15s}
+  .upload-cta{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:var(--bg);padding:12px 22px;border-radius:4px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:12px;text-transform:uppercase;letter-spacing:0.16em;border:none;cursor:pointer;transition:all .15s}
   .upload-cta:hover{background:var(--accent)}
-  .upload-formats{margin-top:20px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
-  .upload-or{display:block;margin:18px 0;font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)}
+  .upload-formats{margin-top:20px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .upload-or{display:block;margin:18px 0;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)}
   .sample-link{background:none;border:none;color:var(--accent);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit;font-size:13px}
   .sample-link:hover{color:var(--ink)}
 
   /* Dashboard layout */
   .dash{display:none}
   .dash.active{display:block}
-  .section-label{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.2em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .section-label{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.2em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:10px}
   .section-label::before{content:"";width:24px;height:1px;background:var(--line-strong)}
-  .section-action{margin-left:auto;opacity:0;pointer-events:none;transition:opacity .15s;background:var(--panel);border:1px solid var(--line-strong);border-radius:4px;color:var(--ink-soft);padding:5px 9px;font:700 10px 'Geist Mono',monospace;text-transform:uppercase;letter-spacing:.1em;cursor:pointer}
+  .section-action{margin-inline-start:auto;opacity:0;pointer-events:none;transition:opacity .15s;background:var(--panel);border:1px solid var(--line-strong);border-radius:4px;color:var(--ink-soft);padding:5px 9px;font:700 11px 'Geist Mono','IBM Plex Sans Arabic',monospace;text-transform:uppercase;letter-spacing:.1em;cursor:pointer}
   .section-label:hover .section-action,.section-label:focus-within .section-action{opacity:1;pointer-events:auto}
   .section-action:hover{background:var(--accent);border-color:var(--accent);color:#fff}
 
   .filters-bar{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 22px;margin-bottom:24px;box-shadow:var(--shadow)}
   .filters-row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
   .filter{display:flex;flex-direction:column;gap:6px;min-width:160px;flex:1 1 180px;max-width:240px}
-  .filter label{font-family:'Geist Mono',monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted)}
+  .filter label{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted)}
   .filter select, .filter input{font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);width:100%}
   .filter select[multiple]{min-height:96px;padding:4px 6px}
   .filter select[multiple] option{padding:5px 6px;border-radius:3px}
   .filter select[multiple] option:checked{background:var(--accent-soft);color:var(--ink)}
   .multi-select-dropdown{position:relative;width:100%}
-  .multi-select-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);font:inherit;font-size:13px;font-weight:700;text-align:left;cursor:pointer}
+  .multi-select-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);font:inherit;font-size:13px;font-weight:700;text-align:start;cursor:pointer}
   .multi-select-trigger::after{content:'⌄';color:var(--muted);font-size:16px;line-height:1}
   .multi-select-dropdown.open .multi-select-trigger{border-color:var(--accent);border-bottom-left-radius:0;border-bottom-right-radius:0}
   .multi-select-menu{display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--panel);border:1px solid var(--accent);border-top:0;border-radius:0 0 5px 5px;box-shadow:0 12px 24px -14px rgba(23,49,58,.45);padding:8px}
@@ -159,7 +169,7 @@
   .multi-select-search:focus{outline:none;border-color:var(--accent)}
   .multi-select-options{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:2px}
   .multi-select-actions{display:flex;gap:6px;margin-bottom:6px}
-  .multi-select-action{flex:1;padding:5px 6px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);font-family:'Geist Mono',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
+  .multi-select-action{flex:1;padding:5px 6px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
   .multi-select-action:hover{background:var(--accent);border-color:var(--accent);color:#fff}
   .multi-select-option{display:flex;align-items:center;gap:8px;padding:6px;border-radius:3px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .multi-select-option:hover{background:var(--accent-soft)}
@@ -169,15 +179,15 @@
 
   .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:28px}
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
-  .kpi::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent)}
+  .kpi::before{content:"";position:absolute;top:0;inset-inline-start:0;width:3px;height:100%;background:var(--accent)}
   .kpi:nth-child(2)::before{background:var(--c2)}
   .kpi:nth-child(3)::before{background:var(--c3)}
   .kpi:nth-child(4)::before{background:var(--c4)}
   .kpi:nth-child(5)::before{background:var(--c5)}
   .kpi:nth-child(6)::before{background:var(--c6)}
-  .kpi-label{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted);margin-bottom:8px}
-  .kpi-value{font-family:'Fraunces',serif;font-size:34px;font-weight:400;letter-spacing:-0.02em;line-height:1.1}
-  .kpi-sub{font-size:11px;color:var(--ink-soft);margin-top:6px;font-family:'Geist Mono',monospace;letter-spacing:0.06em}
+  .kpi-label{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted);margin-bottom:8px}
+  .kpi-value{font-family:'Fraunces','Noto Naskh Arabic',serif;font-size:34px;font-weight:400;letter-spacing:-0.02em;line-height:1.1}
+  .kpi-sub{font-size:11px;color:var(--ink-soft);margin-top:6px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;letter-spacing:0.06em}
 
   .charts-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px;margin-bottom:28px}
   .chart-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);min-height:340px;display:flex;flex-direction:column}
@@ -189,10 +199,10 @@
     .chart-card.span-8,.chart-card.span-6,.chart-card.span-4{grid-column:span 12}
   }
   .chart-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px}
-  .chart-title{font-family:'Fraunces',serif;font-weight:500;font-size:18px;letter-spacing:-0.01em;margin:0}
-  .chart-sub{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);margin-top:3px}
+  .chart-title{font-family:'Fraunces','Noto Naskh Arabic',serif;font-weight:500;font-size:18px;letter-spacing:-0.01em;margin:0}
+  .chart-sub{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);margin-top:3px}
   .chart-controls{display:flex;gap:6px;align-items:center}
-  .chart-controls select{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;padding:5px 8px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);cursor:pointer}
+  .chart-controls select{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;padding:5px 8px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);cursor:pointer}
   .chart-canvas-wrap{flex:1;position:relative;min-height:260px}
 
   .table-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
@@ -201,41 +211,41 @@
   .table-scroll{overflow:auto;max-height:520px}
   table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
   thead{position:sticky;top:0;background:var(--panel);z-index:1}
-  th{text-align:left;padding:12px 16px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;background:var(--soft-bg)}
+  th{text-align:start;padding:12px 16px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;background:var(--soft-bg)}
   th:hover{color:var(--ink)}
-  th .sort-ind{margin-left:4px;opacity:0.4}
+  th .sort-ind{margin-inline-start:4px;opacity:0.4}
   th.sorted .sort-ind{opacity:1;color:var(--accent)}
   td{padding:11px 16px;border-bottom:1px solid var(--line);white-space:normal;min-width:110px;max-width:360px;overflow-wrap:anywhere;vertical-align:top}
   tr:hover td{background:var(--hover-bg)}
   #dataTable{min-width:max-content}
   #dataTable th,#dataTable td{min-width:140px}
   #dataTable td.num{white-space:nowrap;min-width:120px}
-  td.num{text-align:right;font-family:'Geist Mono',monospace}
+  td.num{text-align:end;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace}
 
-  .table-foot{padding:12px 22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:'Geist Mono',monospace;font-size:11px;color:var(--ink-soft);letter-spacing:0.06em}
+  .table-foot{padding:12px 22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;color:var(--ink-soft);letter-spacing:0.06em}
   .pager{display:flex;gap:6px}
   .pager button{background:var(--bg);border:1px solid var(--line-strong);padding:4px 10px;font:inherit;cursor:pointer;border-radius:3px;color:var(--ink)}
   .pager button:disabled{opacity:0.4;cursor:not-allowed}
   .pager button:not(:disabled):hover{background:var(--ink);color:var(--bg)}
 
-  .footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
 
-  .empty-state{text-align:center;padding:60px 20px;color:var(--muted);font-family:'Fraunces',serif;font-style:italic;font-size:18px}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--muted);font-family:'Fraunces','Noto Naskh Arabic',serif;font-style:italic;font-size:18px}
 
   .totals-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:28px}
   .totals-table-wrap{overflow:auto}
   .totals-table{min-width:720px}
-  .totals-table th,.totals-table td{text-align:right;min-width:120px;white-space:nowrap}
-  .totals-table th:first-child,.totals-table td:first-child{text-align:left;min-width:190px;position:sticky;left:0}
+  .totals-table th,.totals-table td{text-align:end;min-width:120px;white-space:nowrap}
+  .totals-table th:first-child,.totals-table td:first-child{text-align:start;min-width:190px;position:sticky;inset-inline-start:0}
   .totals-table th:last-child,.totals-table td:last-child{min-width:140px;background:var(--totals-head);font-weight:700;color:var(--ink)}
   .totals-table th:first-child{background:var(--totals-head)}
-  .totals-table td:first-child{background:var(--totals-first);font-family:'Geist',sans-serif;font-weight:600;color:var(--ink)}
-  .totals-table tbody td{font-family:'Geist Mono',monospace;font-size:12px}
+  .totals-table td:first-child{background:var(--totals-first);font-family:'Geist','IBM Plex Sans Arabic',sans-serif;font-weight:600;color:var(--ink)}
+  .totals-table tbody td{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:12px}
   .totals-table .totals-grand-row td{border-top:2px solid var(--accent);background:var(--totals-grand);color:var(--ink);font-weight:700}
   .totals-table tbody tr:hover td{background:var(--totals-hover)}
 
   /* Loading */
-  .loader{display:none;align-items:center;gap:10px;font-family:'Geist Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .loader{display:none;align-items:center;gap:10px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
   .loader.show{display:flex}
   .loader::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 1s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:0.3;transform:scale(0.8)}50%{opacity:1;transform:scale(1.1)}}
@@ -255,16 +265,16 @@
 
   /* Dynamic KPI and Chart styling */
   .kpi-label-row{display:flex;align-items:center;gap:4px;margin-bottom:8px;position:relative}
-  .kpi-select{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed var(--line-strong);padding:0 2px;cursor:pointer;outline:none}
+  .kpi-select{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed var(--line-strong);padding:0 2px;cursor:pointer;outline:none}
   .kpi-select:hover{color:var(--ink);border-bottom-color:var(--accent)}
-  .kpi-remove{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;opacity:0;transition:opacity .15s, color .15s;padding:0 4px;line-height:1;z-index:10}
+  .kpi-remove{position:absolute;top:6px;inset-inline-end:8px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;opacity:0;transition:opacity .15s, color .15s;padding:0 4px;line-height:1;z-index:10}
   .kpi:hover .kpi-remove{opacity:1}
   .kpi-remove:hover{color:var(--accent)}
   
   .kpi.add-card{display:flex;align-items:center;justify-content:center;border:1px dashed var(--line-strong);background:transparent;cursor:pointer;min-height:100px;box-shadow:none;position:relative}
   .kpi.add-card::before{display:none}
   .kpi.add-card:hover{border-color:var(--accent);background:var(--panel)}
-  .kpi-add-btn{font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .kpi-add-btn{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);display:flex;align-items:center;gap:8px}
   .kpi.add-card:hover .kpi-add-btn{color:var(--accent)}
 
   .chart-card.add-card{display:flex;align-items:center;justify-content:center;border:1px dashed var(--line-strong);background:transparent;cursor:pointer;min-height:340px;box-shadow:none;grid-column:span 4}
@@ -292,18 +302,18 @@
   <div class="top-inner">
     <div class="brand">
       <div class="brand-mark">Atlas</div>
-      <div class="brand-tag">Dynamic Dashboard / v1</div>
+      <div class="brand-tag">لوحة بيانات تفاعلية</div>
     </div>
     <div class="top-meta" id="topMeta">
       <span class="pill" id="fileNamePill" style="display:none"></span>
-      <div class="loader" id="loader"><span>Parsing</span></div>
-      <button class="ghost export-btn" id="excelBtn" style="display:none">Excel</button>
+      <div class="loader" id="loader"><span id="loaderText">جارٍ المعالجة</span></div>
+      <button class="ghost export-btn" id="excelBtn" style="display:none">إكسل</button>
       <button class="ghost export-btn" id="pdfBtn" style="display:none">PDF</button>
-      <button class="ghost" id="resetBtn" style="display:none">↻ New file</button>
-      <button class="ghost theme-toggle" id="themeBtn" title="Toggle night mode">
+      <button class="ghost" id="resetBtn" style="display:none">↻ ملف جديد</button>
+      <button class="ghost theme-toggle" id="themeBtn" title="تبديل الوضع الليلي">
         <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-        <span id="themeLabel">Night</span>
+        <span id="themeLabel">ليلي</span>
       </button>
     </div>
   </div>
@@ -313,23 +323,24 @@
   <!-- UPLOAD VIEW -->
   <section class="upload-wrap" id="uploadView">
     <div class="upload" id="dropZone">
-      <h1>Drop your data.<br/><em>See it move.</em></h1>
-      <p>Upload any CSV or Excel file. Atlas reads the structure, picks the right charts, builds filters from your categories, and lets you slice it live.</p>
+      <h1>أسقط بياناتك هنا.<br/><em>وشاهدها تتحرك.</em></h1>
+      <p>ارفع أي ملف CSV أو Excel، وسيقرأ أطلس بنيته، ويختار الرسوم المناسبة، ويبني الفلاتر من فئاتك، لتحلّل بياناتك مباشرة.</p>
       <button class="upload-cta" id="browseBtn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0-12l-4 4m4-4l4 4M5 21h14"/></svg>
-        Choose file
+        اختر ملفًا
       </button>
       <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.tsv" style="display:none" />
-      <span class="upload-or">— or drag &amp; drop —</span>
+      <span class="upload-or">— أو اسحب الملف وأفلته هنا —</span>
       <div>
-        <button class="sample-link" id="sampleBtn">Try with sample data</button>
+        <button class="sample-link" id="sampleBtn">جرّب ببيانات تجريبية</button>
       </div>
-      <span class="upload-or">— or load a Google Sheet —</span>
+      <span class="upload-or">— أو حمّل جدول Google —</span>
       <div class="sheet-load" id="sheetLoad">
-        <input type="text" id="sheetUrl" placeholder="Paste Google Sheet link (leave empty for the linked sheet)" />
-        <button class="ghost" id="sheetBtn">Load sheet</button>
+        <input type="text" id="sheetUrl" placeholder="الصق رابط Google Sheet (اتركه فارغًا للجدول المرتبط)" />
+        <button class="ghost" id="sheetBtn">تحميل الجدول</button>
       </div>
       <div class="upload-formats">CSV · TSV · XLSX · XLS · Google Sheets</div>
+      <div class="upload-error" id="uploadError"></div>
     </div>
   </section>
 
@@ -337,22 +348,22 @@
   <section class="dash" id="dashView">
     <div id="errorBox"></div>
 
-    <div class="section-label">Filters</div>
+    <div class="section-label">الفلاتر</div>
     <div class="filters-bar">
       <div class="filters-row" id="filtersRow"></div>
     </div>
 
-    <div class="section-label">Key metrics<button class="section-action" id="addMetricBtn">+ Add metric</button></div>
+    <div class="section-label">المؤشرات الرئيسية<button class="section-action" id="addMetricBtn">+ إضافة مؤشر</button></div>
     <div class="kpi-grid" id="kpiGrid"></div>
 
-    <div class="section-label">Visualizations<button class="section-action" id="addChartBtn">+ Add chart</button></div>
+    <div class="section-label">الرسوم البيانية<button class="section-action" id="addChartBtn">+ إضافة رسم</button></div>
     <div class="charts-grid" id="chartsGrid"></div>
 
-    <div class="section-label">Column totals</div>
+    <div class="section-label">إجماليات الأعمدة</div>
     <div class="totals-card">
       <div class="table-head">
         <div>
-          <div class="chart-title">Totals summary</div>
+          <div class="chart-title">ملخص الإجماليات</div>
           <div class="chart-sub" id="totalsSub"></div>
         </div>
         <div class="chart-controls" id="totalsControls"></div>
@@ -362,11 +373,11 @@
       </div>
     </div>
 
-    <div class="section-label">Flexible pivot</div>
+    <div class="section-label">الجدول المحوري</div>
     <div class="totals-card">
       <div class="table-head">
         <div>
-          <div class="chart-title">Custom pivot table</div>
+          <div class="chart-title">جدول محوري مخصص</div>
           <div class="chart-sub" id="pivotSub"></div>
         </div>
         <div class="chart-controls" id="pivotControls"></div>
@@ -376,14 +387,14 @@
       </div>
     </div>
 
-    <div class="section-label">Data</div>
+    <div class="section-label">البيانات</div>
     <div class="table-card">
       <div class="table-head">
         <div>
-          <div class="chart-title" id="tableTitle">Filtered records</div>
+          <div class="chart-title" id="tableTitle">السجلات بعد الفلترة</div>
           <div class="chart-sub" id="tableSub"></div>
         </div>
-        <input type="text" class="table-search" id="tableSearch" placeholder="Search across all columns..." />
+        <input type="text" class="table-search" id="tableSearch" placeholder="ابحث في كل الأعمدة..." />
       </div>
       <div class="table-scroll" id="tableScroll">
         <table id="dataTable"></table>
@@ -391,15 +402,15 @@
       <div class="table-foot">
         <span id="tableInfo"></span>
         <div class="pager">
-          <button id="pagePrev">‹ Prev</button>
+          <button id="pagePrev">› السابق</button>
           <span id="pageLabel" style="padding:4px 8px"></span>
-          <button id="pageNext">Next ›</button>
+          <button id="pageNext">التالي ‹</button>
         </div>
       </div>
     </div>
 
     <div class="footer">
-      <span>Atlas Dashboard</span>
+      <span>لوحة أطلس</span>
       <span id="footMeta"></span>
     </div>
   </section>
@@ -452,6 +463,22 @@ const fmt = {
   }
 };
 
+const TYPE_AR = {number:'رقم', date:'تاريخ', category:'فئة', text:'نص'};
+const AGG_AR = {sum:'مجموع', avg:'متوسط', count:'عدد', min:'أدنى', max:'أعلى', unique:'قيم فريدة'};
+const LIMITS = {pivotRows:200, pivotCols:40, totalsRows:200, scatterPoints:3000, filterOptions:300, sheetChunk:20000};
+const collator = new Intl.Collator('ar', {numeric:true, sensitivity:'base'});
+// Loop-based min/max: Math.min(...arr) overflows the call stack on ~100k values
+function minMax(arr){
+  let min = Infinity, max = -Infinity;
+  for(const v of arr){ const n = +v; if(n < min) min = n; if(n > max) max = n; }
+  return {min, max};
+}
+function debounce(fn, ms){
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+const refreshSoon = debounce(() => refreshAll(), 300);
+
 const palette = ['#d2502a','#2b4a6f','#3f7d5b','#c08a2b','#7a3b6e','#456b7a','#a44b3a','#5e6b3a','#8c5a2b','#3a5a7a'];
 
 /* =========================================================
@@ -502,11 +529,11 @@ const themeBtn = document.getElementById('themeBtn');
 const themeLabel = document.getElementById('themeLabel');
 function applyTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
-  themeLabel.textContent = theme === 'dark' ? 'Day' : 'Night';
+  themeLabel.textContent = theme === 'dark' ? 'نهاري' : 'ليلي';
   try{ localStorage.setItem('atlas-theme', theme); }catch(e){}
   if(state.rows.length) buildCharts(getFilteredRows());
 }
-themeLabel.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Day' : 'Night';
+themeLabel.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'نهاري' : 'ليلي';
 themeBtn.addEventListener('click', ()=>{
   applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 });
@@ -523,36 +550,48 @@ sheetBtn.addEventListener('click', loadGoogleSheet);
 
 function loadGoogleSheet(){
   if(!(window.google && google.script && google.script.run)){
-    showSheetError('Google Sheets loading works only inside the Apps Script web app.');
+    showError('تحميل Google Sheets يعمل فقط داخل تطبيق Apps Script المنشور.');
     return;
   }
+  const url = sheetUrl.value.trim();
+  const call = (fn, ...args) => new Promise((resolve, reject) => {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+  });
   loader.classList.add('show');
-  google.script.run
-    .withSuccessHandler(res => {
-      loader.classList.remove('show');
-      if(!res || !res.rows || res.rows.length < 2){ showSheetError('No data found in the sheet.'); return; }
-      const headers = res.rows[0].map((h, i) => String(h).trim() || `Column ${i+1}`);
-      const data = res.rows.slice(1)
-        .filter(r => r.some(v => v !== '' && v !== null))
-        .map(r => Object.fromEntries(headers.map((h, i) => [h, r[i]])));
-      state.fileName = res.name;
-      ingest(data);
-    })
-    .withFailureHandler(err => {
-      loader.classList.remove('show');
-      showSheetError('Could not read the sheet: ' + (err && err.message ? err.message : err));
-    })
-    .getSheetData(sheetUrl.value.trim());
-}
+  setLoaderText('جارٍ الاتصال بالجدول');
+  sheetBtn.disabled = true;
 
-function showSheetError(msg){
-  // errorBox lives in the dashboard view, so use alert while on the upload screen
-  if(document.getElementById('dashView').classList.contains('active')) showError(msg);
-  else alert(msg);
+  // Large sheets are fetched in chunks: one big google.script.run response can exceed its size limit
+  (async () => {
+    const info = await call('getSheetInfo', url);
+    if(info.rows < 2) throw new Error('لا توجد بيانات في الجدول.');
+    let headers = null;
+    const data = [];
+    for(let start = 1; start <= info.rows; start += LIMITS.sheetChunk){
+      setLoaderText(`تحميل ${Math.min(start - 1, info.rows).toLocaleString()} من ${info.rows.toLocaleString()} صف`);
+      const chunk = JSON.parse(await call('getSheetChunk', url, info.gid, start, LIMITS.sheetChunk));
+      if(!headers) headers = chunk.shift().map((h, i) => String(h).trim() || `عمود ${i+1}`);
+      for(const r of chunk){
+        if(!r.some(v => v !== '')) continue;
+        const o = {};
+        for(let i = 0; i < headers.length; i++) o[headers[i]] = r[i];
+        data.push(o);
+      }
+    }
+    if(!data.length) throw new Error('لا توجد بيانات في الجدول.');
+    state.fileName = info.name;
+    ingest(data);
+  })()
+    .catch(err => {
+      loader.classList.remove('show');
+      showError('تعذّرت قراءة الجدول: ' + (err && err.message ? err.message : err));
+    })
+    .finally(() => { sheetBtn.disabled = false; });
 }
 
 function showError(msg){
-  const box = document.getElementById('errorBox');
+  const onDash = document.getElementById('dashView').classList.contains('active');
+  const box = document.getElementById(onDash ? 'errorBox' : 'uploadError');
   box.innerHTML = `<div class="error">${msg}</div>`;
   setTimeout(()=>{ box.innerHTML=''; }, 6000);
 }
@@ -566,27 +605,27 @@ function handleFile(file){
       header:true, skipEmptyLines:true, dynamicTyping:false,
       complete:(res)=>{
         loader.classList.remove('show');
-        if(!res.data.length){ showError('No data found in file.'); return; }
+        if(!res.data.length){ showError('لا توجد بيانات في الملف.'); return; }
         ingest(res.data);
       },
-      error:(err)=>{ loader.classList.remove('show'); showError('Could not read CSV: '+err.message); }
+      error:(err)=>{ loader.classList.remove('show'); showError('تعذّرت قراءة ملف CSV: '+err.message); }
     });
   } else if(ext==='xlsx' || ext==='xls'){
     const reader = new FileReader();
     reader.onload = e=>{
       try{
-        const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:true, dense:true});
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
         loader.classList.remove('show');
-        if(!data.length){ showError('No data found in spreadsheet.'); return; }
+        if(!data.length){ showError('لا توجد بيانات في جدول البيانات.'); return; }
         ingest(data);
-      } catch(err){ loader.classList.remove('show'); showError('Could not read Excel: '+err.message); }
+      } catch(err){ loader.classList.remove('show'); showError('تعذّرت قراءة ملف Excel: '+err.message); }
     };
     reader.readAsArrayBuffer(file);
   } else {
     loader.classList.remove('show');
-    showError('Unsupported file type. Please upload CSV, TSV, or Excel.');
+    showError('نوع الملف غير مدعوم. ارفع ملف CSV أو TSV أو Excel.');
   }
 }
 
@@ -594,6 +633,18 @@ function handleFile(file){
    DATA INGESTION & TYPE DETECTION
 ========================================================= */
 function ingest(rawRows){
+  loader.classList.add('show');
+  setLoaderText('جارٍ تجهيز ' + rawRows.length.toLocaleString() + ' صف');
+  setTimeout(() => {
+    try{ ingestNow(rawRows); }
+    catch(err){ console.error(err); showError('تعذّرت معالجة البيانات: ' + err.message); }
+    finally{ loader.classList.remove('show'); setLoaderText('جارٍ المعالجة'); }
+  }, 30);
+}
+
+function setLoaderText(text){ document.getElementById('loaderText').textContent = text; }
+
+function ingestNow(rawRows){
   // Clean: strip empty columns, trim keys
   const allKeys = new Set();
   rawRows.forEach(r=> Object.keys(r).forEach(k=>{ if(k && k.trim()) allKeys.add(k); }));
@@ -610,8 +661,11 @@ function ingest(rawRows){
   // Detect column types
   const cols = [];
   allKeys.forEach(name=>{
-    const sample = cleanRows.map(r=>r[name]).filter(v=>v!==null);
-    if(sample.length === 0){ cols.push({name,type:'text',uniqueCount:0}); return; }
+    const values = [];
+    for(const r of cleanRows){ if(r[name] !== null) values.push(r[name]); }
+    if(values.length === 0){ cols.push({name,type:'text',uniqueCount:0}); return; }
+    const step = Math.max(1, Math.floor(values.length / 5000));
+    const sample = step === 1 ? values : values.filter((_, i) => i % step === 0);
 
     // Try numeric
     let numeric = 0;
@@ -632,14 +686,16 @@ function ingest(rawRows){
       }
     });
 
-    const uniq = new Set(sample.map(v=>String(v))).size;
+    const uniqSet = new Set();
+    for(const v of values){ uniqSet.add(String(v)); if(uniqSet.size > 5000) break; }
+    const uniq = uniqSet.size;
     let type;
     if(dates / sample.length > 0.85) type='date';
     else if(numeric / sample.length > 0.85) type='number';
-    else if(uniq <= Math.min(50, sample.length*0.5)) type='category';
+    else if(uniq <= Math.min(50, values.length*0.5)) type='category';
     else type='text';
 
-    cols.push({name, type, uniqueCount:uniq, sampleSize:sample.length});
+    cols.push({name, type, uniqueCount:uniq, sampleSize:values.length});
   });
 
   // Coerce values
@@ -674,7 +730,9 @@ function ingest(rawRows){
     colName: '__RECORDS__',
     agg: 'count'
   });
-  const numColsForKpi = cols.filter(c => c.type === 'number');
+  // Identifier-like numeric columns (ID, Code…) go last: summing them is meaningless
+  const looksLikeId = c => /^(id|#|no\.?|code|رقم|الرقم|كود|م)$|[_ ]id$|^id[_ ]/i.test(c.name.trim());
+  const numColsForKpi = cols.filter(c => c.type === 'number').sort((a, b) => looksLikeId(a) - looksLikeId(b));
   numColsForKpi.slice(0, 3).forEach((c, idx) => {
     state.kpiConfigs.push({
       id: 'kpi_' + Date.now() + '_' + idx,
@@ -707,8 +765,8 @@ function ingest(rawRows){
       dateCol: dateColsForChart[0].name,
       valueCol: numColsForKpi[0].name,
       granularity: 'month',
-      title: `${numColsForKpi[0].name} over time`,
-      sub: `Trended by ${dateColsForChart[0].name}`
+      title: `${numColsForKpi[0].name} عبر الزمن`,
+      sub: `حسب ${dateColsForChart[0].name}`
     });
   }
 
@@ -720,8 +778,8 @@ function ingest(rawRows){
       span: 6,
       catCol: catColsForChart[0].name,
       valueCol: numColsForKpi[0].name,
-      title: `${numColsForKpi[0].name} by ${catColsForChart[0].name}`,
-      sub: 'Aggregated sum',
+      title: `${numColsForKpi[0].name} حسب ${catColsForChart[0].name}`,
+      sub: 'مجموع مجمّع',
       agg: 'sum'
     });
   }
@@ -734,8 +792,8 @@ function ingest(rawRows){
       type: 'doughnut',
       span: 6,
       catCol: donutCatForChart.name,
-      title: `Records by ${donutCatForChart.name}`,
-      sub: 'Share of total'
+      title: `السجلات حسب ${donutCatForChart.name}`,
+      sub: 'النسبة من الإجمالي'
     });
   }
 
@@ -748,8 +806,8 @@ function ingest(rawRows){
       span: 6,
       catCol: catColsForChart[1].name,
       valueCol: v.name,
-      title: `${v.name} by ${catColsForChart[1].name}`,
-      sub: 'Aggregated sum',
+      title: `${v.name} حسب ${catColsForChart[1].name}`,
+      sub: 'مجموع مجمّع',
       agg: 'sum'
     });
   }
@@ -762,8 +820,8 @@ function ingest(rawRows){
       span: 6,
       xCol: numColsForKpi[0].name,
       yCol: numColsForKpi[1].name,
-      title: `${numColsForKpi[0].name} vs ${numColsForKpi[1].name}`,
-      sub: 'Correlation view'
+      title: `${numColsForKpi[0].name} مقابل ${numColsForKpi[1].name}`,
+      sub: 'عرض الارتباط'
     });
   } else if (numColsForKpi.length === 1 && catColsForChart.length === 0) {
     // Histogram
@@ -772,8 +830,8 @@ function ingest(rawRows){
       type: 'histogram',
       span: 6,
       valueCol: numColsForKpi[0].name,
-      title: `Distribution of ${numColsForKpi[0].name}`,
-      sub: 'Frequency by bin'
+      title: `توزيع ${numColsForKpi[0].name}`,
+      sub: 'التكرار حسب الفئة'
     });
   }
 
@@ -784,8 +842,8 @@ function ingest(rawRows){
       type: 'bar-count',
       span: 12,
       catCol: catColsForChart[0].name,
-      title: `Top values: ${catColsForChart[0].name}`,
-      sub: 'Record count'
+      title: `أكثر القيم: ${catColsForChart[0].name}`,
+      sub: 'عدد السجلات'
     });
   }
 
@@ -793,7 +851,7 @@ function ingest(rawRows){
   state.search = '';
   state.sortKey = null;
 
-  fileNamePill.textContent = state.fileName + ' · ' + cleanRows.length.toLocaleString() + ' rows';
+  fileNamePill.textContent = state.fileName + ' · ' + cleanRows.length.toLocaleString() + ' صف';
   fileNamePill.style.display='inline-block';
   excelBtn.style.display='inline-block';
   pdfBtn.style.display='inline-block';
@@ -809,27 +867,27 @@ function ingest(rawRows){
    SAMPLE DATA
 ========================================================= */
 function loadSample(){
-  const regions = ['North','South','East','West','Central'];
-  const products = ['Aurora','Borealis','Cascade','Drift','Ember','Frost'];
-  const channels = ['Online','Retail','Wholesale','Partner'];
-  const segments = ['Consumer','Business','Enterprise'];
+  const regions = ['الشمال','الجنوب','الشرق','الغرب','الوسط'];
+  const products = ['فجر','شفق','شلال','نسيم','جمرة','صقيع'];
+  const channels = ['أونلاين','تجزئة','جملة','شركاء'];
+  const segments = ['أفراد','شركات صغيرة','مؤسسات'];
   const rows = [];
   const start = new Date(2023,0,1);
   for(let i=0;i<500;i++){
     const d = new Date(start.getTime() + Math.random()*1000*60*60*24*700);
     rows.push({
-      'Order Date': d.toISOString().slice(0,10),
-      'Region': regions[Math.floor(Math.random()*regions.length)],
-      'Product': products[Math.floor(Math.random()*products.length)],
-      'Channel': channels[Math.floor(Math.random()*channels.length)],
-      'Segment': segments[Math.floor(Math.random()*segments.length)],
-      'Units': Math.floor(Math.random()*100)+1,
-      'Revenue': Math.round((Math.random()*8000+200)*100)/100,
-      'Profit': Math.round((Math.random()*1500-100)*100)/100,
-      'Discount': Math.round(Math.random()*30*100)/100
+      'تاريخ الطلب': d.toISOString().slice(0,10),
+      'المنطقة': regions[Math.floor(Math.random()*regions.length)],
+      'المنتج': products[Math.floor(Math.random()*products.length)],
+      'القناة': channels[Math.floor(Math.random()*channels.length)],
+      'الشريحة': segments[Math.floor(Math.random()*segments.length)],
+      'الوحدات': Math.floor(Math.random()*100)+1,
+      'الإيرادات': Math.round((Math.random()*8000+200)*100)/100,
+      'الربح': Math.round((Math.random()*1500-100)*100)/100,
+      'الخصم': Math.round(Math.random()*30*100)/100
     });
   }
-  state.fileName = 'sample_sales.csv';
+  state.fileName = 'بيانات_تجريبية';
   ingest(rows);
 }
 
@@ -844,7 +902,8 @@ function getFilteredRows(){
     if(!c) return;
     if(c.type==='category' || c.type==='text'){
       if(Array.isArray(val) && val.length && !val.includes('__ALL__')){
-        rows = rows.filter(r=> val.includes(String(r[col])));
+        const allowed = new Set(val);
+        rows = rows.filter(r=> allowed.has(String(r[col])));
       } else if(val && val !== '__ALL__') {
         rows = rows.filter(r=> String(r[col]) === val);
       }
@@ -888,7 +947,7 @@ function buildDashboard(){
 
 function exportToExcel(){
   const rows = getFilteredRows();
-  if(!rows.length){ showError('No filtered data to export.'); return; }
+  if(!rows.length){ showError('لا توجد بيانات للتصدير.'); return; }
   const exportRows = rows.map(row => Object.fromEntries(state.columns.map(column => {
     const value = row[column.name];
     return [column.name, value instanceof Date ? value.toISOString().slice(0, 10) : value];
@@ -897,12 +956,12 @@ function exportToExcel(){
   worksheet['!autofilter'] = {ref: worksheet['!ref']};
   worksheet['!cols'] = state.columns.map(column => ({wch: Math.min(32, Math.max(12, column.name.length + 3))}));
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Filtered Data');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'البيانات المفلترة');
   XLSX.writeFile(workbook, `atlas-dashboard-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function exportToPdf(){
-  if(!state.rows.length){ showError('Load data before exporting the report.'); return; }
+  if(!state.rows.length){ showError('حمّل البيانات أولًا قبل تصدير التقرير.'); return; }
   window.print();
 }
 
@@ -934,8 +993,8 @@ function addChart(){
     xCol: numCols[0]?.name || '',
     yCol: numCols[1]?.name || numCols[0]?.name || '',
     agg: 'sum',
-    title: defaultVal ? `${defaultVal} by ${defaultCat}` : `Count by ${defaultCat}`,
-    sub: defaultVal ? 'Aggregated sum' : 'Record count'
+    title: defaultVal ? `${defaultVal} حسب ${defaultCat}` : `العدد حسب ${defaultCat}`,
+    sub: defaultVal ? 'مجموع مجمّع' : 'عدد السجلات'
   });
   buildCharts(rows);
 }
@@ -952,67 +1011,83 @@ function buildFilters(){
     wrap.className='filter';
 
     if(col.type==='category' || col.type==='text'){
-      const values = [...new Set(state.rows.map(r=>r[col.name]).filter(v=>v!==null))].sort();
+      const valueSet = new Set();
+      for(const r of state.rows){ if(r[col.name] !== null) valueSet.add(String(r[col.name])); }
+      const values = [...valueSet].sort(collator.compare);
       const currentVal = Array.isArray(state.filters[col.name]) ? state.filters[col.name] : (state.filters[col.name] ? [state.filters[col.name]] : []);
       wrap.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <label style="margin-bottom:0">${col.name}</label>
+          <label style="margin-bottom:0">${escapeHtml(col.name)}</label>
           <button class="remove-filter" data-col="${escapeHtml(col.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin:0">&times;</button>
         </div>
         <div class="multi-select-dropdown">
-          <button type="button" class="multi-select-trigger"><span>${currentVal.length ? `${currentVal.length} selected` : `All (${values.length})`}</span></button>
+          <button type="button" class="multi-select-trigger"><span>${currentVal.length ? `${currentVal.length} محدد` : `الكل (${values.length.toLocaleString()})`}</span></button>
           <div class="multi-select-menu">
-            <input type="search" class="multi-select-search" placeholder="Search values..." aria-label="Search ${escapeHtml(col.name)} values" />
+            <input type="search" class="multi-select-search" placeholder="ابحث في القيم..." aria-label="بحث في قيم ${escapeHtml(col.name)}" />
             <div class="multi-select-actions">
-              <button type="button" class="multi-select-action" data-action="select-all">Select all</button>
-              <button type="button" class="multi-select-action" data-action="clear-selection">Clear selection</button>
+              <button type="button" class="multi-select-action" data-action="select-all">تحديد الكل</button>
+              <button type="button" class="multi-select-action" data-action="clear-selection">إلغاء التحديد</button>
             </div>
-            <div class="multi-select-options">
-              ${values.map(v=>{ const value = String(v); return `<label class="multi-select-option" data-label="${escapeHtml(value.toLowerCase())}"><input type="checkbox" value="${escapeHtml(value)}" ${currentVal.includes(value) ? 'checked' : ''} /> <span>${escapeHtml(value)}</span></label>`; }).join('')}
-            </div>
+            <div class="multi-select-options"></div>
+            <div class="multi-select-more"></div>
           </div>
         </div>`;
       const dropdown = wrap.querySelector('.multi-select-dropdown');
       const trigger = wrap.querySelector('.multi-select-trigger');
       const triggerText = trigger.querySelector('span');
       const searchInput = wrap.querySelector('.multi-select-search');
-      const checkboxes = [...dropdown.querySelectorAll('input[type="checkbox"]')];
+      const optionsBox = wrap.querySelector('.multi-select-options');
+      const moreBox = wrap.querySelector('.multi-select-more');
+      const selectedSet = new Set(currentVal.map(String));
+      let matches = values;
+      const renderOptions = () => {
+        const query = searchInput.value.toLowerCase().trim();
+        matches = query ? values.filter(v => v.toLowerCase().includes(query)) : values;
+        const shown = matches.slice(0, LIMITS.filterOptions);
+        optionsBox.innerHTML = shown.map(value => `<label class="multi-select-option"><input type="checkbox" value="${escapeHtml(value)}" ${selectedSet.has(value) ? 'checked' : ''} /> <span>${escapeHtml(value)}</span></label>`).join('');
+        moreBox.textContent = matches.length > shown.length ? `عرض ${shown.length} من ${matches.length.toLocaleString()} — استخدم البحث` : '';
+      };
       const updateSelection = () => {
-        const selected = checkboxes.filter(input => input.checked).map(input => input.value);
+        const selected = [...selectedSet];
         state.filters[col.name] = selected;
-        triggerText.textContent = selected.length ? `${selected.length} selected` : `All (${values.length})`;
+        triggerText.textContent = selected.length ? `${selected.length.toLocaleString()} محدد` : `الكل (${values.length.toLocaleString()})`;
         refreshAll();
       };
+      renderOptions();
       trigger.addEventListener('click', e=>{
         e.stopPropagation();
         document.querySelectorAll('.multi-select-dropdown.open').forEach(openDropdown => { if(openDropdown !== dropdown) openDropdown.classList.remove('open'); });
         dropdown.classList.toggle('open');
         if(dropdown.classList.contains('open')) searchInput.focus();
       });
-      checkboxes.forEach(input => input.addEventListener('change', updateSelection));
+      optionsBox.addEventListener('change', e=>{
+        if(e.target.checked) selectedSet.add(e.target.value);
+        else selectedSet.delete(e.target.value);
+        updateSelection();
+      });
       dropdown.querySelector('[data-action="select-all"]').addEventListener('click', e=>{
         e.stopPropagation();
-        checkboxes.forEach(input => { input.checked = true; });
+        matches.forEach(value => selectedSet.add(value));
+        renderOptions();
         updateSelection();
       });
       dropdown.querySelector('[data-action="clear-selection"]').addEventListener('click', e=>{
         e.stopPropagation();
-        checkboxes.forEach(input => { input.checked = false; });
+        selectedSet.clear();
+        renderOptions();
         updateSelection();
       });
-      searchInput.addEventListener('input', e=>{
-        const query = e.target.value.toLowerCase().trim();
-        dropdown.querySelectorAll('.multi-select-option').forEach(option => { option.style.display = option.dataset.label.includes(query) ? 'flex' : 'none'; });
-      });
+      searchInput.addEventListener('input', debounce(renderOptions, 150));
     } else if(col.type==='date'){
       const dates = state.rows.map(r=>r[col.name]).filter(v=>v instanceof Date);
       if(!dates.length) return;
-      const min = new Date(Math.min(...dates)).toISOString().slice(0,10);
-      const max = new Date(Math.max(...dates)).toISOString().slice(0,10);
+      const range = minMax(dates);
+      const min = new Date(range.min).toISOString().slice(0,10);
+      const max = new Date(range.max).toISOString().slice(0,10);
       const currentVal = state.filters[col.name] || {start:'',end:''};
       wrap.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <label style="margin-bottom:0">${col.name} (range)</label>
+          <label style="margin-bottom:0">${escapeHtml(col.name)} (نطاق)</label>
           <button class="remove-filter" data-col="${escapeHtml(col.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin:0">&times;</button>
         </div>
         <div style="display:flex;gap:6px">
@@ -1029,24 +1104,25 @@ function buildFilters(){
       });
     } else if(col.type==='number'){
       const vals = state.rows.map(r=>r[col.name]).filter(v=>v!==null && !isNaN(v));
-      const min = vals.length ? Math.min(...vals) : '';
-      const max = vals.length ? Math.max(...vals) : '';
+      const range = minMax(vals);
+      const min = vals.length ? range.min : '';
+      const max = vals.length ? range.max : '';
       const currentVal = state.filters[col.name] || {min:'',max:''};
       wrap.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <label style="margin-bottom:0">${col.name} (range)</label>
+          <label style="margin-bottom:0">${escapeHtml(col.name)} (نطاق)</label>
           <button class="remove-filter" data-col="${escapeHtml(col.name)}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;line-height:1;margin:0">&times;</button>
         </div>
         <div style="display:flex;gap:6px">
-          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="min" placeholder="Min" min="${min}" max="${max}" value="${currentVal.min || ''}" style="flex:1"/>
-          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="max" placeholder="Max" min="${min}" max="${max}" value="${currentVal.max || ''}" style="flex:1"/>
+          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="min" placeholder="من" min="${min}" max="${max}" value="${currentVal.min || ''}" style="flex:1"/>
+          <input type="number" data-col="${escapeHtml(col.name)}" data-bound="max" placeholder="إلى" min="${min}" max="${max}" value="${currentVal.max || ''}" style="flex:1"/>
         </div>`;
       wrap.querySelectorAll('input').forEach(inp=>{
         inp.addEventListener('input', ()=>{
           const cur = state.filters[col.name] || {min:'',max:''};
           cur[inp.dataset.bound] = inp.value;
           state.filters[col.name] = cur;
-          refreshAll();
+          refreshSoon();
         });
       });
     }
@@ -1071,8 +1147,8 @@ function buildFilters(){
     addWrap.innerHTML = `
       <label>&nbsp;</label>
       <select id="addFilterSelect" style="border-style:dashed;border-color:var(--line-strong);cursor:pointer">
-        <option value="" disabled selected>+ Add Filter</option>
-        ${availableCols.map(c=>`<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} (${c.type})</option>`).join('')}
+        <option value="" disabled selected>+ إضافة فلتر</option>
+        ${availableCols.map(c=>`<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)} (${TYPE_AR[c.type]})</option>`).join('')}
       </select>`;
     addWrap.querySelector('#addFilterSelect').addEventListener('change', e=>{
       const colName = e.target.value;
@@ -1090,7 +1166,7 @@ function buildFilters(){
   clearWrap.className='filter filter-clear';
   clearWrap.style.flex = '0 0 auto';
   clearWrap.style.minWidth = 'auto';
-  clearWrap.innerHTML = `<label>&nbsp;</label><button class="ghost" id="clearFilters">Clear all</button>`;
+  clearWrap.innerHTML = `<label>&nbsp;</label><button class="ghost" id="clearFilters">مسح الكل</button>`;
   row.appendChild(clearWrap);
   document.getElementById('clearFilters').addEventListener('click', ()=>{
     state.filters = {};
@@ -1113,7 +1189,7 @@ function refreshAll(){
   buildCharts(rows);
   buildTable(rows);
   document.getElementById('footMeta').textContent =
-    `${rows.length.toLocaleString()} of ${state.rows.length.toLocaleString()} rows · ${state.columns.length} columns`;
+    `${rows.length.toLocaleString()} من ${state.rows.length.toLocaleString()} صف · ${state.columns.length} عمود`;
 }
 
 function buildFlexiblePivot(rows){
@@ -1125,28 +1201,29 @@ function buildFlexiblePivot(rows){
 
   if(!columns.length){
     controls.innerHTML = '';
-    table.innerHTML = '<tbody><tr><td class="empty-state">No columns available.</td></tr></tbody>';
+    table.innerHTML = '<tbody><tr><td class="empty-state">لا توجد أعمدة.</td></tr></tbody>';
     return;
   }
 
-  if(!columns.some(column => column.name === config.rowCol)) config.rowCol = columns[0].name;
-  if(!columns.some(column => column.name === config.colCol)) config.colCol = columns[Math.min(1, columns.length - 1)].name;
+  const categoryColumns = columns.filter(column => column.type === 'category');
+  if(!columns.some(column => column.name === config.rowCol)) config.rowCol = (categoryColumns[0] || columns[0]).name;
+  if(!columns.some(column => column.name === config.colCol)) config.colCol = (categoryColumns[1] || categoryColumns[0] || columns[Math.min(1, columns.length - 1)]).name;
   if(config.valueCol !== '__RECORDS__' && !numericColumns.some(column => column.name === config.valueCol)) config.valueCol = numericColumns[0]?.name || '__RECORDS__';
   if(config.valueCol === '__RECORDS__') config.agg = 'count';
 
   const makePivotSelect = (role, label, options, selected) => `
-    <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
+    <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
       ${label}<select data-pivot-role="${role}">${options.map(option => `<option value="${escapeHtml(option.value)}" ${option.value===selected?'selected':''}>${escapeHtml(option.label)}</option>`).join('')}</select>
     </label>`;
-  const fieldOptions = columns.map(column => ({value:column.name, label:`${column.name} (${column.type})`}));
-  const valueOptions = [{value:'__RECORDS__', label:'Records'}, ...numericColumns.map(column => ({value:column.name, label:column.name}))];
+  const fieldOptions = columns.map(column => ({value:column.name, label:`${column.name} (${TYPE_AR[column.type]})`}));
+  const valueOptions = [{value:'__RECORDS__', label:'السجلات'}, ...numericColumns.map(column => ({value:column.name, label:column.name}))];
   const aggOptions = config.valueCol === '__RECORDS__'
-    ? [{value:'count', label:'Count'}]
-    : [{value:'sum', label:'Sum'}, {value:'avg', label:'Average'}, {value:'count', label:'Count'}];
-  controls.innerHTML = makePivotSelect('row', 'Rows', fieldOptions, config.rowCol)
-    + makePivotSelect('col', 'Columns', fieldOptions, config.colCol)
-    + makePivotSelect('value', 'Values', valueOptions, config.valueCol)
-    + makePivotSelect('agg', 'Aggregate', aggOptions, config.agg);
+    ? [{value:'count', label:'عدد'}]
+    : [{value:'sum', label:'مجموع'}, {value:'avg', label:'متوسط'}, {value:'count', label:'عدد'}];
+  controls.innerHTML = makePivotSelect('row', 'الصفوف', fieldOptions, config.rowCol)
+    + makePivotSelect('col', 'الأعمدة', fieldOptions, config.colCol)
+    + makePivotSelect('value', 'القيم', valueOptions, config.valueCol)
+    + makePivotSelect('agg', 'التجميع', aggOptions, config.agg);
   controls.querySelectorAll('select').forEach(select => select.addEventListener('change', () => {
     const role = select.dataset.pivotRole;
     if(role === 'row') config.rowCol = select.value;
@@ -1180,11 +1257,14 @@ function buildFlexiblePivot(rows){
     }
   });
 
-  const colKeys = Object.keys(columnLabels).sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
-  const rowKeys = Object.keys(groups).sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+  // Cap rendered size: a 100k × 100k pivot would freeze the tab
+  const colKeysAll = Object.keys(columnLabels).sort(collator.compare);
+  const rowKeysAll = Object.keys(groups).sort(collator.compare);
+  const colKeys = colKeysAll.slice(0, LIMITS.pivotCols);
+  const rowKeys = rowKeysAll.slice(0, LIMITS.pivotRows);
   if(!colKeys.length || !rowKeys.length){
-    table.innerHTML = '<tbody><tr><td class="empty-state">No matching values for this pivot.</td></tr></tbody>';
-    document.getElementById('pivotSub').textContent = 'No data for the selected fields';
+    table.innerHTML = '<tbody><tr><td class="empty-state">لا توجد قيم مطابقة لهذا الجدول.</td></tr></tbody>';
+    document.getElementById('pivotSub').textContent = 'لا توجد بيانات للحقول المختارة';
     return;
   }
 
@@ -1206,8 +1286,8 @@ function buildFlexiblePivot(rows){
     grandTotal += rowTotal;
     return `<tr><td>${escapeHtml(rowKey)}</td>${cells.map(value => `<td>${value === null ? '—' : escapeHtml(fmt.full(value))}</td>`).join('')}<td>${escapeHtml(fmt.full(rowTotal))}</td></tr>`;
   }).join('');
-  table.innerHTML = `<thead><tr><th>${escapeHtml(config.rowCol)}</th>${colKeys.map(key => `<th>${escapeHtml(key)}</th>`).join('')}<th>Total</th></tr></thead><tbody>${bodyRows}<tr class="totals-grand-row"><td>Grand Total</td>${colKeys.map(key => `<td>${escapeHtml(fmt.full(columnTotals[key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(grandTotal))}</td></tr></tbody>`;
-  document.getElementById('pivotSub').textContent = `${config.agg} of ${config.valueCol === '__RECORDS__' ? 'records' : config.valueCol} · ${rowKeys.length} rows · ${colKeys.length} columns`;
+  table.innerHTML = `<thead><tr><th>${escapeHtml(config.rowCol)}</th>${colKeys.map(key => `<th>${escapeHtml(key)}</th>`).join('')}<th>الإجمالي</th></tr></thead><tbody>${bodyRows}<tr class="totals-grand-row"><td>الإجمالي العام</td>${colKeys.map(key => `<td>${escapeHtml(fmt.full(columnTotals[key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(grandTotal))}</td></tr></tbody>`;
+  document.getElementById('pivotSub').textContent = `${AGG_AR[config.agg] || config.agg} ${config.valueCol === '__RECORDS__' ? 'السجلات' : config.valueCol} · ${rowKeys.length} صف · ${colKeys.length} عمود${(rowKeysAll.length > rowKeys.length || colKeysAll.length > colKeys.length) ? ` · معروض جزء من ${rowKeysAll.length.toLocaleString()} × ${colKeysAll.length.toLocaleString()}` : ''}`;
 }
 
 function buildTotalsTable(rows){
@@ -1219,8 +1299,8 @@ function buildTotalsTable(rows){
 
   if(!rowCols.length || !dateCols.length || !valueCols.length){
     controls.innerHTML = '';
-    table.innerHTML = '<tbody><tr><td class="empty-state">Need a text column, date column, and numeric column.</td></tr></tbody>';
-    document.getElementById('totalsSub').textContent = 'Pivot summary unavailable for this data';
+    table.innerHTML = '<tbody><tr><td class="empty-state">يلزم عمود نصي وعمود تاريخ وعمود رقمي.</td></tr></tbody>';
+    document.getElementById('totalsSub').textContent = 'الملخص غير متاح لهذه البيانات';
     return;
   }
 
@@ -1230,18 +1310,18 @@ function buildTotalsTable(rows){
   if(!valueCols.some(c => c.name === config.valueCol)) config.valueCol = valueCols[0].name;
 
   const makeSelect = (role, label, columns, selected) => `
-    <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
+    <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
       ${label}
       <select data-role="${role}">${columns.map(c => `<option value="${escapeHtml(c.name)}" ${c.name===selected?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
     </label>`;
-  controls.innerHTML = makeSelect('row', 'Rows', rowCols, config.rowCol)
-    + makeSelect('date', 'Months', dateCols, config.dateCol)
-    + makeSelect('value', 'Values', valueCols, config.valueCol)
-    + `<label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
-      Group
+  controls.innerHTML = makeSelect('row', 'الصفوف', rowCols, config.rowCol)
+    + makeSelect('date', 'التاريخ', dateCols, config.dateCol)
+    + makeSelect('value', 'القيم', valueCols, config.valueCol)
+    + `<label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
+      التجميع
       <select data-role="granularity">
-        <option value="month" ${config.granularity === 'month' ? 'selected' : ''}>By month</option>
-        <option value="year" ${config.granularity === 'year' ? 'selected' : ''}>By year</option>
+        <option value="month" ${config.granularity === 'month' ? 'selected' : ''}>شهري</option>
+        <option value="year" ${config.granularity === 'year' ? 'selected' : ''}>سنوي</option>
       </select>
     </label>`;
   controls.querySelectorAll('select').forEach(select => {
@@ -1252,7 +1332,7 @@ function buildTotalsTable(rows){
     });
   });
 
-  const monthFormatter = new Intl.DateTimeFormat('en-US', {month:'short'});
+  const monthFormatter = new Intl.DateTimeFormat('ar', {month:'long'});
   const granularity = config.granularity === 'year' ? 'year' : 'month';
   const dateGroups = {};
   rows.forEach(row => {
@@ -1285,10 +1365,11 @@ function buildTotalsTable(rows){
     if(!groupRows[rowKey]) groupRows[rowKey] = {};
     groupRows[rowKey][periodKey] = (groupRows[rowKey][periodKey] || 0) + value;
   });
-  const entries = Object.entries(groupRows).sort((a,b) => a[0].localeCompare(b[0]));
+  const entriesAll = Object.entries(groupRows).sort((a,b) => collator.compare(a[0], b[0]));
+  const entries = entriesAll.slice(0, LIMITS.totalsRows);
   if(!periods.length || !entries.length){
-    table.innerHTML = '<tbody><tr><td class="empty-state">No matching values for this summary.</td></tr></tbody>';
-    document.getElementById('totalsSub').textContent = `${config.valueCol} grouped by ${config.rowCol}`;
+    table.innerHTML = '<tbody><tr><td class="empty-state">لا توجد قيم مطابقة لهذا الملخص.</td></tr></tbody>';
+    document.getElementById('totalsSub').textContent = `${config.valueCol} حسب ${config.rowCol}`;
     return;
   }
 
@@ -1302,15 +1383,15 @@ function buildTotalsTable(rows){
   }, 0);
 
   table.innerHTML = `
-    <thead><tr><th>${escapeHtml(config.rowCol)}</th>${periods.map(period => `<th>${escapeHtml(period.label)}</th>`).join('')}<th>Total</th></tr></thead>
+    <thead><tr><th>${escapeHtml(config.rowCol)}</th>${periods.map(period => `<th>${escapeHtml(period.label)}</th>`).join('')}<th>الإجمالي</th></tr></thead>
     <tbody>
       ${entries.map(([rowLabel, values]) => {
         const rowTotal = periods.reduce((sum, period) => sum + (values[period.key] || 0), 0);
         return `<tr><td>${escapeHtml(rowLabel)}</td>${periods.map(period => `<td>${values[period.key] === undefined ? '—' : escapeHtml(fmt.full(values[period.key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(rowTotal))}</td></tr>`;
       }).join('')}
-      <tr class="totals-grand-row"><td>Grand Total</td>${periods.map(period => `<td>${escapeHtml(fmt.full(periodTotals[period.key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(grandTotal))}</td></tr>
+      <tr class="totals-grand-row"><td>الإجمالي العام</td>${periods.map(period => `<td>${escapeHtml(fmt.full(periodTotals[period.key]))}</td>`).join('')}<td>${escapeHtml(fmt.full(grandTotal))}</td></tr>
     </tbody>`;
-  document.getElementById('totalsSub').textContent = `${config.valueCol} grouped by ${config.rowCol} · ${periods.length} ${granularity}${periods.length === 1 ? '' : 's'} · totals included`;
+  document.getElementById('totalsSub').textContent = `${config.valueCol} حسب ${config.rowCol} · ${periods.length} ${granularity === 'year' ? 'سنة' : 'شهر'}${entriesAll.length > entries.length ? ` · عرض أول ${entries.length} من ${entriesAll.length.toLocaleString()} صف` : ''}`;
 }
 
 /* =========================================================
@@ -1320,12 +1401,12 @@ function calculateKpiValue(rows, colName, agg) {
   if (colName === '__RECORDS__') {
     return {
       value: rows.length.toLocaleString(),
-      sub: `of ${state.rows.length.toLocaleString()} total`
+      sub: `من إجمالي ${state.rows.length.toLocaleString()}`
     };
   }
 
   const col = state.columns.find(c => c.name === colName);
-  if (!col) return { value: '—', sub: 'Field not found' };
+  if (!col) return { value: '—', sub: 'الحقل غير موجود' };
 
   let vals = rows.map(r => r[colName]).filter(v => v !== null && v !== undefined);
 
@@ -1339,7 +1420,7 @@ function calculateKpiValue(rows, colName, agg) {
     const uniq = new Set(vals.map(v => String(v))).size;
     return {
       value: uniq.toLocaleString(),
-      sub: `unique values`
+      sub: `قيم فريدة`
     };
   }
 
@@ -1352,7 +1433,7 @@ function calculateKpiValue(rows, colName, agg) {
       const avg = sum / numVals.length;
       return {
         value: fmt.num(sum),
-        sub: `avg ${fmt.num(avg)} · n=${numVals.length}`
+        sub: `المتوسط ${fmt.num(avg)} · العدد ${numVals.length}`
       };
     }
     if (agg === 'avg') {
@@ -1360,21 +1441,21 @@ function calculateKpiValue(rows, colName, agg) {
       const avg = sum / numVals.length;
       return {
         value: fmt.num(avg),
-        sub: `sum ${fmt.num(sum)} · n=${numVals.length}`
+        sub: `المجموع ${fmt.num(sum)} · العدد ${numVals.length}`
       };
     }
     if (agg === 'min') {
-      const min = Math.min(...numVals);
+      const min = minMax(numVals).min;
       return {
         value: fmt.num(min),
-        sub: `minimum value`
+        sub: `أدنى قيمة`
       };
     }
     if (agg === 'max') {
-      const max = Math.max(...numVals);
+      const max = minMax(numVals).max;
       return {
         value: fmt.num(max),
-        sub: `maximum value`
+        sub: `أعلى قيمة`
       };
     }
   }
@@ -1383,22 +1464,22 @@ function calculateKpiValue(rows, colName, agg) {
     const dateVals = vals.map(v => v instanceof Date ? v : new Date(v)).filter(d => !isNaN(d));
     if (dateVals.length === 0) return { value: '—', sub: `n=0` };
     if (agg === 'min') {
-      const minDate = new Date(Math.min(...dateVals));
+      const minDate = new Date(minMax(dateVals).min);
       return {
         value: minDate.toISOString().slice(0, 10),
-        sub: `earliest date`
+        sub: `أقدم تاريخ`
       };
     }
     if (agg === 'max') {
-      const maxDate = new Date(Math.max(...dateVals));
+      const maxDate = new Date(minMax(dateVals).max);
       return {
         value: maxDate.toISOString().slice(0, 10),
-        sub: `latest date`
+        sub: `أحدث تاريخ`
       };
     }
   }
 
-  return { value: '—', sub: 'N/A' };
+  return { value: '—', sub: 'غير متاح' };
 }
 
 function buildKPIs(rows){
@@ -1413,7 +1494,7 @@ function buildKPIs(rows){
     const removeBtn = document.createElement('button');
     removeBtn.className = 'kpi-remove';
     removeBtn.innerHTML = '&times;';
-    removeBtn.title = 'Remove metric';
+    removeBtn.title = 'حذف المؤشر';
     removeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       state.kpiConfigs = state.kpiConfigs.filter(cfg => cfg.id !== config.id);
@@ -1429,7 +1510,7 @@ function buildKPIs(rows){
     const colSelect = document.createElement('select');
     colSelect.className = 'kpi-select';
     
-    let html = `<option value="__RECORDS__" ${config.colName === '__RECORDS__' ? 'selected' : ''}>[Records]</option>`;
+    let html = `<option value="__RECORDS__" ${config.colName === '__RECORDS__' ? 'selected' : ''}>[السجلات]</option>`;
     state.columns.forEach(c => {
       html += `<option value="${escapeHtml(c.name)}" ${config.colName === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`;
     });
@@ -1442,30 +1523,30 @@ function buildKPIs(rows){
     function updateAggOptions(colName) {
       let aggs = [];
       if (colName === '__RECORDS__') {
-        aggs = [{val:'count', label:'Count'}];
+        aggs = [{val:'count', label:'عدد'}];
       } else {
         const col = state.columns.find(c => c.name === colName);
         const type = col ? col.type : 'text';
         if (type === 'number') {
           aggs = [
-            {val:'sum', label:'Sum'},
-            {val:'avg', label:'Avg'},
-            {val:'min', label:'Min'},
-            {val:'max', label:'Max'},
-            {val:'count', label:'Count'},
-            {val:'unique', label:'Unique'}
+            {val:'sum', label:'مجموع'},
+            {val:'avg', label:'متوسط'},
+            {val:'min', label:'أدنى'},
+            {val:'max', label:'أعلى'},
+            {val:'count', label:'عدد'},
+            {val:'unique', label:'قيم فريدة'}
           ];
         } else if (type === 'date') {
           aggs = [
-            {val:'min', label:'Min (Earliest)'},
-            {val:'max', label:'Max (Latest)'},
-            {val:'count', label:'Count'},
-            {val:'unique', label:'Unique'}
+            {val:'min', label:'الأقدم'},
+            {val:'max', label:'الأحدث'},
+            {val:'count', label:'عدد'},
+            {val:'unique', label:'قيم فريدة'}
           ];
         } else {
           aggs = [
-            {val:'count', label:'Count'},
-            {val:'unique', label:'Unique'}
+            {val:'count', label:'عدد'},
+            {val:'unique', label:'قيم فريدة'}
           ];
         }
       }
@@ -1531,7 +1612,7 @@ function buildKPIs(rows){
   addCard.innerHTML = `
     <div class="kpi-add-btn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      Add Metric
+      إضافة مؤشر
     </div>
   `;
   addCard.addEventListener('click', () => {
@@ -1563,7 +1644,7 @@ function buildCharts(rows){
   grid.innerHTML='';
 
   if(rows.length === 0){
-    grid.innerHTML = '<div class="chart-card span-12"><div class="empty-state">No records match the current filters.</div></div>';
+    grid.innerHTML = '<div class="chart-card span-12"><div class="empty-state">لا توجد سجلات تطابق الفلاتر الحالية.</div></div>';
     return;
   }
 
@@ -1577,7 +1658,7 @@ function buildCharts(rows){
   addCard.innerHTML = `
     <div class="kpi-add-btn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      Add Chart
+      إضافة رسم
     </div>
   `;
   addCard.addEventListener('click', () => {
@@ -1606,8 +1687,8 @@ function buildCharts(rows){
       xCol: numCols[0]?.name || '',
       yCol: numCols[1]?.name || numCols[0]?.name || '',
       agg: 'sum',
-      title: defaultVal ? `${defaultVal} by ${defaultCat}` : `Count by ${defaultCat}`,
-      sub: defaultVal ? 'Aggregated sum' : 'Record count'
+      title: defaultVal ? `${defaultVal} حسب ${defaultCat}` : `العدد حسب ${defaultCat}`,
+      sub: defaultVal ? 'مجموع مجمّع' : 'عدد السجلات'
     });
 
     buildCharts(rows);
@@ -1628,12 +1709,12 @@ function renderChart(cfg, rows, grid){
   // Chart type select
   let typeSelectHtml = `
     <select data-role="type">
-      <option value="bar" ${cfg.type==='bar'?'selected':''}>Bar</option>
-      <option value="line" ${cfg.type==='line'?'selected':''}>Line</option>
-      <option value="doughnut" ${cfg.type==='doughnut'?'selected':''}>Donut</option>
-      <option value="scatter" ${cfg.type==='scatter'?'selected':''}>Scatter</option>
-      <option value="histogram" ${cfg.type==='histogram'?'selected':''}>Hist</option>
-      <option value="bar-count" ${cfg.type==='bar-count'?'selected':''}>Counts</option>
+      <option value="bar" ${cfg.type==='bar'?'selected':''}>أعمدة</option>
+      <option value="line" ${cfg.type==='line'?'selected':''}>خطي</option>
+      <option value="doughnut" ${cfg.type==='doughnut'?'selected':''}>دائري</option>
+      <option value="scatter" ${cfg.type==='scatter'?'selected':''}>انتشار</option>
+      <option value="histogram" ${cfg.type==='histogram'?'selected':''}>توزيع</option>
+      <option value="bar-count" ${cfg.type==='bar-count'?'selected':''}>تكرارات</option>
     </select>
   `;
 
@@ -1641,62 +1722,62 @@ function renderChart(cfg, rows, grid){
   let paramHtml = '';
   if(cfg.type === 'line'){
     paramHtml += `
-      <select data-role="date" title="Date Field">
+      <select data-role="date" title="حقل التاريخ">
         ${dateCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.dateCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select data-role="val" title="Value Field">
+      <select data-role="val" title="حقل القيمة">
         ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select data-role="granularity" title="Time grouping">
-        <option value="month" ${(cfg.granularity || 'month')==='month'?'selected':''}>By month</option>
-        <option value="year" ${cfg.granularity==='year'?'selected':''}>By year</option>
+      <select data-role="granularity" title="التجميع الزمني">
+        <option value="month" ${(cfg.granularity || 'month')==='month'?'selected':''}>شهري</option>
+        <option value="year" ${cfg.granularity==='year'?'selected':''}>سنوي</option>
       </select>
     `;
   } else if(cfg.type === 'bar'){
     paramHtml += `
-      <select data-role="cat" title="Category Field">
+      <select data-role="cat" title="حقل الفئة">
         ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select data-role="val" title="Value Field">
-        ${allCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)} (${c.type})</option>`).join('')}
+      <select data-role="val" title="حقل القيمة">
+        ${allCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)} (${TYPE_AR[c.type]})</option>`).join('')}
       </select>
-      <select data-role="agg" title="Aggregation">
-        <option value="sum" ${cfg.agg==='sum'?'selected':''}>Sum</option>
-        <option value="avg" ${cfg.agg==='avg'?'selected':''}>Avg</option>
-        <option value="count" ${cfg.agg==='count'?'selected':''}>Count</option>
+      <select data-role="agg" title="التجميع">
+        <option value="sum" ${cfg.agg==='sum'?'selected':''}>مجموع</option>
+        <option value="avg" ${cfg.agg==='avg'?'selected':''}>متوسط</option>
+        <option value="count" ${cfg.agg==='count'?'selected':''}>عدد</option>
       </select>
     `;
   } else if(cfg.type === 'doughnut'){
     paramHtml += `
-      <select data-role="cat" title="Category Field">
+      <select data-role="cat" title="حقل الفئة">
         ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
     `;
   } else if(cfg.type === 'scatter'){
     paramHtml += `
-      <select data-role="x" title="X Field">
+      <select data-role="x" title="المحور الأفقي">
         ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.xCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
-      <select data-role="y" title="Y Field">
+      <select data-role="y" title="المحور الرأسي">
         ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.yCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
     `;
   } else if(cfg.type === 'histogram'){
     paramHtml += `
-      <select data-role="val" title="Value Field">
+      <select data-role="val" title="حقل القيمة">
         ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
     `;
   } else if(cfg.type === 'bar-count'){
     paramHtml += `
-      <select data-role="cat" title="Category Field">
+      <select data-role="cat" title="حقل الفئة">
         ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
     `;
   }
 
   const removeBtnHtml = `
-    <button class="chart-remove" title="Remove chart" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px;">&times;</button>
+    <button class="chart-remove" title="حذف الرسم" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px;">&times;</button>
   `;
 
   card.innerHTML = `
@@ -1733,31 +1814,31 @@ function renderChart(cfg, rows, grid){
           cfg.dateCol = dateCols[0]?.name || state.columns.find(c => c.type === 'date')?.name || '';
           cfg.valueCol = numCols[0]?.name || '';
           cfg.granularity = 'month';
-          cfg.title = `${cfg.valueCol} over time`;
-          cfg.sub = `Trended by ${cfg.dateCol}`;
+          cfg.title = `${cfg.valueCol} عبر الزمن`;
+          cfg.sub = `حسب ${cfg.dateCol}`;
         } else if (val === 'bar') {
           cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
           cfg.valueCol = numCols[0]?.name || '';
           cfg.agg = 'sum';
-          cfg.title = `${cfg.valueCol} by ${cfg.catCol}`;
-          cfg.sub = 'Aggregated sum';
+          cfg.title = `${cfg.valueCol} حسب ${cfg.catCol}`;
+          cfg.sub = 'مجموع مجمّع';
         } else if (val === 'doughnut') {
           cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
-          cfg.title = `Records by ${cfg.catCol}`;
-          cfg.sub = 'Share of total';
+          cfg.title = `السجلات حسب ${cfg.catCol}`;
+          cfg.sub = 'النسبة من الإجمالي';
         } else if (val === 'scatter') {
           cfg.xCol = numCols[0]?.name || '';
           cfg.yCol = numCols[1]?.name || numCols[0]?.name || '';
-          cfg.title = `${cfg.xCol} vs ${cfg.yCol}`;
-          cfg.sub = 'Correlation view';
+          cfg.title = `${cfg.xCol} مقابل ${cfg.yCol}`;
+          cfg.sub = 'عرض الارتباط';
         } else if (val === 'histogram') {
           cfg.valueCol = numCols[0]?.name || '';
-          cfg.title = `Distribution of ${cfg.valueCol}`;
-          cfg.sub = 'Frequency by bin';
+          cfg.title = `توزيع ${cfg.valueCol}`;
+          cfg.sub = 'التكرار حسب الفئة';
         } else if (val === 'bar-count') {
           cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
-          cfg.title = `Top values: ${cfg.catCol}`;
-          cfg.sub = 'Record count';
+          cfg.title = `أكثر القيم: ${cfg.catCol}`;
+          cfg.sub = 'عدد السجلات';
         }
         buildCharts(rows);
         return;
@@ -1773,23 +1854,23 @@ function renderChart(cfg, rows, grid){
 
       // Update title strings
       if (cfg.type === 'line') {
-        cfg.title = `${cfg.valueCol} over time`;
-        cfg.sub = `Trended by ${cfg.dateCol}`;
+        cfg.title = `${cfg.valueCol} عبر الزمن`;
+        cfg.sub = `حسب ${cfg.dateCol}`;
       } else if (cfg.type === 'bar') {
-        cfg.title = `${cfg.valueCol} by ${cfg.catCol}`;
-        cfg.sub = `Aggregated ${cfg.agg}`;
+        cfg.title = `${cfg.valueCol} حسب ${cfg.catCol}`;
+        cfg.sub = `تجميع: ${AGG_AR[cfg.agg] || cfg.agg}`;
       } else if (cfg.type === 'doughnut') {
-        cfg.title = `Records by ${cfg.catCol}`;
-        cfg.sub = 'Share of total';
+        cfg.title = `السجلات حسب ${cfg.catCol}`;
+        cfg.sub = 'النسبة من الإجمالي';
       } else if (cfg.type === 'scatter') {
-        cfg.title = `${cfg.xCol} vs ${cfg.yCol}`;
-        cfg.sub = 'Correlation view';
+        cfg.title = `${cfg.xCol} مقابل ${cfg.yCol}`;
+        cfg.sub = 'عرض الارتباط';
       } else if (cfg.type === 'histogram') {
-        cfg.title = `Distribution of ${cfg.valueCol}`;
-        cfg.sub = 'Frequency by bin';
+        cfg.title = `توزيع ${cfg.valueCol}`;
+        cfg.sub = 'التكرار حسب الفئة';
       } else if (cfg.type === 'bar-count') {
-        cfg.title = `Top values: ${cfg.catCol}`;
-        cfg.sub = 'Record count';
+        cfg.title = `أكثر القيم: ${cfg.catCol}`;
+        cfg.sub = 'عدد السجلات';
       }
 
       card.querySelector('.chart-title').textContent = cfg.title;
@@ -1813,16 +1894,17 @@ function drawChart(cfg, rows, canvasId){
   const baseOpts = {
     responsive:true, maintainAspectRatio:false,
     plugins:{
-      legend:{labels:{font:{family:"'Geist', sans-serif", size:11}, color:chartText}},
+      legend:{rtl:true, textDirection:'rtl', labels:{font:{family:"'Geist','IBM Plex Sans Arabic', sans-serif", size:11}, color:chartText}},
       tooltip:{
-        backgroundColor:themeColor('--tooltip-bg'), titleFont:{family:"'Geist', sans-serif",size:12}, bodyFont:{family:"'Geist Mono', monospace", size:11},
+        rtl:true, textDirection:'rtl',
+        backgroundColor:themeColor('--tooltip-bg'), titleFont:{family:"'Geist','IBM Plex Sans Arabic', sans-serif",size:12}, bodyFont:{family:"'Geist Mono','IBM Plex Sans Arabic', monospace", size:11},
         padding:10, cornerRadius:4
       }
     },
     scales:{}
   };
   const gridStyle = {color:themeColor('--chart-grid'), drawBorder:false};
-  const tickStyle = {color:themeColor('--chart-tick'), font:{family:"'Geist Mono', monospace", size:10}};
+  const tickStyle = {color:themeColor('--chart-tick'), font:{family:"'Geist Mono','IBM Plex Sans Arabic', monospace", size:10}};
 
   let chart;
 
@@ -1859,7 +1941,7 @@ function drawChart(cfg, rows, canvasId){
       data:{
         labels: entries.map(e=>e[0]),
         datasets:[{
-          label: useCount ? 'Count' : cfg.valueCol,
+          label: useCount ? 'العدد' : cfg.valueCol,
           data: entries.map(e=>e[1]),
           backgroundColor: palette[0],
           borderRadius:3, borderSkipped:false,
@@ -1922,7 +2004,7 @@ function drawChart(cfg, rows, canvasId){
     if(entries.length > 8){
       const top = entries.slice(0,7);
       const otherSum = entries.slice(7).reduce((s,e)=>s+e[1],0);
-      entries = [...top, ['Other', otherSum]];
+      entries = [...top, ['أخرى', otherSum]];
     }
     chart = new Chart(ctx,{
       type:'doughnut',
@@ -1938,14 +2020,20 @@ function drawChart(cfg, rows, canvasId){
   } else if(cfg.type==='scatter'){
     const data = rows.filter(r=>r[cfg.xCol]!==null && r[cfg.yCol]!==null && !isNaN(r[cfg.xCol]) && !isNaN(r[cfg.yCol]))
       .map(r=>({x:r[cfg.xCol], y:r[cfg.yCol]}));
+    if(data.length > LIMITS.scatterPoints){
+      const every = data.length / LIMITS.scatterPoints;
+      const sampled = [];
+      for(let i = 0; i < LIMITS.scatterPoints; i++) sampled.push(data[Math.floor(i * every)]);
+      data.length = 0; data.push(...sampled);
+    }
     chart = new Chart(ctx,{
       type:'scatter',
       data:{datasets:[{label:`${cfg.xCol} × ${cfg.yCol}`, data, backgroundColor:'rgba(210,80,42,0.55)', borderColor:palette[0], pointRadius:3.5, pointHoverRadius:5}]},
       options:{...baseOpts,
         plugins:{...baseOpts.plugins, legend:{display:false}},
         scales:{
-          x:{title:{display:true,text:cfg.xCol,color:chartText,font:{family:"'Geist Mono', monospace",size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}},
-          y:{title:{display:true,text:cfg.yCol,color:chartText,font:{family:"'Geist Mono', monospace",size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}}
+          x:{title:{display:true,text:cfg.xCol,color:chartText,font:{family:"'Geist Mono','IBM Plex Sans Arabic', monospace",size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}},
+          y:{title:{display:true,text:cfg.yCol,color:chartText,font:{family:"'Geist Mono','IBM Plex Sans Arabic', monospace",size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}}
         }
       }
     });
@@ -1986,7 +2074,7 @@ const tableSearch = document.getElementById('tableSearch');
 tableSearch.addEventListener('input', e=>{
   state.search = e.target.value;
   state.page = 1;
-  refreshAll();
+  refreshSoon();
 });
 
 document.getElementById('pagePrev').addEventListener('click', ()=>{ state.page--; refreshAll(); });
@@ -2002,7 +2090,7 @@ function buildTable(rows){
       if(av===null) return 1;
       if(bv===null) return -1;
       if(c.type==='number' || c.type==='date'){ return (av-bv)*state.sortDir; }
-      return String(av).localeCompare(String(bv))*state.sortDir;
+      return collator.compare(String(av), String(bv))*state.sortDir;
     });
   }
 
@@ -2042,11 +2130,11 @@ function buildTable(rows){
   });
 
   document.getElementById('tableInfo').textContent =
-    total ? `Showing ${(startIdx+1).toLocaleString()}–${Math.min(startIdx+state.perPage, total).toLocaleString()} of ${total.toLocaleString()}` : 'No matching records';
+    total ? `عرض ${(startIdx+1).toLocaleString()}–${Math.min(startIdx+state.perPage, total).toLocaleString()} من ${total.toLocaleString()}` : 'لا توجد سجلات مطابقة';
   document.getElementById('pageLabel').textContent = `${state.page} / ${totalPages}`;
   document.getElementById('pagePrev').disabled = state.page<=1;
   document.getElementById('pageNext').disabled = state.page>=totalPages;
-  document.getElementById('tableSub').textContent = `${cols.length} columns · live filtered`;
+  document.getElementById('tableSub').textContent = `${cols.length} عمود · فلترة مباشرة`;
 }
 
 /* =========================================================

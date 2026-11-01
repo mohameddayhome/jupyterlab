@@ -2,7 +2,7 @@
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = '14';
+const CLIENT_VERSION = '15';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -10,7 +10,7 @@ const I18N = {
     app: 'CRM Console', caption: 'إدارة العملاء والتحصيل', eyebrow: 'نظام إدارة العملاء',
     workspace: 'مساحة العمل', reports: 'التقارير والمتابعة', admin: 'الإدارة',
     p_dashboard: 'لوحة التحكم', p_customers: 'العملاء', p_transactions: 'معاملات العملاء', p_groups: 'مجموعات العملاء',
-    p_balances: 'تقرير الأرصدة', p_paid: 'الفواتير المسددة', p_overdue: 'تقرير المتأخرات', p_credit: 'تجاوز حد الائتمان',
+    p_balances: 'تقرير الأرصدة', p_paid: 'الفواتير المسددة', p_overdue: 'تقرير المتأخرات', p_opening: 'تأخير سداد الرصيد الافتتاحي', p_credit: 'تجاوز حد الائتمان',
     p_followup: 'متابعة المتأخرات', p_collection: 'لوحة فريق التحصيل', p_currencies: 'العملات وأسعار الصرف',
     p_import: 'استيراد البيانات', p_users: 'المستخدمون والصلاحيات',
     s_dashboard: 'ملخص الأرصدة والتحصيل والمتأخرات لحظياً.',
@@ -19,7 +19,12 @@ const I18N = {
     s_groups: 'تصنيف العملاء حسب المجموعات.',
     s_balances: 'الرصيد الافتتاحي وحركات الفترة والرصيد الختامي لكل عميل حسب الفلتر.',
     s_paid: 'الفواتير التي تم سدادها بالكامل خلال الفترة (تسوية الأقدم فالأحدث).',
-    s_overdue: 'الفواتير المفتوحة التي تجاوزت تاريخ التحصيل المتوقع (تاريخ التسليم). الأرصدة الافتتاحية والسداد والتسويات لا تدخل في التأخير.',
+    s_overdue: 'أيام التأخير = (تاريخ التقرير − تاريخ التسليم) − أيام السداد للعميل، للفواتير فقط. الأرصدة الافتتاحية لها تقرير مستقل.',
+    s_opening: 'متابعة سداد الأرصدة الافتتاحية عبر السنوات: ما حُصّل منها وفي أي سنة، والمتبقي ومدة بقائه (من تاريخ الرصيد الافتتاحي).',
+    ob_year: 'سنة الرصيد', ob_status: 'الحالة', ob_open: 'غير مسدد', ob_paid: 'مسدد بالكامل', ob_total: 'الأرصدة الافتتاحية', ob_collected: 'المحصل منها',
+    ob_remaining: 'المتبقي', ob_rate: 'نسبة التحصيل', ob_avgAge: 'متوسط عمر المتبقي', ob_years: 'سنة', ob_age: 'العمر', ob_byYear: 'حسب سنة الرصيد الافتتاحي',
+    ob_collectedIn: 'حُصّل في {y}', ob_count: 'عدد الأرصدة', ob_openN: 'غير مسدد', ob_detail: 'تفاصيل الأرصدة', ob_paidDate: 'تاريخ السداد الكامل',
+    y1: 'حتى سنة', y2: '1 - 2 سنة', y3: '2 - 3 سنوات', y4: 'أكثر من 3 سنوات', ob_none: 'لا توجد أرصدة افتتاحية مدينة مطابقة.',
     s_credit: 'العملاء الذين تجاوز رصيدهم حد الائتمان (بعملة العميل).',
     s_followup: 'متابعة العملاء المتأخرين وتسجيل الاتصالات والوعود بالسداد.',
     s_collection: 'مسؤول التحصيل، الشركات التابعة له، المتأخرات وأيام التأخير.',
@@ -181,7 +186,7 @@ const I18N = {
     app: 'CRM Console', caption: 'Customers & Collections', eyebrow: 'Internal CRM',
     workspace: 'Workspace', reports: 'Reports & follow-up', admin: 'Administration',
     p_dashboard: 'Dashboard', p_customers: 'Customers', p_transactions: 'Customer transactions', p_groups: 'Customer groups',
-    p_balances: 'Balances report', p_paid: 'Paid invoices', p_overdue: 'Overdue report', p_credit: 'Credit limit exceeded',
+    p_balances: 'Balances report', p_paid: 'Paid invoices', p_overdue: 'Overdue report', p_opening: 'Opening balance delay', p_credit: 'Credit limit exceeded',
     p_followup: 'Overdue follow-up', p_collection: 'Collection team', p_currencies: 'Currencies & rates',
     p_import: 'Import data', p_users: 'Users & permissions',
     s_dashboard: 'Live summary of balances, collections and overdue amounts.',
@@ -190,7 +195,12 @@ const I18N = {
     s_groups: 'Customer segmentation by group.',
     s_balances: 'Opening balance, period activity and closing balance per customer.',
     s_paid: 'Invoices fully settled within the period (oldest-first settlement).',
-    s_overdue: 'Open invoices past their expected collection date (delivery date). Opening balances, payments and adjustments are never overdue.',
+    s_overdue: 'Days late = (report date − delivery date) − customer payment days, invoices only. Opening balances have their own report.',
+    s_opening: 'Follow opening balances across the years: what was collected and in which year, what is left and for how long (from the opening balance date).',
+    ob_year: 'Balance year', ob_status: 'Status', ob_open: 'Unpaid', ob_paid: 'Fully paid', ob_total: 'Opening balances', ob_collected: 'Collected',
+    ob_remaining: 'Remaining', ob_rate: 'Collection rate', ob_avgAge: 'Average age of remaining', ob_years: 'yr', ob_age: 'Age', ob_byYear: 'By opening-balance year',
+    ob_collectedIn: 'Collected in {y}', ob_count: 'Balances', ob_openN: 'Unpaid', ob_detail: 'Opening balances detail', ob_paidDate: 'Fully paid on',
+    y1: 'Up to 1 year', y2: '1 - 2 years', y3: '2 - 3 years', y4: 'Over 3 years', ob_none: 'No matching debit opening balances.',
     s_credit: 'Customers whose balance exceeds their credit limit (customer currency).',
     s_followup: 'Follow up late customers, log calls and payment promises.',
     s_collection: 'Collector, assigned companies, overdue amounts and days late.',
@@ -362,6 +372,7 @@ const PAGES = [
   { id: 'balances', glyph: '≡', sec: 'reports' },
   { id: 'paid', glyph: '✓', sec: 'reports' },
   { id: 'overdue', glyph: '!', sec: 'reports' },
+  { id: 'opening', glyph: '⌛', sec: 'reports' },
   { id: 'credit', glyph: '⚑', sec: 'reports' },
   { id: 'followup', glyph: '☎', sec: 'reports' },
   { id: 'collection', glyph: '◉', sec: 'reports' },
@@ -846,7 +857,7 @@ function permSummary(r) {
 
 const SETTING_INPUTS = ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'SessionMinutes'];
 const SETTING_TEXTS = ['BankDetails', 'StatementNote'];
-const SETTING_SELECTS = { DeliveryTerms: ['terms', 'zero'], LateFallback: ['due', 'none'] };
+const SETTING_SELECTS = { LateFallback: ['due', 'none'] };
 
 // ───────── Data lists ─────────
 const editDel = () => (can('edit') ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') + (can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '');
@@ -1526,6 +1537,20 @@ const VIEWS = {
     runReport();
   },
 
+  opening() {
+    const f = S.rep.opening = S.rep.opening || { asOf: today(), obStatus: 'open' };
+    const y0 = new Date().getFullYear(), years = Array.from({ length: 12 }, (_, i) => String(y0 - i)).map(y => [y, y]);
+    setContent(heading('opening', reportBtns()) + `
+      <div class="panel view-tools" id="repTools">
+        ${tool('asOf', t('asOf'), 'date', f.asOf)}${tool('year', t('ob_year'), 'select', f.year, years)}
+        ${tool('obStatus', t('ob_status'), 'select', f.obStatus, [['open', t('ob_open')], ['paid', t('ob_paid')]])}
+        ${tool('group', t('f_group'), 'select', f.group, groupOpts())}${tool('collector', t('f_collector'), 'select', f.collector, collectorOpts())}
+        ${tool('account', t('f_account'), 'customer', f.account)}${curTool(f)}
+        <div class="tool-btns">${btn('runReport', t('run'))}</div></div>
+      <div id="repOut"><div class="skeleton">${t('loading')}</div></div>`);
+    runReport();
+  },
+
   overdue() {
     const f = S.rep.overdue = S.rep.overdue || { asOf: today(), minDays: 1, tab: 'inv' };
     setContent(heading('overdue', reportBtns()) + `
@@ -1774,6 +1799,40 @@ async function runReport() {
       <section class="panel">${byCust
         ? table('overdueCust', custCols, custRows, { click: true, sortable: false, foot: footRow(custCols, { remaining: sumRem }, t('all')) })
         : table('overdue', invCols, rows, { click: true, sortable: false, foot: footRow(invCols, { remaining: sumRem, amount: rows.reduce((a, x) => a + x.amount, 0) }, t('all')) })}</section>`;
+  } else if (view === 'opening') {
+    const r = await call('reportOpeningAging', f);
+    if (S.view !== view) return;
+    const cc = r.currency, T = r.totals;
+    const age = v => `<span dir="ltr">${NI.format(v)}</span> ${t('day')}`;
+    const sumK = (a, k) => a.reduce((n, x) => n + (+x[k] || 0), 0);
+    const cols = [{ k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'voucher', l: t('f_voucher') }, { k: 'date', l: t('f_date') },
+      { k: 'year', l: t('ob_year') }, { k: 'amount', l: t('amount') + ' ' + cc, num: true }, { k: 'collected', l: t('ob_collected'), num: true },
+      { k: 'remaining', l: t('ob_remaining'), num: true }, { k: 'rate', l: t('ob_rate'), f: v => `<span dir="ltr">${NI.format(v)}%</span>`, x: x => x.rate / 100, p: x => x.rate + '%' },
+      { k: 'days', l: t('days'), f: (v, x) => x.status === 'open' ? daysPill(v) : age(v), x: x => x.days },
+      { k: 'years', l: t('ob_age'), f: v => `<span dir="ltr">${v}</span> ${t('ob_years')}` },
+      { k: 'lastPaymentDate', l: t('lastPayment') }, { k: 'paidDate', l: t('ob_paidDate') }, collCol];
+    const yCols = [{ k: 'year', l: t('ob_year') }, { k: 'count', l: t('ob_count'), num: true, f: v => NI.format(v) }, { k: 'open', l: t('ob_openN'), num: true, f: v => NI.format(v) },
+      { k: 'amount', l: t('ob_total'), num: true }]
+      .concat(r.payYears.map(y => ({ k: 'p' + y, l: t('ob_collectedIn', { y }), num: true })))
+      .concat([{ k: 'remaining', l: t('ob_remaining'), num: true }, { k: 'rate', l: t('ob_rate'), f: v => `<span dir="ltr">${NI.format(v)}%</span>`, x: x => x.rate / 100, p: x => x.rate + '%' }]);
+    const yRows = r.years.map(y => Object.assign({}, y, Object.fromEntries(r.payYears.map(p => ['p' + p, y.byPayYear[p] || 0]))));
+    const yTot = { amount: T.amount, remaining: T.remaining, count: { html: NI.format(T.count) }, open: { html: NI.format(T.open) }, rate: { html: `<span dir="ltr">${T.rate}%</span>` } };
+    r.payYears.forEach(p => { yTot['p' + p] = yRows.reduce((a, y) => a + y['p' + p], 0); });
+    S.exportData = { name: 'opening_balance_delay_' + r.asOf, cols, rows: r.rows, totals: { amount: sumK(r.rows, 'amount'), collected: sumK(r.rows, 'collected'), remaining: sumK(r.rows, 'remaining') },
+      summary: [[t('ob_total'), money(T.amount) + ' ' + cc], [t('ob_collected'), money(T.collected) + ' ' + cc], [t('ob_remaining'), money(T.remaining) + ' ' + cc], [t('ob_rate'), T.rate + '%']] };
+    const bandTotal = Object.values(r.bands).reduce((a, b) => a + b, 0);
+    out().innerHTML = missingNotice(r) + (!T.count ? `<div class="panel empty">${t('ob_none')}</div>` : `<section class="stats four">
+        ${stat(t('ob_total'), money(T.amount) + curTag(cc), '◐', '', `<span>${NI.format(T.count)} ${t('ob_count')}</span>`)}
+        ${stat(t('ob_collected'), money(T.collected) + curTag(cc), '✓', 'green', `<span class="trend">${T.rate}%</span><span>${t('ob_rate')}</span>`)}
+        ${stat(t('ob_remaining'), money(T.remaining) + curTag(cc), '!', 'red', `<span>${NI.format(T.open)} ${t('ob_openN')}</span>`)}
+        ${stat(t('ob_avgAge'), `<span dir="ltr">${T.avgYears}</span> <small>${t('ob_years')}</small>`, '⌛', 'amber')}</section>
+      <section class="panel" style="padding:14px 16px;margin-bottom:16px"><div class="legend" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+        ${['y1', 'y2', 'y3', 'y4'].map((b, i) => `<div><div class="legend-row"><i class="dot ${['', 'amber', 'orange', 'red'][i]}"></i>${t(b)} <b style="color:var(--text)">${money(r.bands[b])}</b></div>
+          <div class="meter"><i style="width:${bandTotal ? r.bands[b] / bandTotal * 100 : 0}%;background:var(--${['green', 'amber', 'orange', 'red'][i]})"></i></div></div>`).join('')}</div></section>
+      <section class="panel section"><div class="section-head"><h2 class="section-title">${t('ob_byYear')}</h2></div>
+        ${table('openingYears', yCols, yRows, { sortable: false, foot: footRow(yCols, yTot, t('all')) })}</section>
+      <section class="panel section"><div class="section-head"><h2 class="section-title">${t('ob_detail')}</h2><span class="badge blue">${NI.format(r.rows.length)}</span></div>
+        ${table('opening', cols, r.rows, { click: true, sortable: false, foot: footRow(cols, S.exportData.totals, t('all')) })}</section>`);
   } else if (view === 'credit') {
     const r = await call('reportCreditLimit', f);
     if (S.view !== view) return;
@@ -2664,7 +2723,7 @@ function rowOf(el) {
 }
 
 // Rows that open the customer 360 drawer when clicked.
-const ROW_CUSTOMER_VIEWS = ['collectionsDet', 'perfDrawer', 'receipts', 'customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'credit', 'collFlat', 'collDrawer'];
+const ROW_CUSTOMER_VIEWS = ['opening', 'collectionsDet', 'perfDrawer', 'receipts', 'customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'credit', 'collFlat', 'collDrawer'];
 
 document.addEventListener('click', e => {
   const goEl = e.target.closest('[data-go]');

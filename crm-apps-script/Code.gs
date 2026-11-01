@@ -78,7 +78,7 @@ const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'credit
 const BOOL_FIELDS = ['isDeleted', 'canAdd', 'canEdit', 'canDelete', 'canPost', 'isCollector', 'active'];
 
 const ALL_PAGES = ['dashboard', 'customers', 'transactions', 'receipts', 'adjustments', 'groups', 'statement', 'balances', 'paid',
-  'overdue', 'credit', 'followup', 'collection', 'collections', 'performance', 'currencies', 'import', 'users'];
+  'overdue', 'opening', 'credit', 'followup', 'collection', 'collections', 'performance', 'currencies', 'import', 'users'];
 const PAY_METHODS = ['Cash', 'Cheque', 'Transfer'];
 /** Actions that make sense on each page (permissions matrix). */
 const PAGE_ACTIONS = {
@@ -91,7 +91,7 @@ const PAGE_ACTIONS = {
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies', Adjustments: 'adjustments' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = '14';
+const APP_VERSION = '15';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -159,7 +159,7 @@ function setup() {
   }
   const settings = readTable('Settings');
   const defaults = { AppName: 'CRM Console', LocalCurrency: 'SAR', ReportCurrency: 'SAR', ConversionBasis: 'local', CompanyName: 'My Company',
-    DeliveryTerms: 'zero', LateFallback: 'due',
+    LateFallback: 'due',
     CompanyAddress: '', CompanyPhone: '', CompanyEmail: '', BankDetails: '', StatementNote: '', SessionMinutes: 60 };
   const toAdd = Object.keys(defaults).filter(function (k) {
     return !settings.some(function (s) { return s.key === k; });
@@ -1744,7 +1744,7 @@ function ledger_(user, asOf, display) {
   tx.forEach(function (t) { (byCust[t.account] = byCust[t.account] || []).push(t); });
   const links = allocationsByPayment_();
   const st = getSettings_();
-  const lateRule = { terms: st.DeliveryTerms !== 'zero', fallback: st.LateFallback === 'none' ? 'none' : 'due' };
+  const lateRule = { terms: true, fallback: st.LateFallback === 'none' ? 'none' : 'due' };
   const invoices = [];
   Object.keys(byCust).forEach(function (acc) {
     const list = byCust[acc].sort(function (a, b) {
@@ -1802,7 +1802,7 @@ function ledger_(user, asOf, display) {
 
 /**
  * Expected collection date of an invoice — the date lateness is measured from:
- * delivery date (+ the customer's payment days unless DeliveryTerms = zero); without a delivery date
+ * delivery date + the customer's payment days (days late = report date − delivery date − payment days); without a delivery date
  * either the due date / date + terms (LateFallback = due) or never late (LateFallback = none).
  */
 const NEVER = '9999-12-31';
@@ -1885,7 +1885,7 @@ function reportBalances(token, f) {
 /** Customer statement of account with running balance. */
 function customerStatement(token, account, dateFrom, dateTo, currency) {
   const user = auth_(token);
-  const pages = ['customers', 'balances', 'paid', 'overdue', 'followup', 'collection', 'dashboard', 'credit', 'transactions', 'statement', 'receipts'];
+  const pages = ['customers', 'balances', 'paid', 'overdue', 'opening', 'followup', 'collection', 'dashboard', 'credit', 'transactions', 'statement', 'receipts'];
   if (!pages.some(function (p) { return user.pageList.indexOf(p) > -1; })) throw new Error('NO_PERMISSION');
   assertCustomerVisible_(user, account);
   const from = dateFrom || '1900-01-01', to = dateTo || today_();
@@ -1947,6 +1947,67 @@ function reportPaidInvoices(token, f) {
   }).sort(function (a, b) { return a.paidDate < b.paidDate ? 1 : -1; });
   const onTime = rows.filter(function (r) { return r.lateDays === 0; }).length;
   return Object.assign(fxInfo_(L.fx), { rows: rows, totals: { amount: sum_(rows, 'amount'), count: rows.length, onTime: onTime, late: rows.length - onTime } });
+}
+
+/**
+ * Opening-balance collection delay — follows each debit "Opening balance" across the years:
+ * how much was collected from it (oldest-first settlement), in which year, what is left and for how long.
+ * Age = report date − opening balance date (or until it was fully paid).
+ */
+function reportOpeningAging(token, f) {
+  const user = auth_(token, 'opening');
+  f = f || {};
+  const asOf = f.asOf || today_();
+  const status = f.obStatus === undefined ? 'open' : f.obStatus; // f.status is the customer status filter
+  const L = ledger_(user, asOf, f.currency);
+  const all = L.invoices.filter(function (i) {
+    return isOpening_(i) && customerFilter_(L.cmap[i.account], f) && (!f.year || String(i.date).slice(0, 4) === String(f.year));
+  });
+  const band = function (d) { return d <= 365 ? 'y1' : d <= 730 ? 'y2' : d <= 1095 ? 'y3' : 'y4'; };
+  const rows = all.map(function (i) {
+    const c = L.cmap[i.account];
+    const open = i.remaining > 0.005;
+    const days = Math.max(0, daysBetween_(i.date, open ? asOf : i.paidDate));
+    return {
+      account: i.account, name: c.name, group: c.group, collector: c.collector, phone: c.phone,
+      voucher: i.voucher, date: i.date, year: String(i.date).slice(0, 4), amount: i.amount,
+      collected: round2_(i.amount - i.remaining), remaining: open ? i.remaining : 0,
+      rate: i.amount ? Math.round((i.amount - i.remaining) / i.amount * 100) : 0,
+      lastPaymentDate: i.lastPaymentDate, paidDate: open ? '' : i.paidDate, days: days,
+      years: Math.round(days / 365 * 10) / 10, band: band(days), status: open ? 'open' : 'paid', payments: i.payments
+    };
+  });
+  // year of the opening balance × year the money came in
+  const payYears = {}, byYear = {};
+  rows.forEach(function (r) {
+    const y = byYear[r.year] = byYear[r.year] || { year: r.year, count: 0, customers: {}, amount: 0, collected: 0, remaining: 0, open: 0, byPayYear: {} };
+    y.count++; y.customers[r.account] = true;
+    y.amount = round2_(y.amount + r.amount); y.collected = round2_(y.collected + r.collected); y.remaining = round2_(y.remaining + r.remaining);
+    if (r.status === 'open') y.open++;
+    r.payments.forEach(function (p) {
+      const py = String(p.date).slice(0, 4);
+      payYears[py] = true;
+      y.byPayYear[py] = round2_((y.byPayYear[py] || 0) + p.amount);
+    });
+  });
+  const years = Object.keys(byYear).sort().map(function (k) {
+    const y = byYear[k];
+    return { year: y.year, count: y.count, customers: Object.keys(y.customers).length, open: y.open, amount: y.amount, collected: y.collected,
+      remaining: y.remaining, rate: y.amount ? Math.round(y.collected / y.amount * 100) : 0, byPayYear: y.byPayYear };
+  });
+  const listed = rows.filter(function (r) { return !status || r.status === status; })
+    .sort(function (a, b) { return b.remaining - a.remaining || b.days - a.days; });
+  listed.forEach(function (r) { delete r.payments; });
+  const bands = { y1: 0, y2: 0, y3: 0, y4: 0 };
+  rows.forEach(function (r) { if (r.remaining) bands[r.band] = round2_(bands[r.band] + r.remaining); });
+  const openRows = rows.filter(function (r) { return r.status === 'open'; });
+  return Object.assign(fxInfo_(L.fx), {
+    asOf: asOf, rows: listed, years: years, payYears: Object.keys(payYears).sort(), bands: bands,
+    totals: { amount: sum_(rows, 'amount'), collected: sum_(rows, 'collected'), remaining: sum_(rows, 'remaining'),
+      rate: sum_(rows, 'amount') ? Math.round(sum_(rows, 'collected') / sum_(rows, 'amount') * 100) : 0,
+      count: rows.length, open: openRows.length,
+      avgYears: openRows.length ? Math.round(openRows.reduce(function (a, r) { return a + r.days; }, 0) / openRows.length / 365 * 10) / 10 : 0 }
+  });
 }
 
 /** Open invoices past their expected collection (due) date. */

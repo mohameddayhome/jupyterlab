@@ -2,7 +2,7 @@
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = '13';
+const CLIENT_VERSION = '14';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -19,7 +19,7 @@ const I18N = {
     s_groups: 'تصنيف العملاء حسب المجموعات.',
     s_balances: 'الرصيد الافتتاحي وحركات الفترة والرصيد الختامي لكل عميل حسب الفلتر.',
     s_paid: 'الفواتير التي تم سدادها بالكامل خلال الفترة (تسوية الأقدم فالأحدث).',
-    s_overdue: 'الفواتير المفتوحة التي تجاوزت تاريخ التحصيل المتوقع.',
+    s_overdue: 'الفواتير المفتوحة التي تجاوزت تاريخ التحصيل المتوقع (تاريخ التسليم). الأرصدة الافتتاحية والسداد والتسويات لا تدخل في التأخير.',
     s_credit: 'العملاء الذين تجاوز رصيدهم حد الائتمان (بعملة العميل).',
     s_followup: 'متابعة العملاء المتأخرين وتسجيل الاتصالات والوعود بالسداد.',
     s_collection: 'مسؤول التحصيل، الشركات التابعة له، المتأخرات وأيام التأخير.',
@@ -137,6 +137,14 @@ const I18N = {
     LateFallback: 'الفواتير بدون تاريخ تسليم', lf_due: 'يُحسب تأخيرها من تاريخ الاستحقاق', lf_none: 'لا تُعتبر متأخرة حتى إدخال تاريخ التسليم',
     deliveryMode: 'تحديث تاريخ التسليم فقط (رقم السند + رقم العميل + تاريخ التسليم)',
     imp_deliveryKey: 'رقم السند + رقم العميل + تاريخ التسليم',
+    tt_Invoice: 'فاتورة', tt_Payment: 'سداد قيمة', tt_Adjustment: 'تسوية بين العملاء', 'tt_Opening balance': 'رصيد افتتاحي',
+    invBatch: 'فواتير من Excel', invBatchTitle: 'إدخال فواتير جماعي من Excel', invTotal: 'إجمالي الصالح',
+    invBatchHint: 'نزّل النموذج واملأه (سطر لكل فاتورة) ثم اختر الملف. الأعمدة الإلزامية: رقم العميل، رقم الفاتورة، التاريخ، المبلغ. العملة الفارغة = عملة العميل، وسعر الصرف الفارغ يُؤخذ من جدول العملات.',
+    invTemplate: 'تنزيل النموذج', invValid: 'صالحة', invInvalid: 'بها أخطاء', invPostNow: 'ترحيل الفواتير مباشرة', invSaveN: 'حفظ {n} فاتورة',
+    invSaved: 'تم حفظ {n} فاتورة', invSkipped: 'وتجاهل {n} سطر به أخطاء', invNoRows: 'الملف فارغ أو لا يحتوي على أعمدة معروفة', line: 'السطر', rowStatus: 'الحالة',
+    ie_noAccount: 'رقم العميل فارغ', ie_unknownCustomer: 'عميل غير معروف', ie_noVoucher: 'رقم الفاتورة فارغ', ie_voucherExists: 'رقم الفاتورة مسجل مسبقاً لهذا العميل',
+    ie_voucherRepeated: 'مكرر في الملف', ie_badDate: 'تاريخ غير صالح', ie_noAmount: 'المبلغ غير صالح', ie_noRate: 'لا يوجد سعر صرف للعملة',
+    lateInvoicesOnly: 'التأخير يُحسب للفواتير فقط؛ الرصيد الافتتاحي والسداد والتسويات لا تدخل في المتأخرات.',
     postedBy: 'رحّلها', adjNo: 'رقم الحركة', adjDate: 'تاريخ الحركة', adjDesc: 'البيان', adjLines: 'السطور', lineNo: 'م', newAdj: 'تسوية جديدة',
     addLine: 'إضافة سطر', editAdj: 'تعديل التسوية', viewAdj: 'عرض التسوية', adjTotals: 'الإجمالي', adjDiff: 'الفرق (مدين − دائن)',
     linesCount: 'عدد السطور', preparedBy: 'أعده', approvedBy: 'اعتمده', adjSaved: 'تم حفظ التسوية {n}', adjPosted: 'تم ترحيل التسوية',
@@ -182,7 +190,7 @@ const I18N = {
     s_groups: 'Customer segmentation by group.',
     s_balances: 'Opening balance, period activity and closing balance per customer.',
     s_paid: 'Invoices fully settled within the period (oldest-first settlement).',
-    s_overdue: 'Open invoices past their expected collection date.',
+    s_overdue: 'Open invoices past their expected collection date (delivery date). Opening balances, payments and adjustments are never overdue.',
     s_credit: 'Customers whose balance exceeds their credit limit (customer currency).',
     s_followup: 'Follow up late customers, log calls and payment promises.',
     s_collection: 'Collector, assigned companies, overdue amounts and days late.',
@@ -300,6 +308,14 @@ const I18N = {
     LateFallback: 'Invoices without a delivery date', lf_due: 'Lateness counted from the due date', lf_none: 'Not late until a delivery date is entered',
     deliveryMode: 'Update delivery dates only (voucher + customer account + delivery date)',
     imp_deliveryKey: 'Voucher + Customer account + Delivery date',
+    tt_Invoice: 'Invoice', tt_Payment: 'Payment', tt_Adjustment: 'Adjustment between customers', 'tt_Opening balance': 'Opening balance',
+    invBatch: 'Invoices from Excel', invBatchTitle: 'Bulk invoices from Excel', invTotal: 'Valid total',
+    invBatchHint: 'Download the template, fill one row per invoice, then choose the file. Required: customer account, invoice number, date, amount. Empty currency = customer currency; empty rate = from the currencies table.',
+    invTemplate: 'Download template', invValid: 'Valid', invInvalid: 'With errors', invPostNow: 'Post the invoices now', invSaveN: 'Save {n} invoice(s)',
+    invSaved: '{n} invoice(s) saved', invSkipped: '{n} row(s) with errors skipped', invNoRows: 'The file is empty or has no known columns', line: 'Line', rowStatus: 'Status',
+    ie_noAccount: 'Customer account is empty', ie_unknownCustomer: 'Unknown customer', ie_noVoucher: 'Invoice number is empty', ie_voucherExists: 'Invoice number already exists for this customer',
+    ie_voucherRepeated: 'Repeated in the file', ie_badDate: 'Invalid date', ie_noAmount: 'Invalid amount', ie_noRate: 'No exchange rate for the currency',
+    lateInvoicesOnly: 'Lateness applies to invoices only; opening balances, payments and adjustments are never overdue.',
     postedBy: 'Posted by', adjNo: 'Entry no.', adjDate: 'Entry date', adjDesc: 'Description', adjLines: 'Lines', lineNo: '#', newAdj: 'New adjustment',
     addLine: 'Add line', editAdj: 'Edit adjustment', viewAdj: 'View adjustment', adjTotals: 'Total', adjDiff: 'Difference (debit − credit)',
     linesCount: 'Lines', preparedBy: 'Prepared by', approvedBy: 'Approved by', adjSaved: 'Adjustment {n} saved', adjPosted: 'Adjustment posted',
@@ -1019,7 +1035,7 @@ const FORMS = {
     { k: 'collector', type: 'select', o: collectorOpts(), hide: !S.user.isAdmin && S.user.scope === 'own' },
     { k: 'status', type: 'select', o: statusOpts(), noAll: 1 }, { k: 'address', type: 'textarea', span: 1 }, { k: 'notes', type: 'textarea', span: 1 }],
   Transactions: () => [
-    { k: 'voucher', req: 1 }, { k: 'type', type: 'select', o: S.lookups.transactionTypes.map(x => [x, x]), noAll: 1 },
+    { k: 'voucher', req: 1 }, { k: 'type', type: 'select', o: txTypeOpts(), noAll: 1 },
     { k: 'account', type: 'customer', req: 1, span: 1 }, { k: 'date', type: 'date', req: 1 }, { k: 'deliveryDate', type: 'date' },
     { k: 'dueDate', type: 'date', hint: t('dueHint') },
     { k: 'currency', type: 'select', o: currencyOpts(), noAll: 1 }, { k: 'exchange', type: 'number' },
@@ -1095,6 +1111,96 @@ function openForm(entity, rec, isNew) {
       <div class="form-grid">${fields.map(f => fieldHtml(f, rec, isNew)).join('')}</div>
       <div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button><button class="button-primary" type="submit">${t('save')}</button></div>
     </form>`, entity === 'Users');
+}
+
+// ───────── Bulk invoices from Excel (transactions page) ─────────
+const INV_COLS = [
+  ['account', 'Customer account', ['customeraccount', 'account', 'customer', 'رقمالعميل', 'العميل', 'كودالعميل']],
+  ['voucher', 'Invoice number', ['invoicenumber', 'invoiceno', 'invoice', 'voucher', 'رقمالفاتورة', 'رقمالسند', 'الفاتورة']],
+  ['date', 'Invoice date', ['invoicedate', 'date', 'تاريخالفاتورة', 'التاريخ']],
+  ['dueDate', 'Due date', ['duedate', 'تاريخالاستحقاق', 'الاستحقاق']],
+  ['deliveryDate', 'Delivery date', ['deliverydate', 'delivery', 'تاريخالتسليم', 'التسليم']],
+  ['amount', 'Amount', ['amount', 'invoiceamount', 'value', 'المبلغ', 'قيمةالفاتورة', 'القيمة']],
+  ['currency', 'Currency', ['currency', 'العملة']],
+  ['exchange', 'Exchange rate', ['exchangerate', 'exchange', 'rate', 'سعرالصرف']],
+  ['description', 'Description', ['description', 'notes', 'البيان', 'الوصف', 'ملاحظات']]
+];
+const INV = {};
+const normHead = h => String(h).toLowerCase().replace(/[\s_\-.#/()]+/g, '').replace(/[أإآ]/g, 'ا');
+function invMapRow(r) {
+  const o = {};
+  Object.keys(r).forEach(h => {
+    const n = normHead(h), c = INV_COLS.find(x => x[2].indexOf(n) > -1);
+    if (c && (o[c[0]] === undefined || o[c[0]] === '')) o[c[0]] = r[h];
+  });
+  return o;
+}
+function invBatchDialog() {
+  INV.rows = null; INV.check = null;
+  openModal(`<div class="drawer-head"><h2>📥 ${t('invBatchTitle')}</h2><button class="icon-button" data-act="closeModal">×</button></div>
+    <p class="subtitle">${t('invBatchHint')}</p>
+    <div class="form-grid" style="margin-top:12px">
+      <label class="field">${t('chooseFile')}<input type="file" id="invFile" accept=".xlsx,.xls,.csv"></label>
+      <div class="field"><span>&nbsp;</span>${btn('invTemplate', '⬇ ' + t('invTemplate'), 'button-ghost')}</div>
+    </div>
+    <div id="invPrev"></div>
+    <div class="form-actions">${can('post') ? `<label class="check" style="margin-inline-end:auto"><input type="checkbox" id="invPost">${t('invPostNow')}</label>` : ''}
+      <button type="button" class="button-ghost" data-act="closeModal">${t('cancel')}</button>
+      <button type="button" class="button-primary" data-act="invSave" id="invSave" disabled>${t('save')}</button></div>`, true);
+}
+function invTemplate() {
+  if (typeof XLSX === 'undefined') { toast(t('xlsxMissing'), 'error'); return; }
+  const c = S.lookups.customers[0] || { account: 'C0001', currency: localCur() };
+  const ws = XLSX.utils.aoa_to_sheet([INV_COLS.map(x => x[1]),
+    [c.account, 'INV-0001', today(), today(), today(), 1000, c.currency || localCur(), '', 'Invoice']]);
+  ws['!cols'] = INV_COLS.map(() => ({ wch: 18 }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Invoices');
+  XLSX.writeFile(wb, 'invoices_template.xlsx');
+}
+function readInvoiceFile(file) {
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { toast(t('xlsxMissing'), 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = async e => {
+    INV.rows = sheetRows(e.target.result, file.name).map(invMapRow).filter(r => Object.keys(r).length);
+    if (!INV.rows.length) { $('#invPrev').innerHTML = `<div class="panel notice danger">⛔ ${t('invNoRows')}</div>`; $('#invSave').disabled = true; return; }
+    INV.check = await call('saveInvoiceBatch', INV.rows, false, true);
+    renderInvoicePreview();
+  };
+  reader.readAsArrayBuffer(file);
+}
+function renderInvoicePreview() {
+  const c = INV.check;
+  const ie = r => r.errors.length ? `<span class="badge red">${r.errors.map(x => t('ie_' + x)).join('، ')}</span>` : '<span class="badge green">✓</span>';
+  const td = (l, v, cls) => `<td data-l="${l}"${cls ? ` class="${cls}"` : ''}>${v}</td>`;
+  const cols = [t('line'), t('f_account'), t('f_name'), t('f_voucher'), t('f_date'), t('f_dueDate'), t('f_deliveryDate'), t('f_amountCur'), t('f_currency'), t('debit'), t('rowStatus')];
+  $('#invPrev').innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+      <span class="badge green">${t('invValid')}: ${NI.format(c.valid)}</span>
+      ${c.invalid ? `<span class="badge red">${t('invInvalid')}: ${NI.format(c.invalid)}</span>` : ''}
+      <span class="badge blue">${t('invTotal')}: ${money(c.total)} ${esc(c.local)}</span></div>
+    <div class="table-wrap"><table class="cards"><thead><tr>${cols.map((h, i) => `<th class="${i === 7 || i === 9 ? 'num' : ''}">${h}</th>`).join('')}</tr></thead><tbody>
+      ${c.rows.map(r => `<tr class="${r.errors.length ? 'row-err' : ''}">${[r.line, esc(r.account), bdi(r.name), esc(r.voucher), esc(r.date), esc(r.dueDate), esc(r.deliveryDate),
+        numCell(r.amount), esc(r.currency), numCell(r.local), ie(r)].map((v, i) => td(cols[i], v, i === 7 || i === 9 ? 'num' : '')).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const b = $('#invSave'); b.disabled = !c.valid; b.textContent = t('invSaveN', { n: NI.format(c.valid) });
+}
+async function invSave() {
+  const b = $('#invSave'); b.disabled = true;
+  const post = !!($('#invPost') && $('#invPost').checked);
+  try {
+    const r = await call('saveInvoiceBatch', INV.rows, post, false);
+    closeModal();
+    toast(t('invSaved', { n: NI.format(r.saved) }) + (r.skipped ? ' — ' + t('invSkipped', { n: NI.format(r.skipped) }) : ''));
+    loadList('transactions');
+  } catch (e) { b.disabled = false; }
+}
+
+/** Transaction types: invoice / payment / adjustment between customers / opening balance (old values stay selectable). */
+function txTypeOpts() {
+  const list = S.lookups.transactionTypes.slice();
+  const cur = FORM && FORM.rec && FORM.rec.type;
+  if (cur && list.indexOf(cur) < 0) list.push(cur);
+  return list.map(x => [x, I18N.en['tt_' + x] ? t('tt_' + x) : x]);
 }
 
 /** Transaction form: amount × rate → debit/credit, currency → exchange rate. */
@@ -1316,6 +1422,7 @@ const VIEWS = {
 
   transactions() {
     setContent(heading('transactions', [can('post') && btn('postSelected', '⇪ ' + t('postSelected'), 'button-ghost'),
+      can('add') && btn('invBatch', '📥 ' + t('invBatch'), 'button-ghost'),
       can('add') && btn('newTx', '＋ ' + t('addTransaction')), exportBtn(), btn('print', '🖨 ' + t('print'), 'button-ghost')]) + listBlock('transactions'));
     loadList('transactions');
   },
@@ -1762,11 +1869,9 @@ const IMP_KEY = { Customers: 'Customer account', Transactions: 'Customer account
  * Reads the first sheet. Date cells are converted from their Excel serial numbers directly
  * (no browser time-zone shift, which used to move dates to the previous day 23:59).
  */
-function readImportFile(file) {
-  if (typeof XLSX === 'undefined') { toast(t('xlsxMissing'), 'error'); return; }
-  const reader = new FileReader();
-  reader.onload = async e => {
-    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: false, cellNF: true, raw: /\.csv$/i.test(file.name) });
+/** First sheet of an Excel/CSV file → row objects; date cells become 'yyyy-mm-dd' text (no timezone drift). */
+function sheetRows(buf, name) {
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: false, cellNF: true, raw: /\.csv$/i.test(name) });
     const ws = wb.Sheets[wb.SheetNames[0]];
     Object.keys(ws).forEach(addr => {
       const c = ws[addr];
@@ -1779,11 +1884,17 @@ function readImportFile(file) {
         ws[addr] = { t: 's', v: txt, w: txt };
       }
     });
-    IMP.rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }).map(r => {
+    return XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }).map(r => {
       const o = {};
       Object.keys(r).forEach(k => { o[String(k).trim()] = typeof r[k] === 'string' ? r[k].trim() : r[k]; });
       return o;
     }).filter(r => Object.values(r).some(v => v !== '' && v != null));
+}
+function readImportFile(file) {
+  if (typeof XLSX === 'undefined') { toast(t('xlsxMissing'), 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = async e => {
+    IMP.rows = sheetRows(e.target.result, file.name);
     $('#impResult').innerHTML = '';
     const heads = IMP.rows.length ? Object.keys(IMP.rows[0]) : [];
     IMP.preview = heads.length ? await call('previewImport', heads) : null;
@@ -2081,8 +2192,8 @@ async function printReceipt(rowId) {
 }
 
 // ───────── Modal ─────────
-function openModal(html) { $('#modalCard').innerHTML = html; $('#modal').hidden = false; enhance($('#modalCard')); }
-function closeModal() { $('#modal').hidden = true; $('#modalCard').innerHTML = ''; }
+function openModal(html, wide) { const m = $('#modalCard'); m.classList.toggle('wide', !!wide); m.innerHTML = html; $('#modal').hidden = false; enhance(m); }
+function closeModal() { $('#modal').hidden = true; $('#modalCard').innerHTML = ''; $('#modalCard').classList.remove('wide'); }
 
 // ───────── Collection receipt form (invoice-linked) ─────────
 const payOpts = () => (S.lookups.payMethods || ['Cash', 'Cheque', 'Transfer']).map(m => [m, t(m)]);
@@ -2451,6 +2562,7 @@ const ACT = {
         <div class="form-actions"><button type="button" class="button-ghost" data-act="dlvClear">${t('clearDate')}</button><button class="button-primary" type="submit">${t('save')}</button></div>
       </form>`);
   },
+  invBatch: invBatchDialog, invTemplate, invSave,
   async dlvClear() { const f = $('#dlvForm'); f.elements.d.value = ''; await saveDelivery(f); },
   openAdj(el) { openAdj(el.dataset.id); },
   adjAddLine() {
@@ -2603,6 +2715,7 @@ document.addEventListener('input', e => {
   }
 });
 document.addEventListener('change', e => {
+  if (e.target.id === 'invFile') { readInvoiceFile(e.target.files[0]); return; }
   if (e.target.classList.contains('cb-input') || e.target.matches('input[data-num]')) return;
   if (e.target.form && e.target.form.id === 'recForm' && FORM && FORM.entity === 'Transactions' && e.target.name === 'currency') { txFormCalc(e.target.form, 'currency'); return; }
   if (e.target.form && e.target.form.id === 'recForm' && FORM && FORM.entity === 'Currencies' && e.target.name === 'code') {

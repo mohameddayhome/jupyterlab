@@ -91,7 +91,7 @@ const PAGE_ACTIONS = {
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies', Adjustments: 'adjustments' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = '13';
+const APP_VERSION = '14';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -159,7 +159,7 @@ function setup() {
   }
   const settings = readTable('Settings');
   const defaults = { AppName: 'CRM Console', LocalCurrency: 'SAR', ReportCurrency: 'SAR', ConversionBasis: 'local', CompanyName: 'My Company',
-    DeliveryTerms: 'terms', LateFallback: 'due',
+    DeliveryTerms: 'zero', LateFallback: 'due',
     CompanyAddress: '', CompanyPhone: '', CompanyEmail: '', BankDetails: '', StatementNote: '', SessionMinutes: 60 };
   const toAdd = Object.keys(defaults).filter(function (k) {
     return !settings.some(function (s) { return s.key === k; });
@@ -460,7 +460,7 @@ function lookups_(user) {
     users: users.filter(function (u) { return u.active; }).map(function (u) { return { username: u.username, name: u.fullName || u.username }; }),
     payMethods: PAY_METHODS,
     dupCustomers: MEMO.dupCustomers || 0,
-    transactionTypes: ['Invoice', 'Payment', 'Credit note', 'Debit note', 'Settlement', 'Opening balance', 'Adjustment']
+    transactionTypes: TX_TYPES
   };
 }
 
@@ -726,6 +726,72 @@ function deleteRecord(token, entity, id) {
 }
 
 /** Post (ترحيل) or un-post draft transactions. Only posted rows affect balances & reports. */
+/**
+ * Bulk invoices from Excel (transactions page).
+ * rows: [{ account, voucher, date, dueDate, deliveryDate, amount, currency, exchange, description }]
+ * check = true → validate only (preview). Otherwise the valid rows are saved as type "Invoice"
+ * (posted at once when post = true and the user may post); invalid rows are skipped and reported.
+ */
+function saveInvoiceBatch(token, rows, post, check) {
+  const user = auth_(token, 'transactions');
+  requireAction_(user, 'add', 'transactions');
+  if (post && !check) requireAction_(user, 'post', 'transactions');
+  if (!Array.isArray(rows) || !rows.length) throw new Error('REQUIRED_FIELDS');
+  if (rows.length > 5000) throw new Error('TOO_MANY_ROWS');
+  const run = function () {
+    const cmap = {};
+    visibleCustomers_(user).forEach(function (c) { cmap[c.account] = c; });
+    const fx = fx_();
+    const rates = {};
+    readTable('Currencies').forEach(function (c) { if (c.code && c.rate > 0) rates[String(c.code).toUpperCase()] = c.rate; });
+    if (fx.base) rates[fx.base] = 1;
+    const taken = {};
+    readTable('Transactions').forEach(function (t) { if (!t.isDeleted) taken[String(t.voucher).trim().toUpperCase() + '|' + t.account] = true; });
+    const fmt = function (d) { return d ? Utilities.formatDate(d, TZ, 'yyyy-MM-dd') : ''; };
+    const seen = {};
+    const out = rows.map(function (r, n) {
+      const acc = String(r.account == null ? '' : r.account).trim(), c = cmap[acc];
+      const voucher = String(r.voucher == null ? '' : r.voucher).trim();
+      const date = toDate_(r.date), due = toDate_(r.dueDate), dlv = toDate_(r.deliveryDate);
+      const amount = Math.abs(toNum_(r.amount));
+      const cur = String(r.currency || (c && c.currency) || fx.local || '').trim().toUpperCase();
+      let ex = toNum_(r.exchange);
+      if (!(ex > 0)) ex = cur === fx.local ? 1 : rates[cur] && rates[fx.local] ? rates[cur] / rates[fx.local] : 0;
+      const key = voucher.toUpperCase() + '|' + acc;
+      const errs = [];
+      if (!acc) errs.push('noAccount'); else if (!c) errs.push('unknownCustomer');
+      if (!voucher) errs.push('noVoucher');
+      else if (taken[key]) errs.push('voucherExists');
+      else if (seen[key]) errs.push('voucherRepeated');
+      if (!date) errs.push('badDate');
+      if ((r.dueDate && !due) || (r.deliveryDate && !dlv)) errs.push('badDate');
+      if (!(amount > 0)) errs.push('noAmount');
+      if (!(ex > 0)) errs.push('noRate');
+      if (voucher) seen[key] = true;
+      return {
+        line: n + 2, account: acc, name: c ? c.name : '', voucher: voucher, date: fmt(date), dueDate: fmt(due), deliveryDate: fmt(dlv),
+        amount: amount, currency: cur, exchange: Math.round(ex * 1e6) / 1e6, local: round2_(amount * ex),
+        description: String(r.description == null ? '' : r.description).trim(), errors: errs.filter(function (e, k, a) { return a.indexOf(e) === k; })
+      };
+    });
+    const ok = out.filter(function (r) { return !r.errors.length; });
+    if (check) return { rows: out, valid: ok.length, invalid: out.length - ok.length, total: round2_(sum_(ok, 'local')), local: fx.local };
+    const now = new Date(), who = user.fullName || user.username;
+    appendRows('Transactions', ok.map(function (r) {
+      return {
+        voucher: r.voucher, type: 'Invoice', account: r.account, date: r.date, dueDate: r.dueDate, deliveryDate: r.deliveryDate,
+        description: r.description, currency: r.currency, exchange: r.exchange, amountCur: -r.amount, debitMST: r.local, creditMST: 0,
+        rowId: Utilities.getUuid(), userAdd: user.username, createdById: user.userId, createdByName: who, createdAt: now,
+        updatedByName: who, updatedAt: now, isDeleted: false,
+        postStatus: post ? 'Posted' : 'Draft', postedBy: post ? who : '', postedAt: post ? now : ''
+      };
+    }));
+    return { saved: ok.length, skipped: out.length - ok.length, posted: post ? ok.length : 0,
+      errors: out.filter(function (r) { return r.errors.length; }).map(function (r) { return { line: r.line, voucher: r.voucher, errors: r.errors }; }) };
+  };
+  return check ? run() : withLock_(run);
+}
+
 function postTransactions(token, ids, unpost, page) {
   const user = auth_(token);
   // Posting is allowed from the page it is done on (transactions or receipts).
@@ -1741,11 +1807,16 @@ function ledger_(user, asOf, display) {
  */
 const NEVER = '9999-12-31';
 function expectedDate_(t, terms, rule) {
+  if (!isInvoice_(t)) return { date: NEVER, basis: 'other' }; // only invoices can be late
   if (t.deliveryDate) return { date: rule.terms ? addDays_(t.deliveryDate, terms) : t.deliveryDate, basis: 'delivery' };
   if (rule.fallback === 'none') return { date: NEVER, basis: 'none' };
   return { date: t.dueDate || addDays_(t.date, terms), basis: 'due' };
 }
 const expOut_ = function (d) { return d === NEVER ? '' : d; };
+
+/** Customer transactions are invoices, payments or adjustments (plus Opening balance). Lateness applies to invoices only. */
+const TX_TYPES = ['Invoice', 'Payment', 'Adjustment', 'Opening balance'];
+function isInvoice_(t) { return !t.batchId && !isOpening_(t) && /invoice|فاتور/i.test(String(t.type || '')); }
 
 /** Transactions of type "Opening balance" always feed the opening balance column. */
 function isOpening_(t) { return /opening|افتتاح/i.test(String(t.type || '')); }
@@ -1868,7 +1939,7 @@ function reportPaidInvoices(token, f) {
     return {
       account: i.account, name: c.name, collector: c.collector, voucher: i.voucher, date: i.date,
       dueDate: i.dueDate, deliveryDate: i.deliveryDate, expDate: expOut_(i.expDate), paidDate: i.paidDate, amount: i.amount,
-      lateDays: i.basis === 'none' ? 0 : Math.max(0, daysBetween_(i.expDate, i.paidDate)),
+      lateDays: i.basis === 'none' || i.basis === 'other' ? 0 : Math.max(0, daysBetween_(i.expDate, i.paidDate)),
       payVouchers: i.payments.map(function (p) { return p.voucher; }).join('، '),
       methods: i.payments.map(function (p) { return p.method; }).filter(function (m, k, a) { return m && a.indexOf(m) === k; }).join('، '),
       linked: i.payments.some(function (p) { return p.linked; })
@@ -1921,7 +1992,7 @@ function overdue_(user, f, L) {
     .sort(function (a, b) { return b.remaining - a.remaining; });
   return Object.assign(fxInfo_(L.fx), {
     asOf: asOf, rows: rows, customers: customers, buckets: buckets,
-    noDelivery: L.invoices.filter(function (i) { return i.remaining > 0 && !i.deliveryDate && customerFilter_(L.cmap[i.account], f); }).length,
+    noDelivery: L.invoices.filter(function (i) { return i.remaining > 0 && i.basis !== 'other' && !i.deliveryDate && customerFilter_(L.cmap[i.account], f); }).length,
     totals: { remaining: sum_(rows, 'remaining'), count: rows.length, customers: customers.length,
       avgDays: rows.length ? Math.round(rows.reduce(function (s, r) { return s + r.days; }, 0) / rows.length) : 0 }
   });

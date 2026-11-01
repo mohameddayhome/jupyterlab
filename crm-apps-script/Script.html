@@ -2,7 +2,7 @@
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = '12';
+const CLIENT_VERSION = '13';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -129,6 +129,14 @@ const I18N = {
     RECEIPT_PENDING: 'سند تحصيل بانتظار الترحيل', RECEIPT_POSTED: 'تم ترحيل سند التحصيل', PROMISE_DUE: 'موعد وعد بالسداد مستحق',
     msgColleague: 'رسالة لزميل', openCustomer: 'فتح العميل', pickRecipient: 'اختر مستلماً واحداً على الأقل', writeReply: 'اكتب ردك...',
     p_adjustments: 'تسوية حسابات العملاء', s_adjustments: 'قيود تسوية جماعية على حسابات العملاء: رأس (رقم، تاريخ، بيان) وسطور مدين/دائن لكل عميل.',
+    f_deliveryDate: 'تاريخ التسليم', expDate: 'تاريخ التحصيل المتوقع', dueHint: 'لتحديد فترة الإيراد فقط — التأخير يُحسب من تاريخ التسليم',
+    setDelivery: 'تحديد تاريخ التسليم', sameVoucher: 'تطبيق على كل سطور نفس رقم السند لهذا العميل', deliverySaved: 'تم تحديث تاريخ التسليم لـ {n} سطر',
+    clearDate: 'مسح التاريخ', noDeliveryDue: '{n} فاتورة مفتوحة بدون تاريخ تسليم — يُحسب تأخيرها مؤقتاً من تاريخ الاستحقاق.',
+    noDeliveryNone: '{n} فاتورة مفتوحة بدون تاريخ تسليم — لا تُعتبر متأخرة حتى إدخال تاريخ التسليم.',
+    DeliveryTerms: 'بداية حساب التأخير', dt_terms: 'تاريخ التسليم + أيام السداد للعميل', dt_zero: 'من تاريخ التسليم مباشرة',
+    LateFallback: 'الفواتير بدون تاريخ تسليم', lf_due: 'يُحسب تأخيرها من تاريخ الاستحقاق', lf_none: 'لا تُعتبر متأخرة حتى إدخال تاريخ التسليم',
+    deliveryMode: 'تحديث تاريخ التسليم فقط (رقم السند + رقم العميل + تاريخ التسليم)',
+    imp_deliveryKey: 'رقم السند + رقم العميل + تاريخ التسليم',
     postedBy: 'رحّلها', adjNo: 'رقم الحركة', adjDate: 'تاريخ الحركة', adjDesc: 'البيان', adjLines: 'السطور', lineNo: 'م', newAdj: 'تسوية جديدة',
     addLine: 'إضافة سطر', editAdj: 'تعديل التسوية', viewAdj: 'عرض التسوية', adjTotals: 'الإجمالي', adjDiff: 'الفرق (مدين − دائن)',
     linesCount: 'عدد السطور', preparedBy: 'أعده', approvedBy: 'اعتمده', adjSaved: 'تم حفظ التسوية {n}', adjPosted: 'تم ترحيل التسوية',
@@ -284,6 +292,14 @@ const I18N = {
     RECEIPT_PENDING: 'Receipt awaiting posting', RECEIPT_POSTED: 'Your receipt was posted', PROMISE_DUE: 'Payment promise due',
     msgColleague: 'Message a colleague', openCustomer: 'Open customer', pickRecipient: 'Choose at least one recipient', writeReply: 'Write a reply...',
     p_adjustments: 'Customer account adjustments', s_adjustments: 'Bulk adjustment entries on customer accounts: header (number, date, description) and debit/credit lines per customer.',
+    f_deliveryDate: 'Delivery date', expDate: 'Expected collection date', dueHint: 'Revenue period only — days late are counted from the delivery date',
+    setDelivery: 'Set delivery date', sameVoucher: 'Apply to every line of the same voucher for this customer', deliverySaved: 'Delivery date updated on {n} line(s)',
+    clearDate: 'Clear date', noDeliveryDue: '{n} open invoices have no delivery date — their lateness is counted from the due date for now.',
+    noDeliveryNone: '{n} open invoices have no delivery date — they are not counted as late until a delivery date is entered.',
+    DeliveryTerms: 'Lateness starts', dt_terms: 'Delivery date + customer payment days', dt_zero: 'Right from the delivery date',
+    LateFallback: 'Invoices without a delivery date', lf_due: 'Lateness counted from the due date', lf_none: 'Not late until a delivery date is entered',
+    deliveryMode: 'Update delivery dates only (voucher + customer account + delivery date)',
+    imp_deliveryKey: 'Voucher + Customer account + Delivery date',
     postedBy: 'Posted by', adjNo: 'Entry no.', adjDate: 'Entry date', adjDesc: 'Description', adjLines: 'Lines', lineNo: '#', newAdj: 'New adjustment',
     addLine: 'Add line', editAdj: 'Edit adjustment', viewAdj: 'View adjustment', adjTotals: 'Total', adjDiff: 'Difference (debit − credit)',
     linesCount: 'Lines', preparedBy: 'Prepared by', approvedBy: 'Approved by', adjSaved: 'Adjustment {n} saved', adjPosted: 'Adjustment posted',
@@ -814,6 +830,7 @@ function permSummary(r) {
 
 const SETTING_INPUTS = ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'SessionMinutes'];
 const SETTING_TEXTS = ['BankDetails', 'StatementNote'];
+const SETTING_SELECTS = { DeliveryTerms: ['terms', 'zero'], LateFallback: ['due', 'none'] };
 
 // ───────── Data lists ─────────
 const editDel = () => (can('edit') ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') + (can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '');
@@ -844,7 +861,7 @@ const LISTS = {
     cols: () => [
       { k: 'voucher', l: t('f_voucher') }, { k: 'date', l: t('f_date') }, { k: 'account', l: t('f_account') },
       { k: 'customerName', l: t('f_name') }, { k: 'type', l: t('f_type') }, { k: 'description', l: t('f_description'), cls: 'clip' },
-      { k: 'dueDate', l: t('f_dueDate') }, { k: 'currency', l: t('f_currency') }, { k: 'amountCur', l: t('f_amountCur'), num: true },
+      { k: 'deliveryDate', l: t('f_deliveryDate') }, { k: 'dueDate', l: t('f_dueDate') }, { k: 'currency', l: t('f_currency') }, { k: 'amountCur', l: t('f_amountCur'), num: true },
       { k: 'exchange', l: t('f_exchange'), num: true, f: v => NF6.format(+v || 0) },
       { k: 'debitMST', l: t('debit'), num: true }, { k: 'creditMST', l: t('credit'), num: true },
       { k: 'balance', l: t('runBalance'), num: true, f: (v, r) => r.postStatus === 'Draft' ? '—' : numCell(v) },
@@ -852,9 +869,10 @@ const LISTS = {
       { k: 'postStatus', l: t('f_postStatus'), f: statusPill, x: r => t(r.postStatus) }],
     select: r => can('post') && r.postStatus === 'Draft' && !r.batchId,
     actions: r => {
-      if (r.batchId) return hasPage('adjustments') ? `<button data-act="openAdj" data-id="${esc(r.batchId)}" title="${t('openAdj')}">⚖</button>` : '';
+      const dlv = +r.debitMST > 0 && can('edit') ? `<button data-act="rowDelivery" title="${t('setDelivery')}">📦</button>` : '';
+      if (r.batchId) return dlv + (hasPage('adjustments') ? `<button data-act="openAdj" data-id="${esc(r.batchId)}" title="${t('openAdj')}">⚖</button>` : '');
       const draft = r.postStatus === 'Draft';
-      return (draft && (r.payMethod ? hasPage('receipts') && can('edit', 'receipts') : can('edit')) ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') +
+      return dlv + (draft && (r.payMethod ? hasPage('receipts') && can('edit', 'receipts') : can('edit')) ? `<button data-act="rowEdit" title="${t('edit')}">✎</button>` : '') +
         (draft && can('post') ? `<button data-act="rowPost" title="${t('post')}">⇪</button>` : '') +
         (!draft && S.user.isAdmin ? `<button data-act="rowUnpost" title="${t('unpost')}">↺</button>` : '') +
         ((draft || S.user.isAdmin) && can('delete') ? `<button data-act="rowDelete" title="${t('del')}">🗑</button>` : '');
@@ -1002,7 +1020,8 @@ const FORMS = {
     { k: 'status', type: 'select', o: statusOpts(), noAll: 1 }, { k: 'address', type: 'textarea', span: 1 }, { k: 'notes', type: 'textarea', span: 1 }],
   Transactions: () => [
     { k: 'voucher', req: 1 }, { k: 'type', type: 'select', o: S.lookups.transactionTypes.map(x => [x, x]), noAll: 1 },
-    { k: 'account', type: 'customer', req: 1, span: 1 }, { k: 'date', type: 'date', req: 1 }, { k: 'dueDate', type: 'date' },
+    { k: 'account', type: 'customer', req: 1, span: 1 }, { k: 'date', type: 'date', req: 1 }, { k: 'deliveryDate', type: 'date' },
+    { k: 'dueDate', type: 'date', hint: t('dueHint') },
     { k: 'currency', type: 'select', o: currencyOpts(), noAll: 1 }, { k: 'exchange', type: 'number' },
     { k: 'amountCur', type: 'number', hint: t('amountHint'), span: 1 },
     { k: 'debitMST', type: 'number' }, { k: 'creditMST', type: 'number' }, { k: 'description', type: 'textarea', span: 1 }],
@@ -1363,6 +1382,7 @@ const VIEWS = {
         <h2 class="section-title">${t('settings')}</h2>
         <div class="form-grid">${SETTING_INPUTS.map(k =>
           `<label class="field">${t(k)}<input name="${k}" value="${esc(st[k] || '')}" ${k === 'SessionMinutes' ? 'type="number" min="5" max="360"' : ''}></label>`).join('')}
+          ${Object.keys(SETTING_SELECTS).map(k => `<label class="field">${t(k)}<select name="${k}">${opts(SETTING_SELECTS[k].map(v => [v, t({ DeliveryTerms: 'dt_', LateFallback: 'lf_' }[k] + v)]), st[k] || SETTING_SELECTS[k][0])}</select></label>`).join('')}
           ${SETTING_TEXTS.map(k => `<label class="field span2">${t(k)}<textarea name="${k}">${esc(st[k] || '')}</textarea></label>`).join('')}
           <div class="field span2">${t('CompanyLogo')}<div class="logo-box">
             <div class="logo-preview">${st.CompanyLogo ? `<img src="${esc(st.CompanyLogo)}" alt="">` : '<span>—</span>'}</div>
@@ -1482,7 +1502,7 @@ const VIEWS = {
         <div class="form-grid">
           <label class="field span2">${t('chooseFile')}<input type="file" id="impFile" accept=".xlsx,.xls,.csv"></label>
           <label class="field">${t('imp_entity')}<select id="impEntity">${opts([['Customers', t('p_customers')], ['Transactions', t('p_transactions')], ['CustomerGroups', t('p_groups')], ['Currencies', t('p_currencies')]], IMP.entity || 'Customers')}</select></label>
-          <label class="field">${t('imp_mode')}<select id="impMode">${opts([['append', t('append')], ['upsert', t('upsert')]].concat(can('delete') ? [['replace', t('replace')]] : []), 'upsert')}</select></label>
+          <label class="field">${t('imp_mode')}<select id="impMode">${opts([['append', t('append')], ['upsert', t('upsert')], ['delivery', t('deliveryMode')]].concat(can('delete') ? [['replace', t('replace')]] : []), 'upsert')}</select></label>
         </div>
         <div id="impTxOpts" class="imp-opts" hidden>
           <h3 class="section-title">${t('imp_options')}</h3>
@@ -1605,6 +1625,7 @@ async function runReport() {
     if (S.view !== view) return;
     const cc = r.currency;
     const cols = [{ k: 'voucher', l: t('f_voucher') }, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'date', l: t('f_date') }, { k: 'dueDate', l: t('f_dueDate') },
+      { k: 'deliveryDate', l: t('f_deliveryDate') }, { k: 'expDate', l: t('expDate') },
       { k: 'paidDate', l: t('paidDate') }, { k: 'amount', l: t('amount') + ' ' + cc, num: true },
       { k: 'lateDays', l: t('lateDays'), f: v => v ? daysPill(v) : pill(t('onTime'), 'healthy') },
       { k: 'payVouchers', l: t('paidBy'), cls: 'clip' },
@@ -1623,6 +1644,7 @@ async function runReport() {
     if (!f.account && !f.group && !f.collector && !f.voucher) setBadge('overdue', r.totals.customers);
     const rows = f.bucket ? r.rows.filter(x => x.bucket === f.bucket) : r.rows;
     const invCols = [{ k: 'voucher', l: t('f_voucher') }, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') }, { k: 'date', l: t('f_date') }, { k: 'dueDate', l: t('f_dueDate') },
+      { k: 'deliveryDate', l: t('f_deliveryDate') }, { k: 'expDate', l: t('expDate') },
       { k: 'amount', l: t('amount') + ' ' + cc, num: true }, { k: 'remaining', l: t('remaining') + ' ' + cc, num: true }, { k: 'days', l: t('days'), f: daysPill },
       collCol, { k: 'lastFollowUp', l: t('lastFollowUp') }];
     const custRows = f.bucket ? groupCustomers(rows) : r.customers;
@@ -1635,7 +1657,7 @@ async function runReport() {
       : { name: 'overdue_invoices', cols: invCols, rows, totals: { remaining: sumRem } };
     S.exportData.summary = [[t('overdueAmt'), money(sumRem) + ' ' + cc], [t('overdueInvoices'), NI.format(rows.length)],
       [t('overdueCustomers'), NI.format(custRows.length)], [t('avgDays'), NI.format(r.totals.avgDays)]];
-    out().innerHTML = missingNotice(r) + `<section class="stats four">
+    out().innerHTML = missingNotice(r) + (r.noDelivery ? `<div class="panel notice">📦 ${t(S.settings.LateFallback === 'none' ? 'noDeliveryNone' : 'noDeliveryDue', { n: NI.format(r.noDelivery) })}</div>` : '') + `<section class="stats four">
         ${stat(t('overdueAmt'), money(sumRem) + curTag(cc), '!', 'red')}${stat(t('overdueInvoices'), NI.format(rows.length), '▤', 'amber')}
         ${stat(t('overdueCustomers'), NI.format(custRows.length), '♙', '')}${stat(t('avgDays'), NI.format(r.totals.avgDays) + ' <small>' + t('day') + '</small>', '⏱', 'amber')}</section>
       <section class="panel" style="padding:14px 16px;margin-bottom:16px"><div class="legend" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
@@ -1792,10 +1814,16 @@ function renderImportPreview() {
   const pv = IMP.preview && IMP.preview.entities[e];
   const heads = IMP.rows.length ? Object.keys(IMP.rows[0]) : [];
   let warn = '';
-  if (pv && !pv.hasId) warn = `<div class="panel notice danger">⛔ ${t('imp_noid', { f: IMP_KEY[e] })}</div>`;
+  const delivery = $('#impMode').value === 'delivery';
+  if (delivery && e !== 'Transactions') warn = `<div class="panel notice danger">⛔ ${t('deliveryMode')}: ${entityName('Transactions')}</div>`;
+  if (e === 'Transactions' && pv) { // delivery mode keys on voucher + account + delivery date; other modes need account + date
+    const f = pv.pairs.map(x => x[1]);
+    pv.hasId = (delivery ? ['voucher', 'account', 'deliveryDate'] : ['account', 'date']).every(k => f.indexOf(k) > -1);
+  }
+  if (!warn && pv && !pv.hasId) warn = `<div class="panel notice danger">⛔ ${t('imp_noid', { f: delivery ? t('imp_deliveryKey') : IMP_KEY[e] })}</div>`;
   else if (IMP.preview && IMP.preview.best && IMP.preview.best !== e) warn = `<div class="panel notice danger">⚠ ${t('imp_mismatch', { b: entityName(IMP.preview.best), e: entityName(e) })}</div>`;
   note.innerHTML = warn;
-  $('#impRun').disabled = !IMP.rows.length || (pv && !pv.hasId);
+  $('#impRun').disabled = !IMP.rows.length || (pv && !pv.hasId) || (delivery && e !== 'Transactions');
   const fieldLabel = f => I18N.en['f_' + f] ? t('f_' + f) : f === 'custName' ? t('f_name') : f;
   box.innerHTML = `<section class="panel section">
       <div class="section-head"><h2 class="section-title">${t('imp_map')}</h2><span class="badge blue">${t('rowsFound')}: ${NI.format(IMP.rows.length)}</span></div>
@@ -2017,11 +2045,11 @@ function statementDoc(r) {
       ${r.lines.map(l => `<tr><td>${esc(l.date)}</td><td>${esc(l.voucher)}</td><td>${esc(l.type)}</td><td>${esc(lineDesc(l))}</td><td>${esc(l.dueDate || '')}</td>
         <td class="n">${l.debit ? money(l.debit) : ''}</td><td class="n">${l.credit ? money(l.credit) : ''}</td><td class="n">${money(l.balance)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="5">${t('closing')}</td><td class="n">${money(r.periodDebit)}</td><td class="n">${money(r.periodCredit)}</td><td class="n">${money(r.closing)}</td></tr></tfoot></table>` +
-    (r.openInvoices.length ? `<h2>${t('openInvTitle')}</h2><table class="grid"><thead><tr><th>${t('f_voucher')}</th><th>${t('f_date')}</th><th>${t('f_dueDate')}</th>
+    (r.openInvoices.length ? `<h2>${t('openInvTitle')}</h2><table class="grid"><thead><tr><th>${t('f_voucher')}</th><th>${t('f_date')}</th><th>${t('f_dueDate')}</th><th>${t('f_deliveryDate')}</th>
       <th class="n">${t('amount')}</th><th class="n">${t('paid')}</th><th class="n">${t('remaining')}</th><th class="n">${t('days')}</th></tr></thead>
-      <tbody>${r.openInvoices.map(i => `<tr><td>${esc(i.voucher)}</td><td>${esc(i.date)}</td><td>${esc(i.dueDate)}</td><td class="n">${money(i.amount)}</td>
+      <tbody>${r.openInvoices.map(i => `<tr><td>${esc(i.voucher)}</td><td>${esc(i.date)}</td><td>${esc(i.dueDate)}</td><td>${esc(i.deliveryDate || '')}</td><td class="n">${money(i.amount)}</td>
         <td class="n">${money(i.paid)}</td><td class="n">${money(i.remaining)}</td><td class="n">${i.days || ''}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="5">${t('all')}</td><td class="n">${money(r.openAmount)}</td><td></td></tr></tfoot></table>` : '') +
+      <tfoot><tr><td colspan="6">${t('all')}</td><td class="n">${money(r.openAmount)}</td><td></td></tr></tfoot></table>` : '') +
     (st.BankDetails ? `<div class="note"><b>${t('BankDetails')}</b>\n${esc(st.BankDetails)}</div>` : '') +
     (st.StatementNote ? `<div class="note">${esc(st.StatementNote)}</div>` : '');
 }
@@ -2102,9 +2130,9 @@ async function loadAlloc(account) {
   const lc = r.currency;
   box.innerHTML = r.invoices.length ? `
     <label class="field" style="margin-bottom:8px">${t('amountToCollect')} (${esc(lc)})<input id="rcTotal" type="text" inputmode="decimal" data-num></label>
-    <div class="table-wrap"><table class="alloc"><thead><tr><th></th><th>${t('f_voucher')}</th><th>${t('f_date')}</th><th>${t('f_dueDate')}</th><th>${t('days')}</th>
+    <div class="table-wrap"><table class="alloc"><thead><tr><th></th><th>${t('f_voucher')}</th><th>${t('f_date')}</th><th>${t('f_deliveryDate')}</th><th>${t('days')}</th>
       <th class="num">${t('remaining')}</th><th class="num">${t('amount')}</th></tr></thead>
-      <tbody>${r.invoices.map((i, k) => `<tr><td><input type="checkbox" data-ai="${k}"></td><td><b>${esc(i.voucher)}</b></td><td>${esc(i.date)}</td><td>${esc(i.dueDate)}</td>
+      <tbody>${r.invoices.map((i, k) => `<tr><td><input type="checkbox" data-ai="${k}"></td><td><b>${esc(i.voucher)}</b></td><td>${esc(i.date)}</td><td>${esc(i.deliveryDate || '—')}</td>
         <td>${i.days ? daysPill(i.days) : ''}</td><td class="num">${money(i.remaining)}${i.pending ? `<br><small class="cur">${t('Draft')}: ${money(i.pending)}</small>` : ''}</td>
         <td class="num"><input class="alloc-amt" type="text" inputmode="decimal" data-num data-aamt="${k}"></td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="6">${t('allocated')}</td><td class="num"><b id="rcSum">0.00</b> <small class="cur">${esc(lc)}</small></td></tr></tfoot></table></div>`
@@ -2286,6 +2314,13 @@ async function submitReply(form) {
 }
 
 
+// ───────── Delivery date ─────────
+async function saveDelivery(form) {
+  const n = await call('setDeliveryDate', [S.dlvRow.rowId], form.elements.d.value, form.elements.same.checked);
+  closeModal(); toast(t('deliverySaved', { n: NI.format(n) }));
+  loadList(S.view);
+}
+
 // ───────── Customer account adjustments (header + lines) ─────────
 function adjLineHtml(l, i, ro) {
   const dis = ro ? 'disabled' : '';
@@ -2405,6 +2440,18 @@ const ACT = {
   removeLogo() { if (confirm(t('confirmDelete'))) saveLogo(''); },
   newReceipt(el) { openCollect((el && el.dataset.acc) || ''); },
   newAdj() { openAdj(''); },
+  rowDelivery(el) {
+    const { row } = rowOf(el);
+    S.dlvRow = row;
+    openModal(`<div class="drawer-head"><h2>📦 ${t('setDelivery')}</h2><button class="icon-button" data-act="closeModal">×</button></div>
+      <p class="subtitle">${esc(row.voucher)} · ${esc(row.account)} — ${bdi(row.customerName || '')}</p>
+      <form class="form-panel" id="dlvForm" style="padding:8px 0 0">
+        <label class="field">${t('f_deliveryDate')}<input type="date" name="d" value="${esc(row.deliveryDate || today())}"></label>
+        <label class="check"><input type="checkbox" name="same" checked>${t('sameVoucher')}</label>
+        <div class="form-actions"><button type="button" class="button-ghost" data-act="dlvClear">${t('clearDate')}</button><button class="button-primary" type="submit">${t('save')}</button></div>
+      </form>`);
+  },
+  async dlvClear() { const f = $('#dlvForm'); f.elements.d.value = ''; await saveDelivery(f); },
   openAdj(el) { openAdj(el.dataset.id); },
   adjAddLine() {
     const box = $('#adjLines');
@@ -2606,7 +2653,7 @@ document.addEventListener('change', e => {
   }
   if (e.target.id === 'impFile' && e.target.files[0]) readImportFile(e.target.files[0]);
   if (e.target.id === 'impEntity') renderImportPreview();
-  if (e.target.id === 'impMode') impOptions();
+  if (e.target.id === 'impMode') { if (IMP.rows) renderImportPreview(); else impOptions(); }
   if (e.target.id === 'logoFile' && e.target.files[0]) logoDataUrl(e.target.files[0]).then(saveLogo).catch(() => toast(t('err_LOGO_INVALID'), 'error'));
 });
 document.addEventListener('keydown', e => {
@@ -2621,6 +2668,7 @@ document.addEventListener('submit', async e => {
   else if (e.target.id === 'recForm') submitForm(e.target);
   else if (e.target.id === 'rcForm') submitReceipt(e.target);
   else if (e.target.id === 'adjForm') submitAdj(e.target);
+  else if (e.target.id === 'dlvForm') saveDelivery(e.target);
   else if (e.target.id === 'msgForm') submitMessage(e.target);
   else if (e.target.id === 'pwForm') {
     const E = e.target.elements;
@@ -2632,7 +2680,7 @@ document.addEventListener('submit', async e => {
   else if (e.target.id === 'replyForm') submitReply(e.target);
   else if (e.target.id === 'mailForm') sendEmail(e.target);
   else if (e.target.id === 'settingsForm') {
-    const fd = {}; SETTING_INPUTS.concat(SETTING_TEXTS).forEach(k => { fd[k] = e.target.elements[k].value.trim(); });
+    const fd = {}; SETTING_INPUTS.concat(SETTING_TEXTS, Object.keys(SETTING_SELECTS)).forEach(k => { fd[k] = e.target.elements[k].value.trim(); });
     S.settings = await call('saveSettings', fd); toast(t('settingsSaved')); renderShell(); go('users');
   } else if (e.target.id === 'curSettings') {
     const E = e.target.elements;

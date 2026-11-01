@@ -32,7 +32,9 @@ const SCHEMA = {
     ['payMethod', 'Payment method'], ['chequeNo', 'Cheque number'], ['chequeDate', 'Cheque date'],
     ['bankName', 'Bank'], ['payRef', 'Payment reference'], ['collectedBy', 'Collected by'],
     // Lines of a customer-accounts adjustment (v12): adjustment number + line number.
-    ['batchId', 'Adjustment no'], ['lineNo', 'Line no']
+    ['batchId', 'Adjustment no'], ['lineNo', 'Line no'],
+    // Delivery to the customer (v13): days late are counted from here, the due date only marks the revenue period.
+    ['deliveryDate', 'Delivery date']
   ],
   CustomerGroups: [['groupId', 'GroupId'], ['groupName', 'GroupName']],
   Users: [
@@ -71,7 +73,7 @@ const SCHEMA = {
 };
 
 const ID_FIELD = { Customers: 'account', Transactions: 'rowId', CustomerGroups: 'groupId', Users: 'userId', FollowUps: 'id', Currencies: 'code', Allocations: 'id', Messages: 'id', Adjustments: 'id' };
-const DATE_FIELDS = ['date', 'dueDate', 'createdAt', 'updatedAt', 'postedAt', 'lastLogin', 'actionDate', 'promiseDate', 'chequeDate'];
+const DATE_FIELDS = ['date', 'dueDate', 'createdAt', 'updatedAt', 'postedAt', 'lastLogin', 'actionDate', 'promiseDate', 'chequeDate', 'deliveryDate'];
 const NUMBER_FIELDS = ['amountCur', 'exchange', 'creditMST', 'debitMST', 'creditLimit', 'termsDays', 'promiseAmount', 'rate', 'amount', 'lines', 'debit', 'credit', 'lineNo'];
 const BOOL_FIELDS = ['isDeleted', 'canAdd', 'canEdit', 'canDelete', 'canPost', 'isCollector', 'active'];
 
@@ -89,7 +91,7 @@ const PAGE_ACTIONS = {
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies', Adjustments: 'adjustments' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = '12';
+const APP_VERSION = '13';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -157,6 +159,7 @@ function setup() {
   }
   const settings = readTable('Settings');
   const defaults = { AppName: 'CRM Console', LocalCurrency: 'SAR', ReportCurrency: 'SAR', ConversionBasis: 'local', CompanyName: 'My Company',
+    DeliveryTerms: 'terms', LateFallback: 'due',
     CompanyAddress: '', CompanyPhone: '', CompanyEmail: '', BankDetails: '', StatementNote: '', SessionMinutes: 60 };
   const toAdd = Object.keys(defaults).filter(function (k) {
     return !settings.some(function (s) { return s.key === k; });
@@ -781,6 +784,7 @@ const IMPORT_ALIASES = {
   debitMST: ['debitinlocalcurrency', 'debitmst', 'debit'],
   createdAt: ['createddateandtime', 'createdat', 'createddatetime'],
   dueDate: ['duedate', 'due'],
+  deliveryDate: ['deliverydate', 'delivery', 'deliveredon', 'تاريخالتسليم', 'التسليم'],
   groupName: ['groupname', 'description'],
   custName: ['name', 'customername', 'اسمالعميل']   // transactions only: used to create missing customers
 };
@@ -816,7 +820,7 @@ function previewImport(token, headers) {
     const pairs = headers.map(function (h) { return [h, map(h)]; });
     const fields = {};
     pairs.forEach(function (p) { if (p[1]) fields[p[1]] = true; });
-    const hasId = !!fields[ID_FIELD[e] === 'rowId' ? 'account' : ID_FIELD[e]] && (e !== 'Transactions' || !!fields.date);
+    const hasId = !!fields[ID_FIELD[e] === 'rowId' ? 'account' : ID_FIELD[e]] && (e !== 'Transactions' || !!fields.date || (!!fields.voucher && !!fields.deliveryDate));
     const score = hasId ? Object.keys(fields).length : 0;
     out[e] = { pairs: pairs, matched: Object.keys(fields).length, hasId: hasId, score: score };
     if (score > bestScore) { bestScore = score; best = e; }
@@ -854,7 +858,7 @@ function importRows(token, entity, rows, mode, opts) {
     });
     return o;
   }).filter(function (o) {
-    return entity === 'Transactions' ? (o.account !== undefined && o.account !== '' && toDate_(o.date)) : (o[ID_FIELD[entity]] !== undefined && o[ID_FIELD[entity]] !== '');
+    return entity === 'Transactions' ? (o.account !== undefined && o.account !== '' && (mode === 'delivery' ? (o.voucher !== undefined && o.voucher !== '') : toDate_(o.date))) : (o[ID_FIELD[entity]] !== undefined && o[ID_FIELD[entity]] !== '');
   });
   const noId = rows.length - mapped.length;
 
@@ -870,6 +874,7 @@ function importRows(token, entity, rows, mode, opts) {
       delete o.createdById; // marks the row as imported (re-import "replace" only removes imported rows)
       if (o.date) o.date = toDate_(o.date);
       if (o.dueDate) o.dueDate = toDate_(o.dueDate) || '';
+      if (o.deliveryDate) o.deliveryDate = toDate_(o.deliveryDate) || '';
       let d = toNum_(o.debitMST), c = toNum_(o.creditMST);
       // Local debit/credit columns missing or empty → use the signed transaction amount.
       if (!d && !c && o.amountCur !== undefined && o.amountCur !== '') {
@@ -894,6 +899,25 @@ function importRows(token, entity, rows, mode, opts) {
     }
   });
 
+  if (entity === 'Transactions' && mode === 'delivery') return withLock_(function () {
+    const want = {};
+    mapped.forEach(function (o) { if (o.voucher && o.deliveryDate) want[String(o.voucher).trim() + '|' + o.account] = o.deliveryDate; });
+    const sh = sheet_('Transactions');
+    const hm = headerMap_(sh), idx = fieldIndex_('Transactions', hm);
+    const range = sh.getRange(2, 1, sh.getLastRow() - 1, hm.headers.length);
+    const values = range.getValues();
+    const seen = {};
+    let updated = 0;
+    values.forEach(function (row) {
+      const k = String(row[idx.voucher]).trim() + '|' + String(row[idx.account]).trim();
+      if (!want[k] || toBool_(row[idx.isDeleted])) return;
+      row[idx.deliveryDate] = toDate_(want[k]); row[idx.updatedByName] = who; row[idx.updatedAt] = now;
+      seen[k] = true; updated++;
+    });
+    if (updated) { invalidate_(); range.setValues(values); }
+    return { inserted: 0, updated: updated, skipped: noId + Object.keys(want).filter(function (k) { return !seen[k]; }).length,
+      duplicates: 0, createdCustomers: 0, unknownAccounts: 0 };
+  });
   return withLock_(function () {
     const sh = sheet_(entity);
     let inserted = 0, updated = 0, duplicates = 0, createdCustomers = 0;
@@ -1149,8 +1173,8 @@ function openInvoices_(user, account, excludeRowId) {
     const hold = Math.min(pending[i.voucher] || 0, i.remaining);
     if (hold) pending[i.voucher] = round2_(pending[i.voucher] - hold);
     const left = round2_(i.remaining - hold);
-    if (left > 0.005) rows.push({ voucher: i.voucher, date: i.date, dueDate: i.dueDate, amount: i.amount, remaining: left,
-      pending: hold, days: Math.max(0, daysBetween_(i.dueDate, today)) });
+    if (left > 0.005) rows.push({ voucher: i.voucher, date: i.date, dueDate: i.dueDate, deliveryDate: i.deliveryDate, expDate: expOut_(i.expDate),
+      amount: i.amount, remaining: left, pending: hold, days: Math.max(0, daysBetween_(i.expDate, today)) });
   });
   return { invoices: rows, currency: L.fx.local, customer: L.cmap[account] };
 }
@@ -1267,6 +1291,42 @@ function publicSettings_() {
   ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'BankDetails', 'StatementNote',
     'LocalCurrency', 'ReportCurrency', 'CompanyLogo'].forEach(function (k) { out[k] = s[k] || ''; });
   return out;
+}
+
+// ───────────────────────────── Delivery dates ─────────────────────────────
+/**
+ * Sets the delivery date of transactions (posted ones too: it does not change any amount).
+ * sameVoucher: also every non-deleted line with the same voucher and customer.
+ */
+function setDeliveryDate(token, rowIds, date, sameVoucher) {
+  const user = auth_(token, 'transactions');
+  requireAction_(user, 'edit', 'transactions');
+  const d = date ? toDate_(date) : '';
+  if (date && !d) throw new Error('REQUIRED_FIELDS');
+  return withLock_(function () {
+    const sh = sheet_('Transactions');
+    const hm = headerMap_(sh), idx = fieldIndex_('Transactions', hm);
+    const range = sh.getRange(2, 1, sh.getLastRow() - 1, hm.headers.length);
+    const values = range.getValues();
+    const allowed = {};
+    visibleCustomers_(user).forEach(function (c) { allowed[c.account] = true; });
+    const ids = {}, keys = {};
+    rowIds.forEach(function (i) { ids[i] = true; });
+    if (sameVoucher) values.forEach(function (row) {
+      if (ids[String(row[idx.rowId])]) keys[String(row[idx.voucher]) + '|' + String(row[idx.account]).trim()] = true;
+    });
+    let n = 0;
+    const now = new Date(), who = user.fullName || user.username;
+    values.forEach(function (row) {
+      const acc = String(row[idx.account]).trim();
+      const hit = ids[String(row[idx.rowId])] || (sameVoucher && keys[String(row[idx.voucher]) + '|' + acc]);
+      if (!hit || !allowed[acc] || toBool_(row[idx.isDeleted])) return;
+      row[idx.deliveryDate] = d; row[idx.updatedByName] = who; row[idx.updatedAt] = now;
+      n++;
+    });
+    if (n) { invalidate_(); range.setValues(values); }
+    return n;
+  });
 }
 
 // ───────────────────────────── Customer-accounts adjustments ─────────────────────────────
@@ -1617,6 +1677,8 @@ function ledger_(user, asOf, display) {
   const byCust = {};
   tx.forEach(function (t) { (byCust[t.account] = byCust[t.account] || []).push(t); });
   const links = allocationsByPayment_();
+  const st = getSettings_();
+  const lateRule = { terms: st.DeliveryTerms !== 'zero', fallback: st.LateFallback === 'none' ? 'none' : 'due' };
   const invoices = [];
   Object.keys(byCust).forEach(function (acc) {
     const list = byCust[acc].sort(function (a, b) {
@@ -1627,9 +1689,11 @@ function ledger_(user, asOf, display) {
     list.forEach(function (t) {
       const net = round2_(t.dr - t.cr);
       if (net > 0) {
+        const ex = expectedDate_(t, terms, lateRule);
         invs.push({
           account: acc, voucher: t.voucher, type: t.type, date: t.date, description: t.description,
-          dueDate: t.dueDate || addDays_(t.date, terms), amount: net, remaining: net, paidDate: '', lastPaymentDate: '', payments: []
+          dueDate: t.dueDate || '', deliveryDate: t.deliveryDate || '', expDate: ex.date, basis: ex.basis,
+          amount: net, remaining: net, paidDate: '', lastPaymentDate: '', payments: []
         });
       } else if (net < 0) credits.push({ t: t, total: -net, left: -net });
     });
@@ -1669,6 +1733,19 @@ function ledger_(user, asOf, display) {
   tx.forEach(function (t) { balance[t.account] = (balance[t.account] || 0) + t.dr - t.cr; });
   return { customers: custs, cmap: cmap, tx: tx, invoices: invoices, balance: balance, fx: fx };
 }
+
+/**
+ * Expected collection date of an invoice — the date lateness is measured from:
+ * delivery date (+ the customer's payment days unless DeliveryTerms = zero); without a delivery date
+ * either the due date / date + terms (LateFallback = due) or never late (LateFallback = none).
+ */
+const NEVER = '9999-12-31';
+function expectedDate_(t, terms, rule) {
+  if (t.deliveryDate) return { date: rule.terms ? addDays_(t.deliveryDate, terms) : t.deliveryDate, basis: 'delivery' };
+  if (rule.fallback === 'none') return { date: NEVER, basis: 'none' };
+  return { date: t.dueDate || addDays_(t.date, terms), basis: 'due' };
+}
+const expOut_ = function (d) { return d === NEVER ? '' : d; };
 
 /** Transactions of type "Opening balance" always feed the opening balance column. */
 function isOpening_(t) { return /opening|افتتاح/i.test(String(t.type || '')); }
@@ -1749,7 +1826,7 @@ function customerStatement(token, account, dateFrom, dateTo, currency) {
     .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; })
     .forEach(function (t) {
       if (t.date < from || isOpening_(t)) { opening += t.dr - t.cr; return; }
-      lines.push({ date: t.date, voucher: t.voucher, type: t.type, description: t.description, dueDate: t.dueDate,
+      lines.push({ date: t.date, voucher: t.voucher, type: t.type, description: t.description, dueDate: t.dueDate, deliveryDate: t.deliveryDate || '',
         currency: t.currency, amountCur: t.amountCur, debit: round2_(t.dr), credit: round2_(t.cr),
         payMethod: t.payMethod || '', chequeNo: t.chequeNo || '', payRef: t.payRef || '' });
     });
@@ -1757,14 +1834,14 @@ function customerStatement(token, account, dateFrom, dateTo, currency) {
   lines.forEach(function (l) { run = round2_(run + l.debit - l.credit); l.balance = run; });
   const today = to < today_() ? to : today_();
   const open = L.invoices.filter(function (i) { return i.account === account && i.remaining > 0; });
-  const overdue = open.filter(function (i) { return i.dueDate < today; });
+  const overdue = open.filter(function (i) { return i.expDate < today; });
   const aging = { current: 0, b1: 0, b2: 0, b3: 0, b4: 0 };
   const openInvoices = open.map(function (i) {
-    const days = Math.max(0, daysBetween_(i.dueDate, today));
-    const k = i.dueDate < today ? bucket_(days) : 'current';
+    const days = Math.max(0, daysBetween_(i.expDate, today));
+    const k = i.expDate < today ? bucket_(days) : 'current';
     aging[k] = round2_(aging[k] + i.remaining);
-    return { voucher: i.voucher, date: i.date, dueDate: i.dueDate, amount: i.amount, paid: round2_(i.amount - i.remaining),
-      remaining: i.remaining, days: i.dueDate < today ? days : 0,
+    return { voucher: i.voucher, date: i.date, dueDate: i.dueDate, deliveryDate: i.deliveryDate, expDate: expOut_(i.expDate),
+      amount: i.amount, paid: round2_(i.amount - i.remaining), remaining: i.remaining, days: i.expDate < today ? days : 0,
       payments: i.payments.map(function (p) { return p.voucher; }).join('، ') };
   });
   return Object.assign(fxInfo_(L.fx), {
@@ -1772,7 +1849,7 @@ function customerStatement(token, account, dateFrom, dateTo, currency) {
     periodDebit: sum_(lines, 'debit'), periodCredit: sum_(lines, 'credit'),
     aging: aging, openInvoices: openInvoices, settings: publicSettings_(),
     openAmount: sum_(open, 'remaining'), overdueAmount: sum_(overdue, 'remaining'),
-    maxDays: overdue.reduce(function (m, i) { return Math.max(m, daysBetween_(i.dueDate, today)); }, 0),
+    maxDays: overdue.reduce(function (m, i) { return Math.max(m, daysBetween_(i.expDate, today)); }, 0),
     followUps: readTable('FollowUps').filter(function (x) { return x.account === account; })
       .sort(function (a, b) { return a.actionDate < b.actionDate ? 1 : -1; }).slice(0, 20)
   });
@@ -1790,8 +1867,8 @@ function reportPaidInvoices(token, f) {
     const c = L.cmap[i.account];
     return {
       account: i.account, name: c.name, collector: c.collector, voucher: i.voucher, date: i.date,
-      dueDate: i.dueDate, paidDate: i.paidDate, amount: i.amount,
-      lateDays: Math.max(0, daysBetween_(i.dueDate, i.paidDate)),
+      dueDate: i.dueDate, deliveryDate: i.deliveryDate, expDate: expOut_(i.expDate), paidDate: i.paidDate, amount: i.amount,
+      lateDays: i.basis === 'none' ? 0 : Math.max(0, daysBetween_(i.expDate, i.paidDate)),
       payVouchers: i.payments.map(function (p) { return p.voucher; }).join('، '),
       methods: i.payments.map(function (p) { return p.method; }).filter(function (m, k, a) { return m && a.indexOf(m) === k; }).join('، '),
       linked: i.payments.some(function (p) { return p.linked; })
@@ -1816,13 +1893,14 @@ function overdue_(user, f, L) {
     if (!lastFollow[x.account] || x.actionDate > lastFollow[x.account].actionDate) lastFollow[x.account] = x;
   });
   const rows = L.invoices.filter(function (i) {
-    return i.remaining > 0 && i.dueDate < asOf && customerFilter_(L.cmap[i.account], f);
+    return i.remaining > 0 && i.expDate < asOf && customerFilter_(L.cmap[i.account], f);
   }).map(function (i) {
     const c = L.cmap[i.account];
-    const days = daysBetween_(i.dueDate, asOf);
+    const days = daysBetween_(i.expDate, asOf);
     return {
       account: i.account, name: c.name, group: c.group, collector: c.collector, phone: c.phone, email: c.email,
-      voucher: i.voucher, date: i.date, dueDate: i.dueDate, amount: i.amount, remaining: i.remaining,
+      voucher: i.voucher, date: i.date, dueDate: i.dueDate, deliveryDate: i.deliveryDate, expDate: i.expDate, basis: i.basis,
+      amount: i.amount, remaining: i.remaining,
       days: days, bucket: bucket_(days), lastPaymentDate: i.lastPaymentDate,
       lastFollowUp: lastFollow[i.account] ? lastFollow[i.account].actionDate : '',
       promiseDate: lastFollow[i.account] ? lastFollow[i.account].promiseDate : ''
@@ -1843,6 +1921,7 @@ function overdue_(user, f, L) {
     .sort(function (a, b) { return b.remaining - a.remaining; });
   return Object.assign(fxInfo_(L.fx), {
     asOf: asOf, rows: rows, customers: customers, buckets: buckets,
+    noDelivery: L.invoices.filter(function (i) { return i.remaining > 0 && !i.deliveryDate && customerFilter_(L.cmap[i.account], f); }).length,
     totals: { remaining: sum_(rows, 'remaining'), count: rows.length, customers: customers.length,
       avgDays: rows.length ? Math.round(rows.reduce(function (s, r) { return s + r.days; }, 0) / rows.length) : 0 }
   });

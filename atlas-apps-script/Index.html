@@ -446,6 +446,18 @@
   .kpi-label-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px;position:relative;padding-inline-end:18px;min-width:0}
   .kpi-select{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed var(--line-strong);padding:0 2px;cursor:pointer;outline:none;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kpi-select.kpi-col{flex:1 1 0;width:0}
+  /* KPI title: the full field name is the visible label; the field <select> sits invisibly on top of it */
+  .kpi .kpi-label-row{flex-direction:column;flex-wrap:nowrap;align-items:flex-start;gap:4px}
+  .kpi-field{position:relative;width:100%;min-width:0;display:flex;align-items:flex-start;gap:4px;cursor:pointer}
+  .kpi-field-name{font-family:var(--font-mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);line-height:1.35;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .kpi-field-caret{color:var(--muted);font-size:10px;line-height:1.6;flex:0 0 auto}
+  .kpi-field:hover .kpi-field-name,.kpi-field:focus-within .kpi-field-name{color:var(--accent)}
+  .kpi-field .kpi-select.kpi-col{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+  .kpi .kpi-agg{flex:0 0 auto;width:auto;max-width:100%;font-size:11px !important;color:var(--muted)}
+  .kpi-value{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;unicode-bidi:plaintext}
+  [dir="rtl"] .kpi-value{text-align:right}
+  .kpi-value.long{font-size:26px !important}
+  :root[data-skin="executive"] .kpi-value,:root[data-skin="nova"] .kpi-value{font-size:clamp(24px,2.3vw,36px)}
   .kpi-select.kpi-agg{flex:0 0 auto}
   .kpi-select option{text-transform:none;color:var(--ink);background:var(--panel)}
   .kpi-select:hover{color:var(--ink);border-bottom-color:var(--accent)}
@@ -689,6 +701,7 @@ const fmt = {
   num(v){
     if(v===null||v===undefined||isNaN(v)) return '—';
     const n = Number(v);
+    if(Math.abs(n) >= 1e12) return (n/1e12).toFixed(2)+'T';
     if(Math.abs(n) >= 1e9) return (n/1e9).toFixed(2)+'B';
     if(Math.abs(n) >= 1e6) return (n/1e6).toFixed(2)+'M';
     if(Math.abs(n) >= 1e4) return (n/1e3).toFixed(1)+'K';  // below 10,000 show the full number (2,012 not 2.0K)
@@ -743,7 +756,7 @@ const I18N = {
     total:'الإجمالي', grandTotal:'الإجمالي العام', otherRows:'باقي الصفوف ({n})', otherCols:'أخرى ({n})',
     pivotSub:'{agg} {v} · {r} صف · {c} عمود', cappedNote:' · معروض {r} من {R} صف و{c} من {C} عمود، والإجماليات من كل البيانات',
     totalsSub:'{v} حسب {r} · {n} {unit}', totalsCapped:' · معروض {r} من {R} صف، والإجماليات من كل البيانات', unitMonth:'شهر', unitYear:'سنة',
-    ofTotal:'من إجمالي {n}', fieldNotFound:'الحقل غير موجود', uniqueVals:'قيم فريدة', subTotal:'المجموع {a} · من {n} قيمة', colsBtn:'الأعمدة {v}/{n}', colsShowAll:'إظهار الكل', colsHideAll:'إخفاء الكل', colsSearch:'ابحث عن عمود...', colsNone:'كل الأعمدة مخفية. اختر عمودًا واحدًا على الأقل من قائمة «الأعمدة».', tableSubCols:'{v} من {n} عمود · فلترة مباشرة', subAvg:'المتوسط {a} · من {n} قيمة',
+    ofTotal:'من إجمالي {n}', fieldNotFound:'الحقل غير موجود', uniqueVals:'قيم فريدة', subTotal:'المجموع {a} · من {n} قيمة', nonEmpty:'عدد القيم غير الفارغة', colsBtn:'الأعمدة {v}/{n}', colsShowAll:'إظهار الكل', colsHideAll:'إخفاء الكل', colsSearch:'ابحث عن عمود...', colsNone:'كل الأعمدة مخفية. اختر عمودًا واحدًا على الأقل من قائمة «الأعمدة».', tableSubCols:'{v} من {n} عمود · فلترة مباشرة', subAvg:'المتوسط {a} · من {n} قيمة',
     minVal:'أدنى قيمة', maxVal:'أعلى قيمة', earliest:'أقدم تاريخ', latest:'أحدث تاريخ', na:'غير متاح', removeMetric:'حذف المؤشر',
     addMetric:'إضافة مؤشر', addChart:'إضافة رسم', noRecordsFilters:'لا توجد سجلات تطابق الفلاتر الحالية.',
     tBar:'أعمدة', tLine:'خطي', tDoughnut:'دائري', tScatter:'انتشار', tHist:'توزيع', tCounts:'تكرارات',
@@ -785,7 +798,7 @@ const I18N = {
     total:'Total', grandTotal:'Grand Total', otherRows:'Other rows ({n})', otherCols:'Other ({n})',
     pivotSub:'{agg} of {v} · {r} rows · {c} columns', cappedNote:' · showing {r} of {R} rows and {c} of {C} columns; totals use all data',
     totalsSub:'{v} grouped by {r} · {n} {unit}', totalsCapped:' · showing {r} of {R} rows; totals use all data', unitMonth:'months', unitYear:'years',
-    ofTotal:'of {n} total', fieldNotFound:'Field not found', uniqueVals:'unique values', subTotal:'Total {a} · from {n} values', colsBtn:'Columns {v}/{n}', colsShowAll:'Show all', colsHideAll:'Hide all', colsSearch:'Find a column...', colsNone:'All columns are hidden. Pick at least one from the Columns menu.', tableSubCols:'{v} of {n} columns · live filtered', subAvg:'Average {a} · from {n} values',
+    ofTotal:'of {n} total', fieldNotFound:'Field not found', uniqueVals:'unique values', subTotal:'Total {a} · from {n} values', nonEmpty:'non-empty values', colsBtn:'Columns {v}/{n}', colsShowAll:'Show all', colsHideAll:'Hide all', colsSearch:'Find a column...', colsNone:'All columns are hidden. Pick at least one from the Columns menu.', tableSubCols:'{v} of {n} columns · live filtered', subAvg:'Average {a} · from {n} values',
     minVal:'minimum value', maxVal:'maximum value', earliest:'earliest date', latest:'latest date', na:'N/A', removeMetric:'Remove metric',
     addMetric:'Add Metric', addChart:'Add Chart', noRecordsFilters:'No records match the current filters.',
     tBar:'Bar', tLine:'Line', tDoughnut:'Donut', tScatter:'Scatter', tHist:'Hist', tCounts:'Counts',
@@ -2156,7 +2169,7 @@ function calculateKpiValue(rows, colName, agg) {
   if (agg === 'count') {
     return {
       value: vals.length.toLocaleString(),
-      sub: `n=${vals.length}`
+      sub: t('nonEmpty')
     };
   }
   if (agg === 'unique') {
@@ -2169,7 +2182,7 @@ function calculateKpiValue(rows, colName, agg) {
 
   if (col.type === 'number') {
     const numVals = vals.map(v => Number(v)).filter(v => !isNaN(v));
-    if (numVals.length === 0) return { value: '—', sub: `n=0` };
+    if (numVals.length === 0) return { value: '—', sub: t('nonEmpty') };
 
     if (agg === 'sum') {
       const sum = numVals.reduce((a, b) => a + b, 0);
@@ -2205,7 +2218,7 @@ function calculateKpiValue(rows, colName, agg) {
 
   if (col.type === 'date') {
     const dateVals = vals.map(v => v instanceof Date ? v : new Date(v)).filter(d => !isNaN(d));
-    if (dateVals.length === 0) return { value: '—', sub: `n=0` };
+    if (dateVals.length === 0) return { value: '—', sub: t('nonEmpty') };
     if (agg === 'min') {
       const minDate = new Date(minMax(dateVals).min);
       return {
@@ -2321,6 +2334,7 @@ function buildKPIs(rows){
       updateAggOptions(newCol);
       const res = calculateKpiValue(rows, config.colName, config.agg);
       valDiv.textContent = res.value;
+      valDiv.classList.toggle('long', String(res.value).length > 8);
       subDiv.textContent = res.sub;
     });
 
@@ -2328,11 +2342,22 @@ function buildKPIs(rows){
       config.agg = e.target.value;
       const res = calculateKpiValue(rows, config.colName, config.agg);
       valDiv.textContent = res.value;
+      valDiv.classList.toggle('long', String(res.value).length > 8);
       subDiv.textContent = res.sub;
     });
 
-    labelRow.appendChild(colSelect);
-    labelRow.appendChild(document.createTextNode(' · '));
+    const fieldWrap = document.createElement('label');
+    fieldWrap.className = 'kpi-field';
+    const fieldName = document.createElement('span');
+    fieldName.className = 'kpi-field-name';
+    const caret = document.createElement('span');
+    caret.className = 'kpi-field-caret';
+    caret.textContent = '▾';
+    const setFieldName = name => { fieldName.textContent = name === '__RECORDS__' ? t('records') : name; };
+    setFieldName(config.colName);
+    colSelect.addEventListener('change', () => setFieldName(colSelect.value));
+    fieldWrap.append(fieldName, caret, colSelect);
+    labelRow.appendChild(fieldWrap);
     labelRow.appendChild(aggSelect);
     card.appendChild(labelRow);
 
@@ -2341,6 +2366,7 @@ function buildKPIs(rows){
     const valDiv = document.createElement('div');
     valDiv.className = 'kpi-value';
     valDiv.textContent = res.value;
+    valDiv.classList.toggle('long', String(res.value).length > 8);
     card.appendChild(valDiv);
 
     const subDiv = document.createElement('div');

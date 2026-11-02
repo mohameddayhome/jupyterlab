@@ -58,6 +58,7 @@ button,input,select,textarea{font-family:inherit;}
 .app-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px;white-space:nowrap;}
 .app-title .sep{width:1px;height:20px;background:rgba(255,255,255,.35);}
 .app-title .sub{font-weight:400;opacity:.9;}
+.top-logo{height:30px;max-width:90px;object-fit:contain;background:#fff;border-radius:3px;padding:2px;}
 .topbar .spacer{flex:1;}
 .user-chip{display:flex;align-items:center;gap:8px;padding:0 8px;font-size:13px;}
 .avatar{width:32px;height:32px;border-radius:50%;background:#8764B8;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;}
@@ -133,6 +134,12 @@ th.num{text-align:left;}
 .code{font-family:'Segoe UI',Consolas,monospace;color:var(--primary);font-weight:600;}
 tr.sec-row td{background:var(--primary-lighter) !important;font-weight:600;color:var(--primary-pressed);height:36px;}
 #coaTable td{white-space:nowrap;}
+.print-preview{border:1px dashed var(--border-strong);padding:14px;background:#fff;}
+.print-preview .rh{display:flex;align-items:center;gap:14px;border-bottom:3px solid #002050;padding-bottom:10px;}
+.print-preview img{max-height:64px;max-width:170px;object-fit:contain;}
+.print-preview h3{margin:0;color:#002050;font-size:18px;}
+.print-preview .s1{font-size:12px;color:var(--muted);margin-top:2px;}
+.print-preview .s2{font-size:13px;color:var(--primary);font-weight:600;margin-top:4px;}
 th.note-col,td.note-ref{text-align:center;width:64px;color:var(--primary);font-weight:600;}
 .notes-group{font-size:15px;font-weight:600;color:var(--topbar);margin:20px 0 10px;padding-right:10px;border-right:4px solid var(--primary);}
 tr.sub-head td{font-weight:600;color:var(--muted);font-size:13px;height:34px;padding-right:20px;}
@@ -258,7 +265,7 @@ button.btn.warn:hover{background:#A6860A;}
 <div id="appContainer" class="hidden">
   <header class="topbar">
     <button class="tb-btn" onclick="toggleNav()" title="القائمة"><svg class="ic lg"><use href="#i-waffle"/></svg></button>
-    <div class="app-title">مكتب المدقق <span class="sep"></span> <span class="sub">نظام إعداد القوائم المالية</span></div>
+    <div class="app-title"><img id="topLogo" class="top-logo hidden" alt=""><span id="officeTitle">مكتب المدقق</span> <span class="sep"></span> <span class="sub">نظام إعداد القوائم المالية</span></div>
     <div class="spacer"></div>
     <div class="user-chip"><span class="uname" id="userNameDisplay"></span><span class="avatar" id="userAvatar">؟</span></div>
     <button class="tb-btn" onclick="logout()" title="تسجيل الخروج"><svg class="ic lg"><use href="#i-signout"/></svg></button>
@@ -268,6 +275,7 @@ button.btn.warn:hover{background:#A6860A;}
     <nav class="sitemap">
       <div class="grp">عام</div>
       <button data-tab="dash" class="active"><svg class="ic"><use href="#i-home"/></svg><span class="lbl">الرئيسية</span></button>
+      <button data-tab="settings"><svg class="ic"><use href="#i-gear"/></svg><span class="lbl">إعدادات المكتب</span></button>
       <div class="grp">البيانات الأساسية</div>
       <button data-tab="coa"><svg class="ic"><use href="#i-list"/></svg><span class="lbl">دليل الحسابات</span></button>
       <button data-tab="clients"><svg class="ic"><use href="#i-people"/></svg><span class="lbl">العملاء</span></button>
@@ -293,6 +301,39 @@ button.btn.warn:hover{background:#A6860A;}
         <div class="content">
           <div class="grid" id="dashKpis" style="margin-bottom:16px;"></div>
           <div class="card"><h2>آخر العملاء</h2><div class="table-responsive" id="dashClients"><div class="empty">جاري التحميل...</div></div></div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="tab-settings" class="tab hidden">
+        <div class="cmdbar">
+          <button class="cmd" onclick="saveSettings()"><svg class="ic"><use href="#i-save"/></svg>حفظ الإعدادات</button>
+        </div>
+        <div class="page-head"><div class="crumb">عام</div><h1>إعدادات المكتب</h1></div>
+        <div class="content">
+          <div id="settingsRoleMsg"></div>
+          <div class="card">
+            <h2>بيانات رأس التقرير المطبوع</h2>
+            <div class="row">
+              <div class="field"><label>اسم المكتب <span class="req">*</span></label><input id="setOfficeName" placeholder="مثال: مكتب المدقق للمحاسبة والمراجعة"></div>
+              <div class="field" style="flex:2"><label>سطر فرعي (العنوان / رقم الترخيص / الهاتف)</label><input id="setOfficeSubtitle" placeholder="مثال: محاسبون قانونيون — ترخيص رقم 123 — الرياض"></div>
+            </div>
+            <div class="row" style="align-items:flex-start">
+              <div class="field">
+                <label>شعار المكتب (PNG أو JPG)</label>
+                <div class="form-actions">
+                  <button class="btn secondary" onclick="document.getElementById('logoFile').click()"><svg class="ic"><use href="#i-upload"/></svg>اختيار صورة</button>
+                  <button class="btn danger" onclick="removeLogo()"><svg class="ic"><use href="#i-delete"/></svg>حذف الشعار</button>
+                </div>
+                <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="pickLogo(this)">
+                <p style="font-size:12px;color:var(--muted);margin:8px 0 0">يُصغَّر تلقائياً ليناسب رأس التقرير. يفضّل شعار بخلفية بيضاء أو شفافة.</p>
+              </div>
+              <div class="field" style="flex:2">
+                <label>معاينة رأس التقرير</label>
+                <div id="logoPreview" class="print-preview"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -562,6 +603,80 @@ function setBusy(delta){
   pending = Math.max(0, pending + delta);
   document.getElementById('progress').classList.toggle('on', pending > 0);
 }
+/* ================= إعدادات المكتب ================= */
+let currentUser = null;
+let appSettings = { officeName: 'مكتب المدقق', officeSubtitle: '', logo: '' };
+let pendingLogo;   // undefined = بدون تغيير، '' = حذف، data URL = شعار جديد
+
+function applySettings(){
+  document.getElementById('officeTitle').textContent = appSettings.officeName;
+  const img = document.getElementById('topLogo');
+  img.classList.toggle('hidden', !appSettings.logo);
+  if (appSettings.logo) img.src = appSettings.logo;
+}
+async function loadSettings(){
+  try { appSettings = await call('getSettings'); applySettings(); } catch(e){}
+}
+function fillSettingsForm(){
+  pendingLogo = undefined;
+  document.getElementById('setOfficeName').value = appSettings.officeName;
+  document.getElementById('setOfficeSubtitle').value = appSettings.officeSubtitle;
+  const admin = currentUser && currentUser.role === 'مدير';
+  document.getElementById('settingsRoleMsg').innerHTML = admin ? '' :
+    `<div class="msgbar">${ic('info')} تعديل الإعدادات متاح لمستخدم بصلاحية "مدير" فقط.</div>`;
+  renderLogoPreview();
+}
+function renderLogoPreview(){
+  const logo = pendingLogo !== undefined ? pendingLogo : appSettings.logo;
+  const name = document.getElementById('setOfficeName').value || appSettings.officeName;
+  const sub = document.getElementById('setOfficeSubtitle').value;
+  document.getElementById('logoPreview').innerHTML = `<div class="rh">${logo ? `<img src="${esc(logo)}" alt="">` : ''}
+    <div><h3>${esc(name)}</h3>${sub ? `<div class="s1">${esc(sub)}</div>` : ''}<div class="s2">القوائم المالية</div></div></div>`;
+}
+['setOfficeName','setOfficeSubtitle'].forEach(id => document.getElementById(id).addEventListener('input', renderLogoPreview));
+
+// تصغير الشعار في المتصفح قبل الحفظ (أقصى 480×200)
+function pickLogo(input){
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) return toast('اختر صورة PNG أو JPG', false);
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 480 / img.width, 200 / img.height);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * scale));
+      c.height = Math.max(1, Math.round(img.height * scale));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      let url = c.toDataURL('image/png');
+      if (url.length > 250000) {   // صورة كبيرة: JPG بخلفية بيضاء
+        const ctx = c.getContext('2d');
+        ctx.globalCompositeOperation = 'destination-over'; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+        url = c.toDataURL('image/jpeg', 0.85);
+      }
+      pendingLogo = url;
+      renderLogoPreview();
+      toast('تم تجهيز الشعار — اضغط "حفظ الإعدادات"');
+    };
+    img.onerror = () => toast('تعذر قراءة الصورة', false);
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function removeLogo(){ pendingLogo = ''; renderLogoPreview(); }
+
+async function saveSettings(){
+  const s = {
+    officeName: document.getElementById('setOfficeName').value.trim(),
+    officeSubtitle: document.getElementById('setOfficeSubtitle').value.trim()
+  };
+  if (!s.officeName) return toast('أدخل اسم المكتب', false);
+  if (pendingLogo !== undefined) s.logo = pendingLogo;
+  try { appSettings = await call('saveSettings', s); pendingLogo = undefined; applySettings(); renderLogoPreview(); toast('تم حفظ الإعدادات'); } catch(e){}
+}
+
 // رمز الجلسة في الذاكرة فقط: إغلاق التطبيق أو إعادة فتحه يطلب كلمة المرور من جديد
 let sessionToken = null;
 
@@ -625,6 +740,8 @@ function showApp(user) {
   const name = user.name || user.username || '';
   document.getElementById('userNameDisplay').textContent = name;
   document.getElementById('userAvatar').textContent = name.trim().charAt(0) || '؟';
+  currentUser = user;
+  loadSettings();
   try { loadDashboard(); } catch(e) { toast('خطأ في تحميل لوحة التحكم', false); }
 }
 
@@ -735,6 +852,7 @@ function printHtml(reportTitle, content, clientName, year, win) {
   const date = new Date().toLocaleDateString('ar-EG');
   const printWindow = win || window.open('', '_blank');
   if (!printWindow) return toast('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة لهذا الموقع', false);
+  printWindow.document.open();   // مسح رسالة "جاري التجهيز" إن وجدت
 
   printWindow.document.write(`
     <html dir="rtl">
@@ -744,6 +862,10 @@ function printHtml(reportTitle, content, clientName, year, win) {
         body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 32px; color: #323130; background: #fff; font-size: 13px; }
         .report-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 24px; border-bottom: 3px solid #002050; padding-bottom: 14px; }
         .report-header h1 { margin: 0; color: #002050; font-size: 22px; font-weight: 600; }
+        .brand { display: flex; align-items: center; gap: 16px; }
+        .brand img { max-height: 72px; max-width: 180px; object-fit: contain; }
+        .brand .office-sub { font-size: 12px; color: #605E5C; margin-top: 2px; }
+        .cmp-col { width: 150px; }
         .report-header p { margin: 4px 0 0; font-size: 15px; color: #0078D4; font-weight: 600; }
         .report-meta { display: flex; gap: 32px; margin-bottom: 20px; font-size: 13px; background:#F3F2F1; padding:10px 14px; }
         .report-meta b { color:#605E5C; font-weight:600; }
@@ -778,7 +900,8 @@ function printHtml(reportTitle, content, clientName, year, win) {
     </head>
     <body>
       <div class="report-header">
-        <div><h1>مكتب المدقق</h1><p>${esc(reportTitle)}</p></div>
+        <div class="brand">${appSettings.logo ? `<img src="${esc(appSettings.logo)}" alt="">` : ''}
+          <div><h1>${esc(appSettings.officeName)}</h1>${appSettings.officeSubtitle ? `<div class="office-sub">${esc(appSettings.officeSubtitle)}</div>` : ''}<p>${esc(reportTitle)}</p></div></div>
         <div style="font-size:12px;color:#605E5C;">تاريخ الطباعة: ${date}</div>
       </div>
       <div class="report-meta">
@@ -795,7 +918,14 @@ function printHtml(reportTitle, content, clientName, year, win) {
   `);
   printWindow.document.close();
   printWindow.focus();
-  setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+  // الطباعة بعد اكتمال تحميل الشعار
+  let tries = 0;
+  const go = () => {
+    const imgs = Array.from(printWindow.document.images || []);
+    if (imgs.every(i => i.complete) || ++tries > 20) { printWindow.print(); printWindow.close(); }
+    else setTimeout(go, 100);
+  };
+  setTimeout(go, 300);
 }
 
 /* ================= تصدير إلى إكسيل ================= */
@@ -898,27 +1028,29 @@ async function exportFullWorkbook(clientSelId, yearId){
     const [st, nt, wp, tb] = await Promise.all([
       call('getSavedStatements', cid, year), call('getNotes', cid, year),
       call('getWorkingPaper', cid, year), call('getTrialBalance', cid, year)]);
-    const head = [['مكتب المدقق'], ['العميل:', c.name], ['السنة المالية:', year], ['العملة:', c.currency], []];
+    const head = [[appSettings.officeName], ['العميل:', c.name], ['السنة المالية:', year], ['العملة:', c.currency], []];
     const wb = newWorkbook();
 
-    const bs = head.concat([['البند', 'إيضاح', 'المبلغ']]);
+    const yrs = st.years || { cur: year, prev: String(Number(year) - 1) };
+    const xp = v => (v === null || v === undefined) ? '—' : xlNum(v);   // رقم السنة السابقة
+    const bs = head.concat([['البند', 'إيضاح', yrs.cur, yrs.prev]]);
     st.bs.sections.forEach(sec => {
       if (!sec.isTotal) bs.push([sec.section]);
-      (sec.items || []).forEach(i => bs.push(['    ' + i.name, i.note || '', xlNum(i.value)]));
-      if (sec.total !== undefined) bs.push([sec.totalName || sec.section, '', xlNum(sec.total)]);
+      (sec.items || []).forEach(i => bs.push(['    ' + i.name, i.note || '', xlNum(i.value), xp(i.prev)]));
+      if (sec.total !== undefined) bs.push([sec.totalName || sec.section, '', xlNum(sec.total), xp(sec.prevTotal)]);
     });
     (st.bs.notes || []).forEach(n => bs.push([], [n]));
     addSheet(wb, 'الميزانية العمومية', bs);
 
-    const is = head.concat([['البند', 'إيضاح', 'المبلغ']]);
-    st.is.items.forEach(i => i.heading ? is.push([i.name]) : is.push([(i.isTotal ? '' : '    ') + i.name, i.note || '', xlNum(i.value)]));
+    const is = head.concat([['البند', 'إيضاح', yrs.cur, yrs.prev]]);
+    st.is.items.forEach(i => i.heading ? is.push([i.name]) : is.push([(i.isTotal ? '' : '    ') + i.name, i.note || '', xlNum(i.value), xp(i.prev)]));
     addSheet(wb, 'قائمة الدخل', is);
 
-    const cf = head.concat([['البند', 'المبلغ']]);
+    const cf = head.concat([['البند', yrs.cur, yrs.prev]]);
     const cfSecs = list => list.forEach(sec => {
       if (!sec.isTotal) cf.push([sec.section]);
-      (sec.items || []).forEach(i => i.heading ? cf.push(['  ' + i.name]) : cf.push(['    ' + i.name, xlNum(i.value)]));
-      if (sec.total !== undefined) cf.push([sec.totalName || sec.section, xlNum(sec.total)]);
+      (sec.items || []).forEach(i => i.heading ? cf.push(['  ' + i.name]) : cf.push(['    ' + i.name, xlNum(i.value), xp(i.prev)]));
+      if (sec.total !== undefined) cf.push([sec.totalName || sec.section, xlNum(sec.total), xp(sec.prevTotal)]);
     });
     cfSecs(st.cf.items);
     if ((st.cf.direct || []).length) { cf.push([], ['إفصاح إضافي: التدفقات التشغيلية بالطريقة المباشرة']); cfSecs(st.cf.direct); }
@@ -1007,6 +1139,7 @@ document.querySelectorAll('nav.sitemap button').forEach(b=>{
     const t = b.dataset.tab;
     if (t==='dash') loadDashboard();
     if (t==='coa') loadCOA();
+    if (t==='settings') fillSettingsForm();
     if (t==='clients') loadClients();
     if (['tb','mapping','statements','ratios','compare','wp','notes'].includes(t)) loadClientSelects();
   };
@@ -1359,46 +1492,58 @@ function selectedClient(selectId){
 // تنسيق محاسبي: السالب بين قوسين
 function fmtAcc(n){ n = Number(n) || 0; return n < 0 ? `(${fmt(-n)})` : fmt(n); }
 
-// عمود "إيضاح" يظهر إذا كان لأي بند رقم إيضاح (الميزانية وقائمة الدخل)
-function stmtTable(title, sections){
+// رقم السنة السابقة: '—' إذا لم يتوفر
+const fmtPrev = v => (v === null || v === undefined || v === '') ? '—' : fmtAcc(v);
+// رأس أعمدة المبالغ: سنة التقرير + السنة السابقة (عرض مقارن وفق IAS 1)
+const amountHeads = (yrs, cmp) => `<th class="num cmp-col" style="width:170px">${esc(yrs.cur)}</th>${cmp ? `<th class="num cmp-col" style="width:170px">${esc(yrs.prev)}</th>` : ''}`;
+
+// عمود "إيضاح" يظهر إذا كان لأي بند رقم إيضاح، وعمود السنة السابقة إذا توفرت أرقامها
+function stmtTable(title, sections, yrs){
+  yrs = yrs || { cur: 'المبلغ', prev: '' };
   const hasNote = sections.some(sec => (sec.items || []).some(it => it.note));
-  const span = hasNote ? 3 : 2;
+  const cmp = sections.some(sec => (sec.prevTotal !== null && sec.prevTotal !== undefined) ||
+                                   (sec.items || []).some(it => it.prev !== null && it.prev !== undefined));
+  const span = 2 + (hasNote ? 1 : 0) + (cmp ? 1 : 0);
   const noteTd = it => hasNote ? `<td class="note-ref">${esc(it && it.note ? it.note : '')}</td>` : '';
-  let html = `<div class="card"><h2>${title}</h2><div class="table-responsive"><table><thead><tr><th>القسم / البند</th>${hasNote ? '<th class="note-col">إيضاح</th>' : ''}<th class="num" style="width:200px">المبلغ</th></tr></thead><tbody>`;
+  const amt = (v, pv) => `<td class="num">${fmtAcc(v)}</td>${cmp ? `<td class="num">${fmtPrev(pv)}</td>` : ''}`;
+  let html = `<div class="card"><h2>${title}</h2><div class="table-responsive"><table><thead><tr><th>القسم / البند</th>${hasNote ? '<th class="note-col">إيضاح</th>' : ''}${amountHeads(yrs, cmp)}</tr></thead><tbody>`;
   sections.forEach(sec=>{
     if (!sec.isTotal) html += `<tr class="sec-row"><td colspan="${span}">${esc(sec.section)}</td></tr>`;
     (sec.items || []).forEach(it=>{
       html += it.heading
         ? `<tr class="sub-head"><td colspan="${span}">${esc(it.name)}</td></tr>`
-        : `<tr><td style="padding-right:28px">${esc(it.name)}</td>${noteTd(it)}<td class="num">${fmtAcc(it.value)}</td></tr>`;
+        : `<tr><td style="padding-right:28px">${esc(it.name)}</td>${noteTd(it)}${amt(it.value, it.prev)}</tr>`;
     });
     if (sec.total !== undefined) {
       const label = sec.totalName || (sec.isTotal ? sec.section : 'إجمالي ' + sec.section);
-      html += `<tr class="${sec.isTotal?'stmt-final':'stmt-total'}"><td>${esc(label)}</td>${noteTd(null)}<td class="num">${fmtAcc(sec.total)}</td></tr>`;
+      html += `<tr class="${sec.isTotal?'stmt-final':'stmt-total'}"><td>${esc(label)}</td>${noteTd(null)}${amt(sec.total, sec.prevTotal)}</tr>`;
     }
   });
   return html + `</tbody></table></div></div>`;
 }
 
 function renderStatementsUI(res, clientName, year, currency) {
-  const sub = `${esc(clientName)} <span class="count">(${esc(currency)}) — السنة ${esc(year)}</span>`;
+  const yrs = res.years || { cur: String(year), prev: String(Number(year) - 1) };
+  const sub = `${esc(clientName)} <span class="count">(${esc(currency)}) — السنة المنتهية ${esc(yrs.cur)} مع أرقام المقارنة</span>`;
 
-  const bsNotes = (res.bs.notes || []).map(n=>`<div class="msgbar err">${ic('warn')} ${esc(n)}</div>`).join('');
-  const bsHtml = bsNotes + stmtTable(`الميزانية العمومية — ${sub}`, res.bs.sections);
+  const bsNotes = (res.bs.notes || []).map(n=>`<div class="msgbar ${n.includes('متوازنة') ? 'err' : ''}">${ic(n.includes('متوازنة') ? 'warn' : 'info')} ${esc(n)}</div>`).join('');
+  const bsHtml = bsNotes + stmtTable(`الميزانية العمومية — ${sub}`, res.bs.sections, yrs);
 
   const isNote = res.is.items.some(it => it.note);
-  let isHtml = `<div class="card"><h2>قائمة الدخل — ${sub}</h2><div class="table-responsive"><table><thead><tr><th>البند</th>${isNote ? '<th class="note-col">إيضاح</th>' : ''}<th class="num" style="width:200px">المبلغ</th></tr></thead><tbody>`;
+  const isCmp = res.is.items.some(it => !it.heading && it.prev !== null && it.prev !== undefined);
+  const isSpan = 2 + (isNote ? 1 : 0) + (isCmp ? 1 : 0);
+  let isHtml = `<div class="card"><h2>قائمة الدخل — ${sub}</h2><div class="table-responsive"><table><thead><tr><th>البند</th>${isNote ? '<th class="note-col">إيضاح</th>' : ''}${amountHeads(yrs, isCmp)}</tr></thead><tbody>`;
   res.is.items.forEach(it=>{
-    if (it.heading) { isHtml += `<tr class="sub-head"><td colspan="${isNote ? 3 : 2}">${esc(it.name)}</td></tr>`; return; }
+    if (it.heading) { isHtml += `<tr class="sub-head"><td colspan="${isSpan}">${esc(it.name)}</td></tr>`; return; }
     const cls = it.isFinal ? 'stmt-final' : (it.isTotal ? 'stmt-total' : '');
-    isHtml += `<tr class="${cls}"><td ${cls?'':'style="padding-right:28px"'}>${esc(it.name)}</td>${isNote ? `<td class="note-ref">${esc(it.note || '')}</td>` : ''}<td class="num">${fmtAcc(it.value)}</td></tr>`;
+    isHtml += `<tr class="${cls}"><td ${cls?'':'style="padding-right:28px"'}>${esc(it.name)}</td>${isNote ? `<td class="note-ref">${esc(it.note || '')}</td>` : ''}<td class="num">${fmtAcc(it.value)}</td>${isCmp ? `<td class="num">${fmtPrev(it.prev)}</td>` : ''}</tr>`;
   });
   isHtml += `</tbody></table></div></div>`;
 
   const notes = (res.cf.notes || []).map(n=>`<div class="msgbar ${n.includes('فرق') ? 'err' : ''}">${ic('info')} ${esc(n)}</div>`).join('');
-  const cfHtml = notes + stmtTable(`قائمة التدفقات النقدية (الطريقة غير المباشرة - IAS 7) — ${sub}`, res.cf.items);
+  const cfHtml = notes + stmtTable(`قائمة التدفقات النقدية (الطريقة غير المباشرة - IAS 7) — ${sub}`, res.cf.items, yrs);
   const directHtml = (res.cf.direct && res.cf.direct.length)
-    ? stmtTable(`إفصاح إضافي: التدفقات التشغيلية بالطريقة المباشرة — ${sub}`, res.cf.direct) : '';
+    ? stmtTable(`إفصاح إضافي: التدفقات التشغيلية بالطريقة المباشرة — ${sub}`, res.cf.direct, yrs) : '';
 
   document.getElementById('statementsArea').innerHTML = bsHtml + isHtml + cfHtml + directHtml;
 }

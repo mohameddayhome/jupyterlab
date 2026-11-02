@@ -227,7 +227,9 @@ function logout(token) {
  * دوال البيانات تنتهي بـ "_" فلا يمكن استدعاؤها مباشرة من المتصفح.
  */
 function api(token, fn, args) {
-  if (!getSession_(token)) throw new Error('SESSION_EXPIRED');
+  const user = getSession_(token);
+  if (!user) throw new Error('SESSION_EXPIRED');
+  if (fn === 'saveSettings' && user.role !== 'مدير') throw new Error('تعديل الإعدادات متاح للمدير فقط');
   const routes = {
     getCOA: getCOA_, saveCOAAccount: saveCOAAccount_, deleteCOAAccount: deleteCOAAccount_,
     getDashboardStats: getDashboardStats_,
@@ -237,11 +239,48 @@ function api(token, fn, args) {
     computeStatements: computeStatements_, getSavedStatements: getSavedStatements_,
     getComparisonData: getComparisonData_,
     getWorkingPaper: getWorkingPaper_, checkTrialBalanceDuplicate: checkTrialBalanceDuplicate_,
-    getNotes: getNotes_
+    getNotes: getNotes_, getSettings: getSettings_, saveSettings: saveSettings_
   };
   const f = routes[fn];
   if (!f) throw new Error('عملية غير مسموحة: ' + fn);
   return f.apply(null, args || []);
+}
+
+/* ================== إعدادات المكتب (الاسم والشعار) ================== */
+// تُحفظ في خصائص السكربت؛ الشعار مقسّم لأجزاء لأن حد الخاصية الواحدة 9KB
+const DEFAULT_OFFICE_NAME = 'مكتب المدقق';
+const LOGO_CHUNK = 8000;
+
+function getSettings_() {
+  const props = PropertiesService.getScriptProperties();
+  const n = Number(props.getProperty('logo_chunks') || 0);
+  let logo = '';
+  for (let i = 0; i < n; i++) logo += props.getProperty('logo_' + i) || '';
+  return {
+    officeName: props.getProperty('officeName') || DEFAULT_OFFICE_NAME,
+    officeSubtitle: props.getProperty('officeSubtitle') || '',
+    logo: logo
+  };
+}
+
+/* s.logo: data URL لصورة، أو '' لحذف الشعار، أو undefined لعدم تغييره */
+function saveSettings_(s) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('officeName', String(s.officeName || '').trim() || DEFAULT_OFFICE_NAME);
+  props.setProperty('officeSubtitle', String(s.officeSubtitle || '').trim());
+  if (s.logo !== undefined && s.logo !== null) {
+    const logo = String(s.logo);
+    if (logo && !/^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+\/=]+$/.test(logo)) throw new Error('صيغة الشعار غير مدعومة (PNG أو JPG)');
+    if (logo.length > 300000) throw new Error('حجم الشعار كبير جداً — استخدم صورة أصغر');
+    const old = Number(props.getProperty('logo_chunks') || 0);
+    for (let i = 0; i < old; i++) props.deleteProperty('logo_' + i);
+    const parts = {};
+    const n = Math.ceil(logo.length / LOGO_CHUNK);
+    for (let i = 0; i < n; i++) parts['logo_' + i] = logo.substr(i * LOGO_CHUNK, LOGO_CHUNK);
+    parts.logo_chunks = String(n);
+    props.setProperties(parts);
+  }
+  return getSettings_();
 }
 
 /* ================== دليل الحسابات (COA) ================== */
@@ -833,41 +872,46 @@ function computeStatements_(clientId, year) {
   const noteNo = {};
   buildNotes_(d).forEach(n => noteNo[n.stdCode] = n.no);
 
+  // أرقام المقارنة للسنة السابقة (IAS 1 فقرة 38) — null إذا لم يوجد ميزان للسنة السابقة
+  const hasPrev = tbPrev.length > 0;
+  const pv = v => hasPrev ? v : null;
+
   /* ---------- قائمة الدخل ---------- */
   const isItems = [];
   const addGroup = (group, heading, sign) => {
     const list = lines(group);
     if (!list.length) return;
     isItems.push({ name: heading, heading: true });
-    list.forEach(a => isItems.push({ name: a.name, value: sign * m.val(a), note: noteNo[a.code] }));
+    list.forEach(a => isItems.push({ name: a.name, value: sign * m.val(a), prev: pv(sign * p.val(a)), note: noteNo[a.code] }));
   };
   addGroup('revenue', 'الإيرادات:', 1);
   addGroup('cogs', 'يخصم: تكلفة المبيعات:', -1);
-  isItems.push({ name: 'مجمل الربح', value: m.gross, isTotal: true });
+  isItems.push({ name: 'مجمل الربح', value: m.gross, prev: pv(p.gross), isTotal: true });
   addGroup('opex', 'يخصم: المصروفات التشغيلية:', -1);
-  isItems.push({ name: 'الربح التشغيلي', value: m.opProfit, isTotal: true });
+  isItems.push({ name: 'الربح التشغيلي', value: m.opProfit, prev: pv(p.opProfit), isTotal: true });
   addGroup('otherIncome', 'يضاف: إيرادات أخرى:', 1);
   addGroup('finance', 'يخصم: مصروفات مالية وأخرى:', -1);
-  isItems.push({ name: 'صافي الربح', value: m.netProfit, isTotal: true, isFinal: true });
+  isItems.push({ name: 'صافي الربح', value: m.netProfit, prev: pv(p.netProfit), isTotal: true, isFinal: true });
   const isObj = { items: isItems };
 
   /* ---------- الميزانية العمومية ---------- */
-  const items = group => lines(group).map(a => ({ name: a.name, value: m.val(a), note: noteNo[a.code] }));
-  const totA = m.curA + m.nonCurA;
-  const totLE = m.curL + m.nonCurL + m.totE;
+  const items = group => lines(group).map(a => ({ name: a.name, value: m.val(a), prev: pv(p.val(a)), note: noteNo[a.code] }));
+  const npLine = (m.isPreClosing || (hasPrev && p.isPreClosing))
+    ? [{ name: 'صافي ربح العام', value: m.isPreClosing ? m.netProfit : 0, prev: pv(p.isPreClosing ? p.netProfit : 0) }] : [];
   const bsObj = {
     sections: [
-      { section: 'الأصول المتداولة', items: items('assetC'), totalName: 'إجمالي الأصول المتداولة', total: m.curA },
-      { section: 'الأصول غير المتداولة', items: items('assetNC'), totalName: 'إجمالي الأصول غير المتداولة', total: m.nonCurA },
-      { section: 'إجمالي الأصول', isTotal: true, totalName: 'إجمالي الأصول', total: totA },
-      { section: 'الالتزامات المتداولة', items: items('liabilityC'), totalName: 'إجمالي الالتزامات المتداولة', total: m.curL },
-      { section: 'الالتزامات غير المتداولة', items: items('liabilityNC'), totalName: 'إجمالي الالتزامات غير المتداولة', total: m.nonCurL },
-      { section: 'حقوق الملكية', items: items('equity').concat(m.isPreClosing ? [{ name: 'صافي ربح العام', value: m.netProfit }] : []),
-        totalName: 'إجمالي حقوق الملكية', total: m.totE },
-      { section: 'إجمالي الالتزامات وحقوق الملكية', isTotal: true, totalName: 'إجمالي الالتزامات وحقوق الملكية', total: totLE }
+      { section: 'الأصول المتداولة', items: items('assetC'), totalName: 'إجمالي الأصول المتداولة', total: m.curA, prevTotal: pv(p.curA) },
+      { section: 'الأصول غير المتداولة', items: items('assetNC'), totalName: 'إجمالي الأصول غير المتداولة', total: m.nonCurA, prevTotal: pv(p.nonCurA) },
+      { section: 'إجمالي الأصول', isTotal: true, totalName: 'إجمالي الأصول', total: m.curA + m.nonCurA, prevTotal: pv(p.curA + p.nonCurA) },
+      { section: 'الالتزامات المتداولة', items: items('liabilityC'), totalName: 'إجمالي الالتزامات المتداولة', total: m.curL, prevTotal: pv(p.curL) },
+      { section: 'الالتزامات غير المتداولة', items: items('liabilityNC'), totalName: 'إجمالي الالتزامات غير المتداولة', total: m.nonCurL, prevTotal: pv(p.nonCurL) },
+      { section: 'حقوق الملكية', items: items('equity').concat(npLine), totalName: 'إجمالي حقوق الملكية', total: m.totE, prevTotal: pv(p.totE) },
+      { section: 'إجمالي الالتزامات وحقوق الملكية', isTotal: true, totalName: 'إجمالي الالتزامات وحقوق الملكية',
+        total: m.curL + m.nonCurL + m.totE, prevTotal: pv(p.curL + p.nonCurL + p.totE) }
     ],
     notes: []
   };
+  if (!hasPrev) bsObj.notes.push('لا يوجد ميزان مراجعة لسنة ' + prevYear + ' — لن تظهر أرقام المقارنة. أدخل ميزان السنة السابقة لعرض السنتين كما يتطلب IAS 1.');
   const diag = {
     year: String(year),
     curDiff: bsDiff_(m), curUnmapped: unmappedAccounts_(tb, mapping, coaMap),
@@ -879,8 +923,24 @@ function computeStatements_(clientId, year) {
   }
 
   /* ---------- التدفقات والمؤشرات ---------- */
-  const cf = buildCashFlow_(accs, m, p, shown, tbPrev.length > 0, prevYear, diag);
-  const cfObj = { items: cf.items, direct: cf.direct, notes: cf.notes };
+  const prev2Year = String(Number(year) - 2);
+  const tbPrev2 = hasPrev ? getTrialBalance_(clientId, prev2Year) : [];
+  const pp = buildModel_(tbPrev2.length ? stdRawBalances_(tbPrev2, mapping, coaMap) : {}, accs);
+  // نفس البنود في السنتين حتى تتطابق الأسطر
+  const shownCF = a => shown(a) || Math.abs(pp.raw[a.code] || 0) > 0.0001;
+  const cf = buildCashFlow_(accs, m, p, shownCF, hasPrev, prevYear, diag);
+  let cfPrev = null;
+  if (hasPrev && tbPrev2.length) {
+    cfPrev = buildCashFlow_(accs, p, pp, shownCF, true, prev2Year, {
+      year: prevYear, curDiff: bsDiff_(p), curUnmapped: unmappedAccounts_(tbPrev, mapping, coaMap),
+      prevDiff: bsDiff_(pp), prevUnmapped: unmappedAccounts_(tbPrev2, mapping, coaMap) });
+  }
+  const cfObj = { items: mergeComparative_(cf.items, cfPrev && cfPrev.items),
+                  direct: mergeComparative_(cf.direct, cfPrev && cfPrev.direct), notes: cf.notes.slice() };
+  if (hasPrev && !tbPrev2.length) {
+    cfObj.notes.push('أرقام المقارنة لقائمة التدفقات النقدية (سنة ' + prevYear + ') تحتاج ميزان مراجعة سنة ' + prev2Year + ' كأرصدة افتتاحية — أدخله لعرض السنتين.');
+  }
+  if (cfPrev) cfPrev.notes.filter(n => n.indexOf('فرق') >= 0).forEach(n => cfObj.notes.push('أرقام المقارنة (' + prevYear + '): ' + n));
 
   const safe = (a, b) => b ? a / b : 0;
   const ratios = [
@@ -893,7 +953,28 @@ function computeStatements_(clientId, year) {
 
   const wp = buildWorkingPaper_(tb, mapping, coa);
   saveStatementsToSheets_(clientId, year, bsObj, isObj, cfObj, ratios, wp);
-  return { bs: bsObj, is: isObj, cf: cfObj, ratios: ratios };
+  return { bs: bsObj, is: isObj, cf: cfObj, ratios: ratios, years: { cur: String(year), prev: prevYear } };
+}
+
+/* يضيف رقم السنة السابقة لكل سطر (بالاسم داخل نفس القسم). prevSecs = null يعني لا توجد مقارنة */
+function mergeComparative_(curSecs, prevSecs) {
+  return (curSecs || []).map(sec => {
+    const ps = prevSecs ? prevSecs.find(x => x.section === sec.section) : null;
+    const out = Object.assign({}, sec);
+    if (sec.items) {
+      out.items = sec.items.map(it => {
+        if (it.heading) return it;
+        const match = ps ? (ps.items || []).find(x => !x.heading && x.name === it.name) : null;
+        return Object.assign({}, it, { prev: ps ? (match ? match.value : 0) : null });
+      });
+      // سطر موجود في السنة السابقة فقط (مثل استبعاد أصول)
+      if (ps) (ps.items || []).forEach(x => {
+        if (!x.heading && !out.items.some(i => i.name === x.name)) out.items.push({ name: x.name, value: 0, prev: x.value });
+      });
+    }
+    if (sec.total !== undefined) out.prevTotal = ps ? ps.total : null;
+    return out;
+  });
 }
 
 /* يضيف عنوان عمود "النوع" للملفات القديمة */
@@ -913,25 +994,33 @@ function saveStatementsToSheets_(clientId, year, bsObj, isObj, cfObj, ratios, wp
   replaceRows_(ensureSheet_(ss, SHEET_NAMES.WP, WP_HEADERS), match, wpRows);
 
   // عمود "النوع" في كل القوائم: بند / عنوان / إجمالي / نهائي / ملاحظة
+  // null (لا توجد مقارنة) يُحفظ خانة فارغة
+  const pc = v => (v === null || v === undefined) ? '' : v;
   const bsRows = [];
   bsObj.sections.forEach(sec => {
-    (sec.items || []).forEach(it => bsRows.push([clientId, year, sec.section, it.name, it.value, 'بند', it.note || '']));
-    if (sec.total !== undefined) bsRows.push([clientId, year, sec.section, sec.totalName || 'الإجمالي', sec.total, 'إجمالي']);
+    (sec.items || []).forEach(it => bsRows.push([clientId, year, sec.section, it.name, it.value, 'بند', it.note || '', pc(it.prev)]));
+    if (sec.total !== undefined) bsRows.push([clientId, year, sec.section, sec.totalName || 'الإجمالي', sec.total, 'إجمالي', '', pc(sec.prevTotal)]);
   });
   (bsObj.notes || []).forEach(n => bsRows.push([clientId, year, 'ملاحظات', n, '', 'ملاحظة']));
-  replaceRows_(ensureHeaderCell_(ensureHeaderCell_(getSheetByNameSafe_(ss, SHEET_NAMES.BS), 6, 'النوع'), 7, 'إيضاح'), match, bsRows);
+  const bsSh = getSheetByNameSafe_(ss, SHEET_NAMES.BS);
+  [[6, 'النوع'], [7, 'إيضاح'], [8, 'السنة السابقة']].forEach(h => ensureHeaderCell_(bsSh, h[0], h[1]));
+  replaceRows_(bsSh, match, bsRows);
 
   const isRows = isObj.items.map(it => [clientId, year, it.name, it.heading ? '' : it.value,
-    it.heading ? 'عنوان' : (it.isFinal ? 'نهائي' : (it.isTotal ? 'إجمالي' : 'بند')), it.note || '']);
-  replaceRows_(ensureHeaderCell_(ensureHeaderCell_(getSheetByNameSafe_(ss, SHEET_NAMES.IS), 5, 'النوع'), 6, 'إيضاح'), match, isRows);
+    it.heading ? 'عنوان' : (it.isFinal ? 'نهائي' : (it.isTotal ? 'إجمالي' : 'بند')), it.note || '', it.heading ? '' : pc(it.prev)]);
+  const isSh = getSheetByNameSafe_(ss, SHEET_NAMES.IS);
+  [[5, 'النوع'], [6, 'إيضاح'], [7, 'السنة السابقة']].forEach(h => ensureHeaderCell_(isSh, h[0], h[1]));
+  replaceRows_(isSh, match, isRows);
 
   const cfRows = [];
   (cfObj.items || []).concat(cfObj.direct || []).forEach(sec => {
-    (sec.items || []).forEach(it => cfRows.push([clientId, year, sec.section, it.name, it.heading ? '' : it.value, it.heading ? 'عنوان' : 'بند']));
-    if (sec.total !== undefined) cfRows.push([clientId, year, sec.section, sec.totalName || ('إجمالي ' + sec.section), sec.total, 'إجمالي']);
+    (sec.items || []).forEach(it => cfRows.push([clientId, year, sec.section, it.name, it.heading ? '' : it.value, it.heading ? 'عنوان' : 'بند', it.heading ? '' : pc(it.prev)]));
+    if (sec.total !== undefined) cfRows.push([clientId, year, sec.section, sec.totalName || ('إجمالي ' + sec.section), sec.total, 'إجمالي', pc(sec.prevTotal)]);
   });
   (cfObj.notes || []).forEach(n => cfRows.push([clientId, year, 'ملاحظات', n, '', 'ملاحظة']));
-  replaceRows_(ensureHeaderCell_(getSheetByNameSafe_(ss, SHEET_NAMES.CF), 6, 'النوع'), match, cfRows);
+  const cfSh = getSheetByNameSafe_(ss, SHEET_NAMES.CF);
+  [[6, 'النوع'], [7, 'السنة السابقة']].forEach(h => ensureHeaderCell_(cfSh, h[0], h[1]));
+  replaceRows_(cfSh, match, cfRows);
 
   const ratioRows = ratios.map(r => [clientId, year, r.cat + ' - ' + r.name, r.value, r.eval]);
   replaceRows_(getSheetByNameSafe_(ss, SHEET_NAMES.RATIOS), match, ratioRows);
@@ -954,7 +1043,8 @@ function getSavedStatements_(clientId, year) {
     throw new Error('لا توجد قوائم محفوظة لهذا العميل وهذه السنة. يرجى النقر على "إعداد القوائم" أولاً.');
   }
 
-  // الصفوف القديمة (بدون عمود النوع) تُميَّز بالاسم
+  // الصفوف القديمة (بدون عمود النوع أو السنة السابقة) تُميَّز بالاسم
+  const pr = x => (x === '' || x === null || x === undefined) ? null : Number(x);
   const bsSections = [], bsNotes = [];
   bsRows.forEach(r => {
     const secName = String(r[2]), itemName = String(r[3]), val = r[4], kind = String(r[5] || '');
@@ -964,18 +1054,18 @@ function getSavedStatements_(clientId, year) {
     const isTot = kind ? kind === 'إجمالي'
                        : (itemName === secName || itemName.includes('إجمالي') || secName.startsWith('إجمالي'));
     if (isTot) {
-      sec.total = val; sec.totalName = itemName;
+      sec.total = val; sec.totalName = itemName; sec.prevTotal = pr(r[7]);
       if (secName.startsWith('إجمالي')) sec.isTotal = true;
     } else {
       if (!sec.items) sec.items = [];
-      sec.items.push({ name: itemName, value: val, note: r[6] || '' });
+      sec.items.push({ name: itemName, value: val, note: r[6] || '', prev: pr(r[7]) });
     }
   });
 
   const isItems = isRows.map(r => {
     const name = String(r[2]), kind = String(r[4] || '');
     if (kind === 'عنوان') return { name: name, heading: true };
-    if (kind) return { name: name, value: r[3], isTotal: kind === 'إجمالي' || kind === 'نهائي', isFinal: kind === 'نهائي', note: r[5] || '' };
+    if (kind) return { name: name, value: r[3], isTotal: kind === 'إجمالي' || kind === 'نهائي', isFinal: kind === 'نهائي', note: r[5] || '', prev: pr(r[6]) };
     return { name: name, value: r[3], isTotal: name.includes('مجمل الربح') || name.includes('الربح التشغيلي'), isFinal: name.includes('صافي الربح') };
   });
 
@@ -988,11 +1078,11 @@ function getSavedStatements_(clientId, year) {
     if (!sec) { sec = { section: secName }; list.push(sec); }
     const isTotalRow = kind ? kind === 'إجمالي' : (itemName.startsWith('إجمالي') || secName === 'صافي التغير في النقدية');
     if (isTotalRow) {
-      sec.total = val; sec.totalName = itemName;
+      sec.total = val; sec.totalName = itemName; sec.prevTotal = pr(r[6]);
       if (secName === 'صافي التغير في النقدية') sec.isTotal = true;
     } else {
       if (!sec.items) sec.items = [];
-      sec.items.push(kind === 'عنوان' ? { name: itemName, heading: true } : { name: itemName, value: val });
+      sec.items.push(kind === 'عنوان' ? { name: itemName, heading: true } : { name: itemName, value: val, prev: pr(r[6]) });
     }
   });
 
@@ -1002,7 +1092,8 @@ function getSavedStatements_(clientId, year) {
   });
 
   return { bs: { sections: bsSections, notes: bsNotes }, is: { items: isItems },
-           cf: { items: cfSections, direct: cfDirect, notes: cfNotes }, ratios: ratios };
+           cf: { items: cfSections, direct: cfDirect, notes: cfNotes }, ratios: ratios,
+           years: { cur: String(year), prev: String(Number(year) - 1) } };
 }
 
 /* ================== مقارنة السنوات ================== */

@@ -564,7 +564,12 @@ function classifyAccount_(c) {
     else if (['تشغيلي','استثماري','تمويلي'].indexOf(cf) >= 0) cfCat = cf;
     else cfCat = { assetC:'تشغيلي', assetNC:'استثماري', liabilityC:'تشغيلي', liabilityNC:'تمويلي' }[group];
   }
-  return { kind, group, isCash, isContra, isNonCash, cfCat };
+  // حسابات يحتاجها التحليل المالي (تُعرف من الاسم)
+  const isInventory  = kind === 'asset' && /مخزون|بضاع/.test(name);
+  const isReceivable = kind === 'asset' && !isCash && (/عملاء|مدين|ذمم مدينة|أوراق قبض/.test(name) || /مخصص.*(ديون|مشكوك)/.test(name));
+  const isPayable    = kind === 'liability' && /مورد|دائن|ذمم دائنة|أوراق دفع/.test(name);
+  const isCapital    = kind === 'equity' && /رأس المال|راس المال|رأس مال|راس مال/.test(name);
+  return { kind, group, isCash, isContra, isNonCash, cfCat, isInventory, isReceivable, isPayable, isCapital };
 }
 
 /* رصيد كل حساب معياري = مجموع (مدين − دائن) لحسابات العميل المربوطة به */
@@ -605,6 +610,8 @@ function buildModel_(raw, accs) {
     raw, val,
     revenue: g('revenue'), cogs: g('cogs'), opex: g('opex'), otherIncome: g('otherIncome'), finance: g('finance'),
     dep: sum(a => a.isNonCash),
+    inventory: sum(a => a.isInventory), receivables: sum(a => a.isReceivable),
+    payables: sum(a => a.isPayable), capital: sum(a => a.isCapital),
     curA: g('assetC'), nonCurA: g('assetNC'), curL: g('liabilityC'), nonCurL: g('liabilityNC'), eqBase: g('equity'),
     cash: sum(a => a.isCash),
     isPreClosing: accs.some(a => !BS_KINDS_[a.kind] && Math.abs(raw[a.code] || 0) > 0.0001)
@@ -828,29 +835,27 @@ const GROUP_TITLES_ = {
  * المبالغ بطبيعة الحساب (المصروفات موجبة كما هو متعارف عليه في الإيضاحات).
  */
 function buildNotes_(d) {
+  // الإيضاحات تفصّل أرصدة سنة التقرير فقط؛ البند الذي ليس له رصيد هذه السنة لا يأخذ إيضاحاً
   const toStd = mappedStd_(d.mapping, d.coaMap);
   const byStd = {};
-  const add = (list, key) => list.forEach(t => {
+  d.tb.forEach(t => {
     const sc = toStd[t.code];
     if (!t.code || !sc) return;
     const bucket = byStd[sc] = byStd[sc] || {};
-    const e = bucket[t.code] = bucket[t.code] || { code: t.code, name: t.name, cur: 0, prev: 0 };
-    if (key === 'cur') e.name = t.name;
-    e[key] += (Number(t.debit) || 0) - (Number(t.credit) || 0);
+    const e = bucket[t.code] = bucket[t.code] || { code: t.code, name: t.name, raw: 0 };
+    e.raw += (Number(t.debit) || 0) - (Number(t.credit) || 0);
   });
-  add(d.tbPrev, 'prev');
-  add(d.tb, 'cur');
 
   const notes = [];
-  d.accs.filter(d.shown).forEach(a => {
+  d.accs.filter(a => Math.abs(d.m.raw[a.code] || 0) > 0.0001).forEach(a => {
     const rows = Object.keys(byStd[a.code] || {}).map(k => byStd[a.code][k])
-      .map(r => ({ code: r.code, name: r.name, cur: signedValue_(a.kind, r.cur), prev: signedValue_(a.kind, r.prev) }))
-      .filter(r => Math.abs(r.cur) > 0.0001 || Math.abs(r.prev) > 0.0001)
+      .map(r => ({ code: r.code, name: r.name, amount: signedValue_(a.kind, r.raw) }))
+      .filter(r => Math.abs(r.amount) > 0.0001)
       .sort((x, y) => String(x.code).localeCompare(String(y.code)));
     notes.push({
       no: notes.length + 1, stdCode: a.code, title: a.name,
       stmt: BS_KINDS_[a.kind] ? 'الميزانية العمومية' : 'قائمة الدخل', group: GROUP_TITLES_[a.group],
-      rows: rows, totalCur: d.m.val(a), totalPrev: d.p.val(a)
+      rows: rows, total: d.m.val(a)
     });
   });
   return notes;
@@ -859,7 +864,7 @@ function buildNotes_(d) {
 function getNotes_(clientId, year) {
   const d = loadYearData_(clientId, year);
   const client = getClients_().find(c => String(c.id) === String(clientId)) || {};
-  return { year: String(year), prevYear: d.prevYear, hasPrev: d.tbPrev.length > 0,
+  return { year: String(year),
            clientName: client.name || '', currency: client.currency || '', endDate: client.endDate || '',
            notes: buildNotes_(d) };
 }
@@ -942,18 +947,95 @@ function computeStatements_(clientId, year) {
   }
   if (cfPrev) cfPrev.notes.filter(n => n.indexOf('فرق') >= 0).forEach(n => cfObj.notes.push('أرقام المقارنة (' + prevYear + '): ' + n));
 
-  const safe = (a, b) => b ? a / b : 0;
-  const ratios = [
-    {cat:'السيولة', name:'نسبة التداول', value:safe(m.curA, m.curL), eval: safe(m.curA, m.curL)>=1.5?'جيد':'ضعيف'},
-    {cat:'الربحية', name:'هامش الربح الإجمالي %', value:safe(m.gross, m.revenue)*100, eval: safe(m.gross, m.revenue)>=0.25?'جيد':'ضعيف'},
-    {cat:'الربحية', name:'هامش صافي الربح %', value:safe(m.netProfit, m.revenue)*100, eval: safe(m.netProfit, m.revenue)>=0.1?'جيد':'ضعيف'},
-    {cat:'التدفقات النقدية', name:'نسبة التدفق النقدي التشغيلي', value:safe(cf.opTotal, m.curL), eval: safe(cf.opTotal, m.curL)>=1?'جيد':'ضعيف'},
-    {cat:'التدفقات النقدية', name:'جودة الأرباح (النقد التشغيلي / صافي الربح)', value:safe(cf.opTotal, m.netProfit), eval: (m.netProfit>0 && safe(cf.opTotal, m.netProfit)>=1)?'جيد':'ضعيف'}
-  ];
+  // المؤشرات للسنتين: الأرصدة المتوسطة تستخدم السنة السابقة لها إن وُجدت
+  const ratios = buildRatios_(m, hasPrev ? p : null, cf.opTotal,
+                              hasPrev ? p : null, (hasPrev && tbPrev2.length) ? pp : null, cfPrev ? cfPrev.opTotal : null);
 
   const wp = buildWorkingPaper_(tb, mapping, coa);
   saveStatementsToSheets_(clientId, year, bsObj, isObj, cfObj, ratios, wp);
   return { bs: bsObj, is: isObj, cf: cfObj, ratios: ratios, years: { cur: String(year), prev: prevYear } };
+}
+
+/* ================== المؤشرات المالية (التحليل المالي) ================== */
+/*
+ * كل مؤشر: المعادلة، الوحدة، قيمة سنة التقرير والسنة السابقة، ومعيار تقييم عام.
+ * المعايير استرشادية وتختلف حسب نشاط المنشأة.
+ * الأرصدة "المتوسطة" = (أول المدة + آخر المدة) ÷ 2، وإذا لم تتوفر السنة السابقة يُستخدم رصيد آخر المدة.
+ */
+const RATIO_DEFS_ = [
+  // [التصنيف، الاسم، المعادلة، الوحدة، الدالة، [جيد، مقبول]، أعلى أفضل؟]
+  ['السيولة', 'نسبة التداول', 'الأصول المتداولة ÷ الالتزامات المتداولة', 'مرة', r => r.div(r.c.curA, r.c.curL), [2, 1], true],
+  ['السيولة', 'نسبة السيولة السريعة', '(الأصول المتداولة − المخزون) ÷ الالتزامات المتداولة', 'مرة', r => r.div(r.c.curA - r.c.inventory, r.c.curL), [1, 0.7], true],
+  ['السيولة', 'نسبة النقدية', 'النقدية ÷ الالتزامات المتداولة', 'مرة', r => r.div(r.c.cash, r.c.curL), [0.5, 0.2], true],
+  ['السيولة', 'رأس المال العامل', 'الأصول المتداولة − الالتزامات المتداولة', 'مبلغ', r => r.c.curA - r.c.curL, [0.0001, 0], true],
+
+  ['الربحية', 'هامش مجمل الربح', 'مجمل الربح ÷ المبيعات', '%', r => r.pct(r.c.gross, r.c.revenue), [40, 20], true],
+  ['الربحية', 'هامش الربح التشغيلي', 'الربح التشغيلي ÷ المبيعات', '%', r => r.pct(r.c.opProfit, r.c.revenue), [15, 5], true],
+  ['الربحية', 'العائد على المبيعات (هامش صافي الربح)', 'صافي الربح ÷ المبيعات', '%', r => r.pct(r.c.netProfit, r.c.revenue), [10, 5], true],
+  ['الربحية', 'العائد على الأصول (ROA)', 'صافي الربح ÷ متوسط إجمالي الأصول', '%', r => r.pct(r.c.netProfit, r.avg(x => x.curA + x.nonCurA)), [10, 5], true],
+  ['الربحية', 'العائد على حقوق الملكية (ROE)', 'صافي الربح ÷ متوسط حقوق الملكية', '%', r => r.pct(r.c.netProfit, r.avg(x => x.totE)), [15, 8], true],
+  ['الربحية', 'العائد على رأس المال المدفوع', 'صافي الربح ÷ رأس المال المدفوع', '%', r => r.pct(r.c.netProfit, r.c.capital), [20, 10], true],
+  ['الربحية', 'العائد على رأس المال المستخدم (ROCE)', 'الربح قبل الفوائد ÷ (إجمالي الأصول − الالتزامات المتداولة)', '%', r => r.pct(r.c.netProfit + r.c.finance, r.c.curA + r.c.nonCurA - r.c.curL), [15, 8], true],
+
+  ['النشاط والكفاءة', 'معدل دوران الأصول', 'المبيعات ÷ متوسط إجمالي الأصول', 'مرة', r => r.div(r.c.revenue, r.avg(x => x.curA + x.nonCurA)), [1, 0.5], true],
+  ['النشاط والكفاءة', 'معدل دوران المدينين', 'المبيعات ÷ متوسط المدينين', 'مرة', r => r.div(r.c.revenue, r.avg(x => x.receivables)), [8, 4], true],
+  ['النشاط والكفاءة', 'متوسط فترة التحصيل', '365 ÷ معدل دوران المدينين', 'يوم', r => r.days(r.c.revenue, r.avg(x => x.receivables)), [45, 90], false],
+  ['النشاط والكفاءة', 'معدل دوران المخزون', 'تكلفة المبيعات ÷ متوسط المخزون', 'مرة', r => r.div(r.c.cogs, r.avg(x => x.inventory)), [6, 3], true],
+  ['النشاط والكفاءة', 'متوسط فترة التخزين', '365 ÷ معدل دوران المخزون', 'يوم', r => r.days(r.c.cogs, r.avg(x => x.inventory)), [60, 120], false],
+  ['النشاط والكفاءة', 'متوسط فترة السداد للموردين', 'متوسط الدائنين ÷ تكلفة المبيعات × 365', 'يوم', r => r.days(r.c.cogs, r.avg(x => x.payables)), [90, 120], false],
+  ['النشاط والكفاءة', 'دورة التحويل النقدي', 'فترة التحصيل + فترة التخزين − فترة السداد', 'يوم', r => r.ccc(), [60, 120], false],
+
+  ['الرفع المالي والملاءة', 'نسبة المديونية', 'إجمالي الالتزامات ÷ إجمالي الأصول', '%', r => r.pct(r.c.curL + r.c.nonCurL, r.c.curA + r.c.nonCurA), [50, 70], false],
+  ['الرفع المالي والملاءة', 'الديون إلى حقوق الملكية', 'إجمالي الالتزامات ÷ حقوق الملكية', 'مرة', r => r.div(r.c.curL + r.c.nonCurL, r.c.totE), [1, 2], false],
+  ['الرفع المالي والملاءة', 'نسبة الملكية', 'حقوق الملكية ÷ إجمالي الأصول', '%', r => r.pct(r.c.totE, r.c.curA + r.c.nonCurA), [50, 30], true],
+  ['الرفع المالي والملاءة', 'تغطية الفوائد', 'الربح قبل الفوائد ÷ المصروفات المالية', 'مرة', r => r.div(r.c.netProfit + r.c.finance, r.c.finance), [5, 2], true],
+
+  ['التدفقات النقدية', 'نسبة التدفق النقدي التشغيلي', 'صافي النقد التشغيلي ÷ الالتزامات المتداولة', 'مرة', r => r.ocf === null ? null : r.div(r.ocf, r.c.curL), [1, 0.5], true],
+  ['التدفقات النقدية', 'جودة الأرباح', 'صافي النقد التشغيلي ÷ صافي الربح', 'مرة', r => (r.ocf === null || r.c.netProfit <= 0) ? null : r.div(r.ocf, r.c.netProfit), [1, 0.8], true],
+  ['التدفقات النقدية', 'هامش التدفق النقدي', 'صافي النقد التشغيلي ÷ المبيعات', '%', r => r.ocf === null ? null : r.pct(r.ocf, r.c.revenue), [10, 5], true]
+];
+
+/* مؤشرات سنة واحدة. c = نموذج السنة، o = نموذج أول المدة (أو null)، ocf = صافي النقد التشغيلي (أو null) */
+function ratioValues_(c, o, ocf) {
+  const div = (a, b) => (b && Math.abs(b) > 0.0001) ? a / b : null;
+  const r = {
+    c, ocf,
+    div: div,
+    pct: (a, b) => { const v = div(a, b); return v === null ? null : v * 100; },
+    avg: f => o ? (f(c) + f(o)) / 2 : f(c),
+    days: (num, avgBal) => { const t = div(num, avgBal); return (t === null || t === 0) ? null : 365 / t; }
+  };
+  r.ccc = () => {
+    const dso = r.days(c.revenue, r.avg(x => x.receivables));
+    const dio = r.days(c.cogs, r.avg(x => x.inventory));
+    const dpo = r.days(c.cogs, r.avg(x => x.payables));
+    if (dso === null && dio === null) return null;
+    return (dso || 0) + (dio || 0) - (dpo || 0);
+  };
+  return RATIO_DEFS_.map(d => { const v = d[4](r); return (v === null || !isFinite(v)) ? null : v; });
+}
+
+function rateRatio_(v, limits, higherBetter) {
+  if (v === null) return 'غير متاح';
+  if (higherBetter) return v >= limits[0] ? 'جيد' : (v >= limits[1] ? 'مقبول' : 'ضعيف');
+  return v <= limits[0] ? 'جيد' : (v <= limits[1] ? 'مقبول' : 'ضعيف');
+}
+
+function benchmarkText_(d) {
+  const u = d[3] === '%' ? '%' : (d[3] === 'يوم' ? ' يوم' : (d[3] === 'مرة' ? ' مرة' : ''));
+  if (d[3] === 'مبلغ') return 'موجب';
+  // بالكلمات بدل ≥ و≤ لأن المتصفح يعكس الرمزين في النص العربي
+  return d[5][0] + u + (d[6] ? ' فأكثر' : ' فأقل');
+}
+
+function buildRatios_(m, mOpen, ocf, p, pOpen, ocfPrev) {
+  const cur = ratioValues_(m, mOpen, ocf);
+  const prev = p ? ratioValues_(p, pOpen, ocfPrev) : null;
+  return RATIO_DEFS_.map((d, i) => ({
+    cat: d[0], name: d[1], formula: d[2], unit: d[3],
+    value: cur[i], prev: prev ? prev[i] : null,
+    benchmark: benchmarkText_(d), eval: rateRatio_(cur[i], d[5], d[6]), higherBetter: d[6]
+  }));
 }
 
 /* يضيف رقم السنة السابقة لكل سطر (بالاسم داخل نفس القسم). prevSecs = null يعني لا توجد مقارنة */
@@ -1022,8 +1104,11 @@ function saveStatementsToSheets_(clientId, year, bsObj, isObj, cfObj, ratios, wp
   [[6, 'النوع'], [7, 'السنة السابقة']].forEach(h => ensureHeaderCell_(cfSh, h[0], h[1]));
   replaceRows_(cfSh, match, cfRows);
 
-  const ratioRows = ratios.map(r => [clientId, year, r.cat + ' - ' + r.name, r.value, r.eval]);
-  replaceRows_(getSheetByNameSafe_(ss, SHEET_NAMES.RATIOS), match, ratioRows);
+  const ratioRows = ratios.map(r => [clientId, year, r.cat + ' - ' + r.name, pc(r.value), r.eval,
+    r.unit || '', pc(r.prev), r.formula || '', r.benchmark || '', r.higherBetter === false ? 'أقل أفضل' : 'أعلى أفضل']);
+  const ratSh = getSheetByNameSafe_(ss, SHEET_NAMES.RATIOS);
+  [[6, 'الوحدة'], [7, 'السنة السابقة'], [8, 'المعادلة'], [9, 'المعيار'], [10, 'الاتجاه']].forEach(h => ensureHeaderCell_(ratSh, h[0], h[1]));
+  replaceRows_(ratSh, match, ratioRows);
 }
 
 function getSavedStatements_(clientId, year) {
@@ -1087,13 +1172,20 @@ function getSavedStatements_(clientId, year) {
   });
 
   const ratios = ratRows.map(r => {
-    const full = String(r[2]);
-    return { cat: full.split(' - ')[0], name: full.split(' - ')[1] || full, value: r[3], eval: r[4] };
+    const full = String(r[2]), i = full.indexOf(' - ');
+    return { cat: i >= 0 ? full.slice(0, i) : full, name: i >= 0 ? full.slice(i + 3) : full,
+             value: pr(r[3]), eval: r[4], unit: r[5] || '', prev: pr(r[6]), formula: r[7] || '',
+             benchmark: r[8] || '', higherBetter: r[9] !== 'أقل أفضل' };
   });
+
+  // قوائم محفوظة بإصدار سابق (بدون أرقام المقارنة) بينما يوجد ميزان للسنة السابقة
+  const prevYear = String(Number(year) - 1);
+  const noCmp = bsRows.every(r => r[7] === '' || r[7] === undefined) && ratRows.every(r => r[6] === '' || r[6] === undefined);
+  const needsRefresh = (noCmp && getTrialBalance_(clientId, prevYear).length > 0) || ratRows.every(r => !r[5]);
 
   return { bs: { sections: bsSections, notes: bsNotes }, is: { items: isItems },
            cf: { items: cfSections, direct: cfDirect, notes: cfNotes }, ratios: ratios,
-           years: { cur: String(year), prev: String(Number(year) - 1) } };
+           years: { cur: String(year), prev: prevYear }, needsRefresh: needsRefresh };
 }
 
 /* ================== مقارنة السنوات ================== */

@@ -1117,12 +1117,10 @@ async function loadMapping(){
   const year = document.getElementById('mapYear').value;
   if (!cid) return;
   try{
-    const [coa, mapping, tb] = await Promise.all([call('getCOA'), call('getMapping', cid), call('getTrialBalance', cid, year)]);
+    // حسابات السنة المختارة + السنة السابقة (للأرصدة الافتتاحية في التدفقات النقدية)
+    const [coa, view] = await Promise.all([call('getCOA'), call('getMappingView', cid, year)]);
     coaData = coa;
-    mapData = tb.map(t=>{
-      const m = mapping.find(x=>String(x.clientCode)===String(t.code));
-      return { clientCode:t.code, clientName:t.name, stdCode: m?m.stdCode:'', stdName: m?m.stdName:'', notes: m?m.notes:'' };
-    });
+    mapData = view;
     renderMapping();
   } catch(e){}
 }
@@ -1138,7 +1136,7 @@ function renderMapping(){
   document.getElementById('mappingTable').innerHTML = `
     <table><thead><tr><th style="width:130px">كود الشركة</th><th>اسم الحساب بالشركة</th><th>الحساب المعياري</th><th style="width:120px">الحالة</th></tr></thead>
     <tbody>${mapData.map((m,i)=>`
-      <tr><td class="code">${esc(m.clientCode)}</td><td>${esc(m.clientName)}</td>
+      <tr><td class="code">${esc(m.clientCode)}</td><td>${esc(m.clientName)}${m.prevOnly ? ' <span class="badge b-warn" title="موجود في ميزان السنة السابقة فقط — مطلوب لحساب التدفقات النقدية">السنة السابقة فقط</span>' : ''}</td>
         <td><select onchange="updMap(${i},this.value)"><option value="">-- اختر --</option>
           ${coaData.map(c=>`<option value="${esc(c.code)}" ${String(m.stdCode)===String(c.code)?'selected':''}>${esc(c.code)} - ${esc(c.name)}</option>`).join('')}
         </select></td>
@@ -1148,9 +1146,11 @@ function renderMapping(){
 function updateMapStatus(){
   const done = mapData.filter(m=>m.stdCode).length;
   const left = mapData.length - done;
+  const prev = mapData.filter(m=>m.prevOnly).length;
+  const prevNote = prev ? ` — تشمل ${prev} حساب من ميزان السنة السابقة (مطلوبة لقائمة التدفقات النقدية)` : '';
   document.getElementById('mapStatus').innerHTML = left
-    ? `<div class="msgbar">${ic('info')} تم ربط ${done} من ${mapData.length} حساب — متبقي ${left}</div>`
-    : `<div class="msgbar ok">${ic('info')} تم ربط جميع الحسابات (${done})</div>`;
+    ? `<div class="msgbar">${ic('info')} تم ربط ${done} من ${mapData.length} حساب — متبقي ${left}${prevNote}</div>`
+    : `<div class="msgbar ok">${ic('info')} تم ربط جميع الحسابات (${done})${prevNote}</div>`;
 }
 function updMap(i, val){
   mapData[i].stdCode = val;

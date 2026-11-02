@@ -145,16 +145,26 @@ function replaceRows_(sh, shouldRemove, newRows) {
   try {
     const lastRow = sh.getLastRow();
     const lastCol = Math.max(sh.getLastColumn(), (newRows && newRows[0]) ? newRows[0].length : 1);
-    let kept = [];
+    let kept = [], footer = [];
     if (lastRow > 1) {
-      kept = sh.getRange(2, 1, lastRow - 1, lastCol).getValues().filter(r => !shouldRemove(r));
+      const range = sh.getRange(2, 1, lastRow - 1, lastCol);
+      const vals = range.getValues(), forms = range.getFormulas();
+      vals.forEach((r, i) => {
+        const row = r.map((v, j) => forms[i][j] || v);   // الحفاظ على معادلات المستخدم
+        if (String(r[0]).trim() === '') {
+          // صفوف بدون ClientID (مثل صف إجماليات أضافه المستخدم) تبقى في آخر الجدول
+          if (r.some(x => x !== '')) footer.push(row);
+        } else if (!shouldRemove(r)) {
+          kept.push(row);
+        }
+      });
     }
     const added = (newRows || []).map(r => {
       const a = r.slice(0, lastCol);
       while (a.length < lastCol) a.push('');
       return a;
     });
-    const all = kept.concat(added);
+    const all = kept.concat(added, footer);
     if (lastRow > 1) sh.getRange(2, 1, lastRow - 1, lastCol).clearContent();
     if (all.length) sh.getRange(2, 1, all.length, lastCol).setValues(all);
   } finally {
@@ -223,7 +233,7 @@ function api(token, fn, args) {
     getDashboardStats: getDashboardStats_,
     getClients: getClients_, saveClient: saveClient_, deleteClient: deleteClient_,
     getTrialBalance: getTrialBalance_, saveTrialBalance: saveTrialBalance_,
-    getMapping: getMapping_, saveMapping: saveMapping_, autoMapClient: autoMapClient_,
+    getMapping: getMapping_, getMappingView: getMappingView_, saveMapping: saveMapping_, autoMapClient: autoMapClient_,
     computeStatements: computeStatements_, getSavedStatements: getSavedStatements_,
     getComparisonData: getComparisonData_,
     getWorkingPaper: getWorkingPaper_, checkTrialBalanceDuplicate: checkTrialBalanceDuplicate_
@@ -403,21 +413,45 @@ function getMapping_(clientId) {
   }));
 }
 
+/* يحدّث ربط الحسابات المرسلة فقط، ويحتفظ بربط باقي حسابات العميل (حسابات السنوات الأخرى) */
 function saveMapping_(clientId, rows) {
   const sh = requireSheet_(SHEET_NAMES.MAPPING);
+  const codes = {};
+  (rows || []).forEach(r => codes[String(r.clientCode)] = true);
   const newRows = (rows || []).map(r => [clientId, r.clientCode, r.clientName, r.stdCode, r.stdName, r.notes || '']);
-  replaceRows_(sh, r => String(r[0]) === String(clientId), newRows);
+  replaceRows_(sh, r => String(r[0]) === String(clientId) && codes[String(r[1])], newRows);
   return true;
+}
+
+/* حسابات ميزان السنة المختارة + حسابات السنة السابقة (تحتاجها التدفقات النقدية كأرصدة افتتاحية) */
+function mappingAccounts_(clientId, year) {
+  const seen = {}, out = [];
+  const add = (list, prevOnly) => list.forEach(t => {
+    if (t.code && !seen[t.code]) { seen[t.code] = true; out.push({ code: t.code, name: t.name, prevOnly }); }
+  });
+  add(getTrialBalance_(clientId, year), false);
+  add(getTrialBalance_(clientId, String(Number(year) - 1)), true);
+  return out;
+}
+
+function getMappingView_(clientId, year) {
+  const map = {};
+  getMapping_(clientId).forEach(m => map[m.clientCode] = m);
+  return mappingAccounts_(clientId, year).map(a => {
+    const m = map[a.code];
+    return { clientCode: a.code, clientName: a.name, stdCode: m ? m.stdCode : '', stdName: m ? m.stdName : '',
+             notes: m ? m.notes : '', prevOnly: a.prevOnly };
+  });
 }
 
 function autoMapClient_(clientId, year) {
   const coa = getCOA_();
-  const tb  = getTrialBalance_(clientId, year);
+  const tb  = mappingAccounts_(clientId, year);
   const existing = {};
   getMapping_(clientId).forEach(m => existing[m.clientCode] = m);
 
   const results = tb.map(t => {
-    if (existing[t.code] && existing[t.code].stdCode) return existing[t.code];
+    if (existing[t.code] && existing[t.code].stdCode) return Object.assign({}, existing[t.code], { prevOnly: t.prevOnly });
     const tName = String(t.name || '').trim();
     let exact = null, fuzzy = null;
     if (tName) {
@@ -429,7 +463,7 @@ function autoMapClient_(clientId, year) {
       });
     }
     const best = exact || fuzzy;
-    return { clientCode: t.code, clientName: t.name, stdCode: best ? best.code : '', stdName: best ? best.name : '', notes: best ? (exact ? 'مطابقة تامة' : 'مطابقة جزئية') : 'يحتاج ربط يدوي' };
+    return { clientCode: t.code, clientName: t.name, stdCode: best ? best.code : '', stdName: best ? best.name : '', notes: best ? (exact ? 'مطابقة تامة' : 'مطابقة جزئية') : 'يحتاج ربط يدوي', prevOnly: t.prevOnly };
   });
   saveMapping_(clientId, results);
   return results;
@@ -540,7 +574,43 @@ function buildModel_(raw, accs) {
  * قائمة التدفقات النقدية وفق IAS 7 (الطريقة غير المباشرة + إفصاح بالطريقة المباشرة)
  * كل حساب ميزانية غير نقدي يدخل في نشاطه حسب "تصنيف التدفقات" في الدليل، لذا تتطابق النقدية دائماً.
  */
-function buildCashFlow_(accs, m, p, shown, hasPrev, prevYear) {
+/* تنسيق رقم بفواصل الآلاف (بدون الاعتماد على Intl في Apps Script) */
+function fmtN_(n) {
+  const s = (Math.round(Number(n) * 100) / 100).toFixed(2);
+  const parts = s.split('.');
+  return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + parts[1];
+}
+
+/* حسابات في ميزان العميل لها رصيد ولم تُربط بحساب موجود في الدليل */
+function unmappedAccounts_(tb, mapping, coaMap) {
+  const mapped = {};
+  mapping.forEach(m => { if (m.clientCode && m.stdCode && coaMap[m.stdCode]) mapped[m.clientCode] = true; });
+  const bal = {}, names = {};
+  tb.forEach(t => {
+    if (!t.code || mapped[t.code]) return;
+    bal[t.code] = (bal[t.code] || 0) + (Number(t.debit) || 0) - (Number(t.credit) || 0);
+    names[t.code] = t.name;
+  });
+  return Object.keys(bal).filter(c => Math.abs(bal[c]) > 0.005).map(c => ({ code: c, name: names[c], raw: bal[c] }));
+}
+
+/* فرق توازن الميزانية بعد الربط = الأصول − (الالتزامات + حقوق الملكية) */
+function bsDiff_(m) {
+  return Math.round(((m.curA + m.nonCurA) - (m.curL + m.nonCurL + m.totE)) * 100) / 100;
+}
+
+/* شرح سبب عدم توازن ميزانية سنة معينة */
+function explainYear_(label, year, diff, unmapped) {
+  if (Math.abs(diff) < 0.005) return '';
+  let s = label + ' ' + year + ' غير متوازنة بعد الربط بفرق ' + fmtN_(diff);
+  if (unmapped.length) {
+    s += ' — بها ' + unmapped.length + ' حساب غير مربوط (مثل: ' +
+         unmapped.slice(0, 5).map(u => u.code + ' ' + u.name).join('، ') + (unmapped.length > 5 ? '...' : '') + ')';
+  }
+  return s + '.';
+}
+
+function buildCashFlow_(accs, m, p, shown, hasPrev, prevYear, diag) {
   const d = a => m.val(a) - p.val(a);
   const bsNonCash = accs.filter(a => BS_KINDS_[a.kind] && !a.isCash && shown(a));
   const notes = [];
@@ -614,7 +684,18 @@ function buildCashFlow_(accs, m, p, shown, hasPrev, prevYear) {
   if (!hasPrev) notes.push('لا يوجد ميزان مراجعة لسنة ' + prevYear + ' — تم اعتبار الأرصدة الافتتاحية صفراً (مناسب فقط للسنة الأولى للشركة). أدخل ميزان السنة السابقة للحصول على تدفقات دقيقة.');
   if (!m.isPreClosing) notes.push('ميزان المراجعة بعد الإقفال (حسابات الإيرادات والمصروفات صفر)، لذا يظهر الربح ضمن حركة حقوق الملكية وليس في الأنشطة التشغيلية.');
   if (!accs.some(a => a.isCash)) notes.push('لا يوجد حساب نقدية في الدليل. حدد "نقدية" في عمود تصنيف التدفقات لحسابات النقدية والبنوك.');
-  if (diff !== 0) notes.push('يوجد فرق غير مطابق في النقدية = ' + diff.toFixed(2) + ' — السبب غالباً حسابات غير مربوطة أو ميزان غير متوازن.');
+  if (diff !== 0) {
+    // رياضياً: فرق النقدية = فرق توازن الميزانية الافتتاحية − فرق توازن الميزانية الختامية
+    const why = [
+      explainYear_('ميزانية', diag.year, diag.curDiff, diag.curUnmapped),
+      explainYear_('الأرصدة الافتتاحية (ميزان', prevYear + ')', diag.prevDiff, diag.prevUnmapped)
+    ].filter(Boolean);
+    let msg = 'يوجد فرق غير مطابق في النقدية = ' + fmtN_(diff) + '. ';
+    msg += why.length ? 'السبب: ' + why.join(' ') : 'السبب غالباً حسابات غير مربوطة أو ميزان غير متوازن.';
+    if (diag.prevUnmapped.length) msg += ' الحل: افتح "ربط الحسابات" لسنة ' + diag.year + ' (تعرض الآن حسابات ' + prevYear + ' أيضاً) واربطها ثم أعد إعداد القوائم.';
+    else if (diag.curUnmapped.length) msg += ' الحل: اربط هذه الحسابات من صفحة "ربط الحسابات" ثم أعد إعداد القوائم.';
+    notes.push(msg);
+  }
   notes.push('تم تصنيف الفوائد المدفوعة ضمن الأنشطة التشغيلية (IAS 7 فقرة 33).');
 
   return { items, direct, notes, opTotal };
@@ -722,11 +803,18 @@ function computeStatements_(clientId, year) {
     ],
     notes: []
   };
-  const bsDiff = Math.round((totA - totLE) * 100) / 100;
-  if (bsDiff !== 0) bsObj.notes.push('الميزانية غير متوازنة بفرق ' + bsDiff.toFixed(2) + ' — راجع الحسابات غير المربوطة في ورقة العمل أو توازن ميزان المراجعة.');
+  const diag = {
+    year: String(year),
+    curDiff: bsDiff_(m), curUnmapped: unmappedAccounts_(tb, mapping, coaMap),
+    prevDiff: tbPrev.length ? bsDiff_(p) : 0, prevUnmapped: unmappedAccounts_(tbPrev, mapping, coaMap)
+  };
+  if (diag.curDiff !== 0) {
+    bsObj.notes.push(explainYear_('ميزانية', diag.year, diag.curDiff, diag.curUnmapped) +
+      ' راجع ورقة العمل وصفحة "ربط الحسابات".');
+  }
 
   /* ---------- التدفقات والمؤشرات ---------- */
-  const cf = buildCashFlow_(accs, m, p, shown, tbPrev.length > 0, prevYear);
+  const cf = buildCashFlow_(accs, m, p, shown, tbPrev.length > 0, prevYear, diag);
   const cfObj = { items: cf.items, direct: cf.direct, notes: cf.notes };
 
   const safe = (a, b) => b ? a / b : 0;

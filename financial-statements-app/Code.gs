@@ -236,7 +236,8 @@ function api(token, fn, args) {
     getMapping: getMapping_, getMappingView: getMappingView_, saveMapping: saveMapping_, autoMapClient: autoMapClient_,
     computeStatements: computeStatements_, getSavedStatements: getSavedStatements_,
     getComparisonData: getComparisonData_,
-    getWorkingPaper: getWorkingPaper_, checkTrialBalanceDuplicate: checkTrialBalanceDuplicate_
+    getWorkingPaper: getWorkingPaper_, checkTrialBalanceDuplicate: checkTrialBalanceDuplicate_,
+    getNotes: getNotes_
   };
   const f = routes[fn];
   if (!f) throw new Error('عملية غير مسموحة: ' + fn);
@@ -528,16 +529,22 @@ function classifyAccount_(c) {
 }
 
 /* رصيد كل حساب معياري = مجموع (مدين − دائن) لحسابات العميل المربوطة به */
+/* حساب العميل ← الحساب المعياري (آخر ربط للحساب، ويُتجاهل الربط بحساب محذوف من الدليل) */
+function mappedStd_(mapping, coaMap) {
+  const uniq = {};
+  mapping.forEach(m => { if (m.clientCode && m.stdCode) uniq[m.clientCode] = m.stdCode; });
+  Object.keys(uniq).forEach(cc => { if (!coaMap[uniq[cc]]) delete uniq[cc]; });
+  return uniq;
+}
+
 function stdRawBalances_(tb, mapping, coaMap) {
   const tbMap = {};
   tb.forEach(t => { if (t.code) tbMap[t.code] = (tbMap[t.code] || 0) + (Number(t.debit) || 0) - (Number(t.credit) || 0); });
-  const uniq = {};
-  mapping.forEach(m => { if (m.clientCode && m.stdCode) uniq[m.clientCode] = m.stdCode; });
+  const uniq = mappedStd_(mapping, coaMap);
   const raw = {};
   Object.keys(uniq).forEach(cc => {
-    const sc = uniq[cc];
-    if (!coaMap[sc] || tbMap[cc] === undefined) return;
-    raw[sc] = (raw[sc] || 0) + tbMap[cc];
+    if (tbMap[cc] === undefined) return;
+    raw[uniq[cc]] = (raw[uniq[cc]] || 0) + tbMap[cc];
   });
   return raw;
 }
@@ -748,7 +755,8 @@ function getWorkingPaper_(clientId, year) {
   return buildWorkingPaper_(tb, getMapping_(clientId), getCOA_());
 }
 
-function computeStatements_(clientId, year) {
+/* بيانات سنة واحدة + السنة السابقة، مشتركة بين القوائم والمرفقات */
+function loadYearData_(clientId, year) {
   const tb = getTrialBalance_(clientId, year);
   if (!tb.length) throw new Error('لا يوجد ميزان مراجعة لهذا العميل والسنة');
   const mapping = getMapping_(clientId);
@@ -758,7 +766,7 @@ function computeStatements_(clientId, year) {
   const coaMap = {}; coa.forEach(c => coaMap[c.code] = c);
   const accs = sortedAccounts_(coa);
 
-  // السنة الحالية والسابقة (السابقة للتدفقات النقدية)
+  // السنة الحالية والسابقة (السابقة للتدفقات النقدية وأرقام المقارنة)
   const prevYear = String(Number(year) - 1);
   const tbPrev = getTrialBalance_(clientId, prevYear);
   const m = buildModel_(stdRawBalances_(tb, mapping, coaMap), accs);
@@ -766,7 +774,64 @@ function computeStatements_(clientId, year) {
 
   // يظهر الحساب إذا كان له رصيد في السنة الحالية أو السابقة
   const shown = a => Math.abs(m.raw[a.code] || 0) > 0.0001 || Math.abs(p.raw[a.code] || 0) > 0.0001;
+  return { tb, tbPrev, mapping, coa, coaMap, accs, prevYear, m, p, shown };
+}
+
+const GROUP_TITLES_ = {
+  assetC:'الأصول المتداولة', assetNC:'الأصول غير المتداولة', liabilityC:'الالتزامات المتداولة',
+  liabilityNC:'الالتزامات غير المتداولة', equity:'حقوق الملكية', revenue:'الإيرادات', cogs:'تكلفة المبيعات',
+  opex:'المصروفات التشغيلية', otherIncome:'إيرادات أخرى', finance:'مصروفات مالية وأخرى'
+};
+
+/**
+ * المرفقات (الإيضاحات المتممة): لكل بند في القوائم إيضاح مرقّم يفصّل حسابات العميل المكوّنة له
+ * للسنة الحالية والسابقة. الترقيم بنفس ترتيب ظهور البنود في الميزانية ثم قائمة الدخل.
+ * المبالغ بطبيعة الحساب (المصروفات موجبة كما هو متعارف عليه في الإيضاحات).
+ */
+function buildNotes_(d) {
+  const toStd = mappedStd_(d.mapping, d.coaMap);
+  const byStd = {};
+  const add = (list, key) => list.forEach(t => {
+    const sc = toStd[t.code];
+    if (!t.code || !sc) return;
+    const bucket = byStd[sc] = byStd[sc] || {};
+    const e = bucket[t.code] = bucket[t.code] || { code: t.code, name: t.name, cur: 0, prev: 0 };
+    if (key === 'cur') e.name = t.name;
+    e[key] += (Number(t.debit) || 0) - (Number(t.credit) || 0);
+  });
+  add(d.tbPrev, 'prev');
+  add(d.tb, 'cur');
+
+  const notes = [];
+  d.accs.filter(d.shown).forEach(a => {
+    const rows = Object.keys(byStd[a.code] || {}).map(k => byStd[a.code][k])
+      .map(r => ({ code: r.code, name: r.name, cur: signedValue_(a.kind, r.cur), prev: signedValue_(a.kind, r.prev) }))
+      .filter(r => Math.abs(r.cur) > 0.0001 || Math.abs(r.prev) > 0.0001)
+      .sort((x, y) => String(x.code).localeCompare(String(y.code)));
+    notes.push({
+      no: notes.length + 1, stdCode: a.code, title: a.name,
+      stmt: BS_KINDS_[a.kind] ? 'الميزانية العمومية' : 'قائمة الدخل', group: GROUP_TITLES_[a.group],
+      rows: rows, totalCur: d.m.val(a), totalPrev: d.p.val(a)
+    });
+  });
+  return notes;
+}
+
+function getNotes_(clientId, year) {
+  const d = loadYearData_(clientId, year);
+  const client = getClients_().find(c => String(c.id) === String(clientId)) || {};
+  return { year: String(year), prevYear: d.prevYear, hasPrev: d.tbPrev.length > 0,
+           clientName: client.name || '', currency: client.currency || '', endDate: client.endDate || '',
+           notes: buildNotes_(d) };
+}
+
+function computeStatements_(clientId, year) {
+  const d = loadYearData_(clientId, year);
+  const { tb, tbPrev, mapping, coa, coaMap, accs, prevYear, m, p, shown } = d;
   const lines = group => accs.filter(a => a.group === group && shown(a));
+  // رقم الإيضاح لكل بند
+  const noteNo = {};
+  buildNotes_(d).forEach(n => noteNo[n.stdCode] = n.no);
 
   /* ---------- قائمة الدخل ---------- */
   const isItems = [];
@@ -774,7 +839,7 @@ function computeStatements_(clientId, year) {
     const list = lines(group);
     if (!list.length) return;
     isItems.push({ name: heading, heading: true });
-    list.forEach(a => isItems.push({ name: a.name, value: sign * m.val(a) }));
+    list.forEach(a => isItems.push({ name: a.name, value: sign * m.val(a), note: noteNo[a.code] }));
   };
   addGroup('revenue', 'الإيرادات:', 1);
   addGroup('cogs', 'يخصم: تكلفة المبيعات:', -1);
@@ -787,7 +852,7 @@ function computeStatements_(clientId, year) {
   const isObj = { items: isItems };
 
   /* ---------- الميزانية العمومية ---------- */
-  const items = group => lines(group).map(a => ({ name: a.name, value: m.val(a) }));
+  const items = group => lines(group).map(a => ({ name: a.name, value: m.val(a), note: noteNo[a.code] }));
   const totA = m.curA + m.nonCurA;
   const totLE = m.curL + m.nonCurL + m.totE;
   const bsObj = {
@@ -850,15 +915,15 @@ function saveStatementsToSheets_(clientId, year, bsObj, isObj, cfObj, ratios, wp
   // عمود "النوع" في كل القوائم: بند / عنوان / إجمالي / نهائي / ملاحظة
   const bsRows = [];
   bsObj.sections.forEach(sec => {
-    (sec.items || []).forEach(it => bsRows.push([clientId, year, sec.section, it.name, it.value, 'بند']));
+    (sec.items || []).forEach(it => bsRows.push([clientId, year, sec.section, it.name, it.value, 'بند', it.note || '']));
     if (sec.total !== undefined) bsRows.push([clientId, year, sec.section, sec.totalName || 'الإجمالي', sec.total, 'إجمالي']);
   });
   (bsObj.notes || []).forEach(n => bsRows.push([clientId, year, 'ملاحظات', n, '', 'ملاحظة']));
-  replaceRows_(ensureHeaderCell_(getSheetByNameSafe_(ss, SHEET_NAMES.BS), 6, 'النوع'), match, bsRows);
+  replaceRows_(ensureHeaderCell_(ensureHeaderCell_(getSheetByNameSafe_(ss, SHEET_NAMES.BS), 6, 'النوع'), 7, 'إيضاح'), match, bsRows);
 
   const isRows = isObj.items.map(it => [clientId, year, it.name, it.heading ? '' : it.value,
-    it.heading ? 'عنوان' : (it.isFinal ? 'نهائي' : (it.isTotal ? 'إجمالي' : 'بند'))]);
-  replaceRows_(ensureHeaderCell_(getSheetByNameSafe_(ss, SHEET_NAMES.IS), 5, 'النوع'), match, isRows);
+    it.heading ? 'عنوان' : (it.isFinal ? 'نهائي' : (it.isTotal ? 'إجمالي' : 'بند')), it.note || '']);
+  replaceRows_(ensureHeaderCell_(ensureHeaderCell_(getSheetByNameSafe_(ss, SHEET_NAMES.IS), 5, 'النوع'), 6, 'إيضاح'), match, isRows);
 
   const cfRows = [];
   (cfObj.items || []).concat(cfObj.direct || []).forEach(sec => {
@@ -903,14 +968,14 @@ function getSavedStatements_(clientId, year) {
       if (secName.startsWith('إجمالي')) sec.isTotal = true;
     } else {
       if (!sec.items) sec.items = [];
-      sec.items.push({ name: itemName, value: val });
+      sec.items.push({ name: itemName, value: val, note: r[6] || '' });
     }
   });
 
   const isItems = isRows.map(r => {
     const name = String(r[2]), kind = String(r[4] || '');
     if (kind === 'عنوان') return { name: name, heading: true };
-    if (kind) return { name: name, value: r[3], isTotal: kind === 'إجمالي' || kind === 'نهائي', isFinal: kind === 'نهائي' };
+    if (kind) return { name: name, value: r[3], isTotal: kind === 'إجمالي' || kind === 'نهائي', isFinal: kind === 'نهائي', note: r[5] || '' };
     return { name: name, value: r[3], isTotal: name.includes('مجمل الربح') || name.includes('الربح التشغيلي'), isFinal: name.includes('صافي الربح') };
   });
 

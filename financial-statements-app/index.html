@@ -133,6 +133,8 @@ th.num{text-align:left;}
 .code{font-family:'Segoe UI',Consolas,monospace;color:var(--primary);font-weight:600;}
 tr.sec-row td{background:var(--primary-lighter) !important;font-weight:600;color:var(--primary-pressed);height:36px;}
 #coaTable td{white-space:nowrap;}
+th.note-col,td.note-ref{text-align:center;width:64px;color:var(--primary);font-weight:600;}
+.notes-group{font-size:15px;font-weight:600;color:var(--topbar);margin:20px 0 10px;padding-right:10px;border-right:4px solid var(--primary);}
 tr.sub-head td{font-weight:600;color:var(--muted);font-size:13px;height:34px;padding-right:20px;}
 .stmt-total td{font-weight:600;background:var(--sitemap);border-top:1px solid var(--border-strong);}
 .stmt-final td{font-weight:700;background:var(--primary-light) !important;color:var(--primary-pressed);border-top:2px solid var(--primary);}
@@ -229,6 +231,7 @@ button.btn.warn:hover{background:#A6860A;}
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></symbol>
   <symbol id="i-review" viewBox="0 0 24 24"><path d="M9 4h6v3H9zM9 5H6v16h12V5h-3M9 13l2 2 4-4"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7"/></symbol>
   <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2zM12 10v5M12 18h.01"/></symbol>
 </svg>
 
@@ -276,6 +279,7 @@ button.btn.warn:hover{background:#A6860A;}
       <button data-tab="ratios"><svg class="ic"><use href="#i-chart"/></svg><span class="lbl">مؤشرات الأداء</span></button>
       <button data-tab="compare"><svg class="ic"><use href="#i-scale"/></svg><span class="lbl">مقارنة السنوات</span></button>
       <button data-tab="wp"><svg class="ic"><use href="#i-review"/></svg><span class="lbl">ورقة العمل</span></button>
+      <button data-tab="notes"><svg class="ic"><use href="#i-clip"/></svg><span class="lbl">المرفقات (الإيضاحات)</span></button>
     </nav>
 
     <main>
@@ -283,6 +287,7 @@ button.btn.warn:hover{background:#A6860A;}
       <section id="tab-dash" class="tab">
         <div class="cmdbar">
           <button class="cmd" onclick="loadDashboard()"><svg class="ic"><use href="#i-refresh"/></svg>تحديث</button>
+          <button class="cmd excel" onclick="exportToExcel('tab-dash', 'آخر_العملاء')"><svg class="ic"><use href="#i-excel"/></svg>تصدير إلى Excel</button>
         </div>
         <div class="page-head"><div class="crumb">عام</div><h1>لوحة التحكم</h1></div>
         <div class="content">
@@ -298,6 +303,7 @@ button.btn.warn:hover{background:#A6860A;}
           <button class="cmd" onclick="resetCOAForm()"><svg class="ic"><use href="#i-add"/></svg>جديد</button>
           <span class="vsep"></span>
           <button class="cmd" onclick="loadCOA()"><svg class="ic"><use href="#i-refresh"/></svg>تحديث</button>
+          <button class="cmd excel" onclick="exportToExcel('tab-coa', 'دليل_الحسابات')"><svg class="ic"><use href="#i-excel"/></svg>تصدير إلى Excel</button>
         </div>
         <div class="page-head"><div class="crumb">البيانات الأساسية</div><h1>دليل الحسابات المعياري</h1></div>
         <div class="content">
@@ -343,6 +349,7 @@ button.btn.warn:hover{background:#A6860A;}
           <button class="cmd" onclick="resetClientForm()"><svg class="ic"><use href="#i-add"/></svg>جديد</button>
           <span class="vsep"></span>
           <button class="cmd" onclick="loadClients()"><svg class="ic"><use href="#i-refresh"/></svg>تحديث</button>
+          <button class="cmd excel" onclick="exportToExcel('tab-clients', 'العملاء')"><svg class="ic"><use href="#i-excel"/></svg>تصدير إلى Excel</button>
         </div>
         <div class="page-head"><div class="crumb">البيانات الأساسية</div><h1>العملاء</h1></div>
         <div class="content">
@@ -379,6 +386,8 @@ button.btn.warn:hover{background:#A6860A;}
           <button class="cmd excel" onclick="document.getElementById('excelUpload').click()"><svg class="ic"><use href="#i-upload"/></svg>استيراد من Excel</button>
           <input type="file" id="excelUpload" accept=".xlsx, .xls, .csv" style="display:none" onchange="handleExcelUpload(this)">
           <span class="vsep"></span>
+          <button class="cmd excel" onclick="exportToExcel('tab-tb', 'ميزان_المراجعة')"><svg class="ic"><use href="#i-excel"/></svg>تصدير إلى Excel</button>
+          <span class="vsep"></span>
           <button class="cmd danger" onclick="clearTB()"><svg class="ic"><use href="#i-delete"/></svg>مسح</button>
         </div>
         <div class="page-head"><div class="crumb">العمليات</div><h1>ميزان المراجعة</h1></div>
@@ -402,6 +411,7 @@ button.btn.warn:hover{background:#A6860A;}
           <button class="cmd" onclick="autoMap()"><svg class="ic"><use href="#i-spark"/></svg>ربط تلقائي</button>
           <span class="vsep"></span>
           <button class="cmd" onclick="loadMapping()"><svg class="ic"><use href="#i-refresh"/></svg>تحديث</button>
+          <button class="cmd excel" onclick="exportToExcel('tab-mapping', 'ربط_الحسابات')"><svg class="ic"><use href="#i-excel"/></svg>تصدير إلى Excel</button>
         </div>
         <div class="page-head"><div class="crumb">العمليات</div><h1>ربط الحسابات</h1></div>
         <div class="content">
@@ -423,7 +433,9 @@ button.btn.warn:hover{background:#A6860A;}
           <button class="cmd" onclick="loadSavedStatements()"><svg class="ic"><use href="#i-eye"/></svg>عرض المحفوظ</button>
           <span class="vsep"></span>
           <button class="cmd" onclick="printReport('statementsArea', 'القوائم المالية')"><svg class="ic"><use href="#i-print"/></svg>طباعة</button>
-          <button class="cmd excel" onclick="exportToExcel('statementsArea', 'القوائم_المالية')"><svg class="ic"><use href="#i-excel"/></svg>تصدير إلى Excel</button>
+          <button class="cmd" onclick="printStatementsWithNotes()"><svg class="ic"><use href="#i-clip"/></svg>طباعة القوائم مع المرفقات</button>
+          <button class="cmd excel" onclick="exportToExcel('statementsArea', 'القوائم_المالية', {perCard:true})"><svg class="ic"><use href="#i-excel"/></svg>تصدير إلى Excel</button>
+          <button class="cmd excel" onclick="exportFullWorkbook('stmtClient','stmtYear')"><svg class="ic"><use href="#i-excel"/></svg>ملف Excel شامل</button>
         </div>
         <div class="page-head"><div class="crumb">التقارير</div><h1>القوائم المالية</h1></div>
         <div class="content">
@@ -476,6 +488,27 @@ button.btn.warn:hover{background:#A6860A;}
             </div>
           </div>
           <div id="compareArea"></div>
+        </div>
+      </section>
+
+      <!-- Notes (supporting schedules) -->
+      <section id="tab-notes" class="tab hidden">
+        <div class="cmdbar">
+          <button class="cmd" onclick="loadNotes()"><svg class="ic"><use href="#i-eye"/></svg>عرض المرفقات</button>
+          <span class="vsep"></span>
+          <button class="cmd" onclick="printReport('notesArea', 'الإيضاحات المتممة للقوائم المالية')"><svg class="ic"><use href="#i-print"/></svg>طباعة المرفقات</button>
+          <button class="cmd excel" onclick="exportToExcel('notesArea', 'المرفقات')"><svg class="ic"><use href="#i-excel"/></svg>تصدير إلى Excel</button>
+          <button class="cmd excel" onclick="exportFullWorkbook('notesClient','notesYear')"><svg class="ic"><use href="#i-excel"/></svg>ملف Excel شامل</button>
+        </div>
+        <div class="page-head"><div class="crumb">التقارير</div><h1>المرفقات — الإيضاحات المتممة للقوائم المالية</h1></div>
+        <div class="content">
+          <div class="card">
+            <div class="row" style="margin-bottom:0">
+              <div class="field"><label>العميل</label><select id="notesClient"></select></div>
+              <div class="field"><label>السنة المالية</label><input id="notesYear" type="number"></div>
+            </div>
+          </div>
+          <div id="notesArea"></div>
         </div>
       </section>
 
@@ -629,7 +662,7 @@ function showLogin(msg) {
   document.getElementById('loginOverlay').style.display = 'flex';
   document.getElementById('loginPassword').value = '';
   wpData = [];
-  ['dashKpis','dashClients','coaTable','clientsTable','tbTable','tbStatus','tbDupWarn','mappingTable','mapStatus','statementsArea','ratiosArea','compareArea','wpArea']
+  ['dashKpis','dashClients','coaTable','clientsTable','tbTable','tbStatus','tbDupWarn','mappingTable','mapStatus','statementsArea','ratiosArea','compareArea','wpArea','notesArea']
     .forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
   setLoginMsg(msg || '', 'var(--danger)');
   document.getElementById('loginUsername').focus();
@@ -674,13 +707,12 @@ const REPORT_FIELDS = {
   statementsArea: { client:'stmtClient',  year:'stmtYear' },
   ratiosArea:     { client:'ratioClient', year:'ratioYear' },
   compareArea:    { client:'compClient',  year:null },
-  wpArea:         { client:'wpClient',    year:'wpYear' }
+  wpArea:         { client:'wpClient',    year:'wpYear' },
+  notesArea:      { client:'notesClient', year:'notesYear' }
 };
 
-function printReport(elementId, reportTitle) {
-  const content = document.getElementById(elementId).innerHTML;
-  if (!content.trim()) return toast('لا يوجد شيء لطباعته', false);
-
+// العميل والسنة المعروضان في منطقة تقرير
+function reportMeta(elementId){
   const f = REPORT_FIELDS[elementId] || {};
   const clientSel = f.client ? document.getElementById(f.client) : null;
   const clientName = clientSel?.selectedOptions[0]?.text || '';
@@ -688,9 +720,21 @@ function printReport(elementId, reportTitle) {
   if (elementId === 'compareArea') {
     year = document.getElementById('compYear1').value + ' / ' + document.getElementById('compYear2').value;
   }
+  return { clientName, year };
+}
 
+function printReport(elementId, reportTitle) {
+  const content = document.getElementById(elementId).innerHTML;
+  if (!content.trim()) return toast('لا يوجد شيء لطباعته', false);
+  const meta = reportMeta(elementId);
+  printHtml(reportTitle, content, meta.clientName, meta.year);
+}
+
+// win اختياري: نافذة مفتوحة مسبقاً (لتجنّب حظر النوافذ المنبثقة بعد انتظار الخادم)
+function printHtml(reportTitle, content, clientName, year, win) {
   const date = new Date().toLocaleDateString('ar-EG');
-  const printWindow = window.open('', '_blank');
+  const printWindow = win || window.open('', '_blank');
+  if (!printWindow) return toast('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة لهذا الموقع', false);
 
   printWindow.document.write(`
     <html dir="rtl">
@@ -723,6 +767,10 @@ function printReport(elementId, reportTitle) {
         .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight:600; }
         .b-good { background:#DFF6DD; color:#107C10; } .b-bad { background:#FDE7E9; color:#A4262C; }
         .ic, svg { display:none; }
+        .note-col, .note-ref { text-align: center; width: 60px; }
+        .notes-group { font-size: 14px; font-weight: 700; color: #002050; margin: 22px 0 8px; padding-right: 8px; border-right: 4px solid #0078D4; }
+        .notes-title { font-size: 18px; color: #002050; text-align: center; margin: 0 0 16px; }
+        .page-break { page-break-before: always; }
         .report-footer { margin-top: 60px; display: flex; justify-content: space-between; font-size: 13px; }
         .signature { border-top: 1px solid #323130; width: 200px; text-align: center; padding-top: 8px; }
         @media print { body { padding: 0; } th, .sec-row td, .stmt-final td, .report-meta { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
@@ -751,31 +799,158 @@ function printReport(elementId, reportTitle) {
 }
 
 /* ================= تصدير إلى إكسيل ================= */
-function exportToExcel(containerId, fileName) {
+const XL_NUM = '#,##0.00;(#,##0.00);"-"';
+const xlNum = v => ({ v: Number(v) || 0, z: XL_NUM });
+
+function xlReady(){
+  if (typeof XLSX === 'undefined') { toast('مكتبة Excel لم تُحمّل — تحقق من الاتصال بالإنترنت ثم أعد فتح التطبيق', false); return false; }
+  return true;
+}
+function newWorkbook(){ const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{ RTL: true }] }; return wb; }
+
+// rows: مصفوفة صفوف، والخلية قيمة أو {v, z} لرقم بتنسيق
+function addSheet(wb, name, rows){
+  const aoa = rows.map(r => r.map(c => (c && typeof c === 'object') ? c.v : c));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  rows.forEach((r, R) => r.forEach((c, C) => {
+    if (c && typeof c === 'object' && c.z) { const ref = XLSX.utils.encode_cell({ r: R, c: C }); if (ws[ref]) ws[ref].z = c.z; }
+  }));
+  const widths = [];
+  aoa.forEach(r => r.forEach((v, i) => {
+    const len = typeof v === 'number' ? 16 : String(v == null ? '' : v).length + 2;
+    widths[i] = Math.min(60, Math.max(widths[i] || 10, len));
+  }));
+  ws['!cols'] = widths.map(w => ({ wch: w }));
+  let base = String(name || 'Sheet').split('—')[0].replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').replace(/[\\\/\?\*\[\]:]/g, ' ').trim().slice(0, 31) || 'Sheet';
+  let sheetName = base, k = 2;
+  while (wb.SheetNames.includes(sheetName)) sheetName = base.slice(0, 27) + ' ' + (k++);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+}
+function saveWorkbook(wb, fileName){
+  XLSX.writeFile(wb, String(fileName).replace(/[\\/:*?"<>|]/g, '_') + '.xlsx');
+}
+
+// قيمة خلية HTML للتصدير: الحقول تؤخذ قيمتها، وخلايا المبالغ تتحول لأرقام حقيقية
+function xlCell(cell){
+  const sel = cell.querySelector('select'), inp = cell.querySelector('input');
+  const text = sel ? (sel.selectedOptions[0]?.text || '') : (inp ? inp.value : cell.innerText.trim());
+  const numeric = cell.classList.contains('num') || (inp && inp.type === 'number');
+  if (!numeric) return text;
+  const t = text.replace(/[\s,]/g, '');
+  const m = t.match(/^([+-]?)\(?(\d+(?:\.\d+)?)\)?(%?)$/);
+  if (!m) return text;
+  let v = Number(m[2]);
+  if (m[1] === '-' || t.includes('(')) v = -v;
+  return m[3] ? { v: v / 100, z: '0.00%' } : { v: v, z: XL_NUM };
+}
+function tableRows(table){
+  // الخلايا المدمجة (colspan) تُتبع بخلايا فارغة حتى تبقى الأعمدة في مكانها
+  return Array.from(table.querySelectorAll('tr')).map(tr => {
+    const out = [];
+    Array.from(tr.querySelectorAll('th, td')).filter(c => !c.classList.contains('no-export')).forEach(c => {
+      out.push(xlCell(c));
+      for (let i = 1; i < (c.colSpan || 1); i++) out.push('');
+    });
+    return out;
+  });
+}
+const cardTitle = card => (card.querySelector('h2')?.innerText || '').replace(/\s+/g, ' ').trim();
+
+/* تصدير أي صفحة: كل جداولها في ورقة واحدة، أو ورقة لكل جدول (perCard) */
+function exportToExcel(containerId, fileName, opts) {
+  opts = opts || {};
+  if (!xlReady()) return;
   const container = document.getElementById(containerId);
   if (!container) return;
-  const cards = container.querySelectorAll('.card');
-  if (!cards.length) return toast('لا يوجد بيانات للتصدير', false);
+  const cards = Array.from(container.querySelectorAll('.card')).filter(c => c.querySelector('table'));
+  if (!cards.length) return toast('لا يوجد بيانات للتصدير — اعرض البيانات أولاً', false);
 
-  const wb = XLSX.utils.book_new();
-  const sheetData = [];
+  const meta = reportMeta(containerId);
+  const head = [];
+  if (meta.clientName && !meta.clientName.startsWith('--')) head.push(['العميل:', meta.clientName]);
+  if (meta.year) head.push(['السنة:', meta.year]);
+  if (head.length) head.push([]);
 
-  cards.forEach(card => {
-    const title = card.querySelector('h2')?.innerText || '';
-    sheetData.push([title]);
-    const table = card.querySelector('table');
-    if (table) {
-      table.querySelectorAll('tr').forEach(row => {
-        sheetData.push(Array.from(row.querySelectorAll('th, td')).map(cell => cell.innerText.trim()));
-      });
-    }
-    sheetData.push([]); // سطر فارغ بين الجداول
-  });
+  const wb = newWorkbook();
+  if (opts.perCard) {
+    cards.forEach(card => addSheet(wb, cardTitle(card), head.concat([[cardTitle(card)], []], tableRows(card.querySelector('table')))));
+  } else {
+    const rows = head.slice();
+    cards.forEach(card => {
+      if (cardTitle(card)) rows.push([cardTitle(card)]);
+      rows.push(...tableRows(card.querySelector('table')));
+      rows.push([]);
+    });
+    addSheet(wb, fileName.replace(/_/g, ' '), rows);
+  }
+  saveWorkbook(wb, fileName + (meta.year ? '_' + meta.year.replace(/\s|\//g, '') : ''));
+  toast('تم التصدير إلى Excel');
+}
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
-  ws['!cols'] = [{ wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
-  XLSX.utils.book_append_sheet(wb, ws, "Report");
-  XLSX.writeFile(wb, fileName + ".xlsx");
+/* ملف Excel شامل لعميل وسنة: كل القوائم والمرفقات وورقة العمل والميزان في أوراق منفصلة */
+async function exportFullWorkbook(clientSelId, yearId){
+  if (!xlReady()) return;
+  const cid = document.getElementById(clientSelId).value;
+  const year = document.getElementById(yearId).value;
+  if (!cid || !year) return toast('اختر العميل والسنة', false);
+  const c = selectedClient(clientSelId);
+  try {
+    const [st, nt, wp, tb] = await Promise.all([
+      call('getSavedStatements', cid, year), call('getNotes', cid, year),
+      call('getWorkingPaper', cid, year), call('getTrialBalance', cid, year)]);
+    const head = [['مكتب المدقق'], ['العميل:', c.name], ['السنة المالية:', year], ['العملة:', c.currency], []];
+    const wb = newWorkbook();
+
+    const bs = head.concat([['البند', 'إيضاح', 'المبلغ']]);
+    st.bs.sections.forEach(sec => {
+      if (!sec.isTotal) bs.push([sec.section]);
+      (sec.items || []).forEach(i => bs.push(['    ' + i.name, i.note || '', xlNum(i.value)]));
+      if (sec.total !== undefined) bs.push([sec.totalName || sec.section, '', xlNum(sec.total)]);
+    });
+    (st.bs.notes || []).forEach(n => bs.push([], [n]));
+    addSheet(wb, 'الميزانية العمومية', bs);
+
+    const is = head.concat([['البند', 'إيضاح', 'المبلغ']]);
+    st.is.items.forEach(i => i.heading ? is.push([i.name]) : is.push([(i.isTotal ? '' : '    ') + i.name, i.note || '', xlNum(i.value)]));
+    addSheet(wb, 'قائمة الدخل', is);
+
+    const cf = head.concat([['البند', 'المبلغ']]);
+    const cfSecs = list => list.forEach(sec => {
+      if (!sec.isTotal) cf.push([sec.section]);
+      (sec.items || []).forEach(i => i.heading ? cf.push(['  ' + i.name]) : cf.push(['    ' + i.name, xlNum(i.value)]));
+      if (sec.total !== undefined) cf.push([sec.totalName || sec.section, xlNum(sec.total)]);
+    });
+    cfSecs(st.cf.items);
+    if ((st.cf.direct || []).length) { cf.push([], ['إفصاح إضافي: التدفقات التشغيلية بالطريقة المباشرة']); cfSecs(st.cf.direct); }
+    (st.cf.notes || []).forEach(n => cf.push([], [n]));
+    addSheet(wb, 'التدفقات النقدية', cf);
+
+    const nr = head.slice();
+    nt.notes.forEach(n => {
+      nr.push(['إيضاح (' + n.no + '): ' + n.title, '', '', n.stmt + ' — ' + n.group]);
+      nr.push(['رقم الحساب', 'اسم الحساب', nt.year, nt.prevYear]);
+      n.rows.forEach(r => nr.push([String(r.code), r.name, xlNum(r.cur), xlNum(r.prev)]));
+      nr.push(['الإجمالي', '', xlNum(n.totalCur), xlNum(n.totalPrev)], []);
+    });
+    addSheet(wb, 'المرفقات (الإيضاحات)', nr);
+
+    const rr = head.concat([['التصنيف', 'المؤشر', 'القيمة', 'التقييم']]);
+    (st.ratios || []).forEach(r => rr.push([r.cat, r.name, xlNum(r.value), r.eval]));
+    addSheet(wb, 'مؤشرات الأداء', rr);
+
+    const w = head.concat([['القائمة', 'بند القوائم', 'رقم الحساب', 'اسم الحساب', 'الحساب المعياري', 'المبلغ']]);
+    wp.forEach(r => w.push([r.stmt, r.line, String(r.code), r.name, r.stdCode ? r.stdCode + ' - ' + r.stdName : '', xlNum(r.amount)]));
+    addSheet(wb, 'ورقة العمل', w);
+
+    const t = head.concat([['رقم الحساب', 'اسم الحساب', 'مدين', 'دائن']]);
+    let dr = 0, cr = 0;
+    tb.forEach(r => { dr += Number(r.debit) || 0; cr += Number(r.credit) || 0; t.push([String(r.code), r.name, xlNum(r.debit), xlNum(r.credit)]); });
+    t.push(['الإجمالي', '', xlNum(dr), xlNum(cr)]);
+    addSheet(wb, 'ميزان المراجعة', t);
+
+    saveWorkbook(wb, 'القوائم_المالية_' + c.name + '_' + year);
+    toast('تم تصدير الملف الشامل (' + wb.SheetNames.length + ' أوراق)');
+  } catch(e){}
 }
 
 /* ================= الإكسيل للاستيراد ================= */
@@ -833,7 +1008,7 @@ document.querySelectorAll('nav.sitemap button').forEach(b=>{
     if (t==='dash') loadDashboard();
     if (t==='coa') loadCOA();
     if (t==='clients') loadClients();
-    if (['tb','mapping','statements','ratios','compare','wp'].includes(t)) loadClientSelects();
+    if (['tb','mapping','statements','ratios','compare','wp','notes'].includes(t)) loadClientSelects();
   };
 });
 
@@ -847,10 +1022,10 @@ async function loadCOA() {
       return;
     }
     document.getElementById('coaTable').innerHTML = `
-      <table><thead><tr><th>الكود</th><th>الاسم</th><th>النوع</th><th>بند القائمة</th><th>التصنيف</th><th>الرصيد الطبيعي</th><th>تصنيف التدفقات</th><th>يظهر في</th><th style="width:90px"></th></tr></thead>
+      <table><thead><tr><th>الكود</th><th>الاسم</th><th>النوع</th><th>بند القائمة</th><th>التصنيف</th><th>الرصيد الطبيعي</th><th>تصنيف التدفقات</th><th>يظهر في</th><th class="no-export" style="width:90px"></th></tr></thead>
       <tbody>${data.map(c=>`
         <tr><td class="code">${esc(c.code)}</td><td>${esc(c.name)}</td><td>${esc(c.type)}</td><td>${esc(c.stmt)}</td><td>${esc(c.classif)}</td><td>${esc(c.normal)}</td><td>${esc(c.cfCat)}</td><td style="color:var(--muted)">${esc(coaPlacement(c))}</td>
-          <td><div class="actions">
+          <td class="no-export"><div class="actions">
             <button class="btn small secondary icon" title="تعديل" onclick="editCOA(${jsonAttr(c)})">${ic('edit')}</button>
             <button class="btn small danger icon" title="حذف" onclick="deleteCOA(${jsonAttr(c.code)})">${ic('delete')}</button>
           </div></td></tr>`).join('')}</tbody></table>`;
@@ -952,11 +1127,11 @@ async function loadClients(){
     document.getElementById('clientsCount').textContent = cl.length ? `(${cl.length})` : '';
     if (!cl.length){ document.getElementById('clientsTable').innerHTML = emptyState('لا يوجد عملاء', 'people'); return; }
     document.getElementById('clientsTable').innerHTML = `
-      <table><thead><tr><th>#</th><th>الاسم</th><th>الرقم الضريبي</th><th>العملة</th><th>السنة المالية</th><th>الحالة</th><th style="width:90px"></th></tr></thead>
+      <table><thead><tr><th>#</th><th>الاسم</th><th>الرقم الضريبي</th><th>العملة</th><th>السنة المالية</th><th>الحالة</th><th class="no-export" style="width:90px"></th></tr></thead>
       <tbody>${cl.map((c,i)=>`
         <tr><td>${i+1}</td><td style="font-weight:600">${esc(c.name)}</td><td>${esc(c.tax)}</td><td>${esc(c.currency)}</td>
           <td>${c.startDate ? esc(c.startDate) + ' ← ' + esc(c.endDate) : '—'}</td><td>${statusBadge(c.status)}</td>
-          <td><div class="actions">
+          <td class="no-export"><div class="actions">
             <button class="btn small secondary icon" title="تعديل" onclick="editClient(${jsonAttr(c)})">${ic('edit')}</button>
             <button class="btn small danger icon" title="حذف" onclick="deleteClient(${jsonAttr(c.id)})">${ic('delete')}</button>
           </div></td></tr>`).join('')}</tbody></table>`;
@@ -1000,10 +1175,10 @@ async function deleteClient(id){
 async function loadClientSelects(){
   const cl = await call('getClients');
   const opts = '<option value="">-- اختر عميل --</option>' + cl.map(c=>`<option value="${esc(c.id)}" data-currency="${esc(c.currency)}">${esc(c.name)}</option>`).join('');
-  ['tbClient','mapClient','stmtClient','ratioClient','compClient','wpClient'].forEach(id=>{
+  ['tbClient','mapClient','stmtClient','ratioClient','compClient','wpClient','notesClient'].forEach(id=>{
     const el = document.getElementById(id); if (el){ const cur=el.value; el.innerHTML=opts; el.value=cur; }
   });
-  ['tbYear','mapYear','stmtYear','ratioYear','compYear2','wpYear'].forEach(id=>{
+  ['tbYear','mapYear','stmtYear','ratioYear','compYear2','wpYear','notesYear'].forEach(id=>{
     const el = document.getElementById(id); if (el && !el.value) el.value = new Date().getFullYear();
   });
   const y1 = document.getElementById('compYear1');
@@ -1028,16 +1203,16 @@ async function loadTB(){
 
 function renderTB(){
   document.getElementById('tbTable').innerHTML = `
-    <table><thead><tr><th style="width:140px">الكود</th><th>اسم الحساب</th><th class="num" style="width:170px">مدين</th><th class="num" style="width:170px">دائن</th><th style="width:44px"></th></tr></thead>
+    <table><thead><tr><th style="width:140px">الكود</th><th>اسم الحساب</th><th class="num" style="width:170px">مدين</th><th class="num" style="width:170px">دائن</th><th class="no-export" style="width:44px"></th></tr></thead>
     <tbody>${tbData.map((r,i)=>`
       <tr>
         <td><input value="${esc(r.code)}" oninput="updTB(${i},'code',this.value)"></td>
         <td><input value="${esc(r.name)}" oninput="updTB(${i},'name',this.value)"></td>
         <td><input class="num" type="number" value="${r.debit||0}" oninput="updTB(${i},'debit',this.value)"></td>
         <td><input class="num" type="number" value="${r.credit||0}" oninput="updTB(${i},'credit',this.value)"></td>
-        <td><button class="btn small danger icon" title="حذف الصف" onclick="delTBRow(${i})">${ic('cancel')}</button></td>
+        <td class="no-export"><button class="btn small danger icon" title="حذف الصف" onclick="delTBRow(${i})">${ic('cancel')}</button></td>
       </tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="2">الإجمالي</td><td class="num" id="tbTotDr"></td><td class="num" id="tbTotCr"></td><td></td></tr></tfoot></table>`;
+    <tfoot><tr><td colspan="2">الإجمالي</td><td class="num" id="tbTotDr"></td><td class="num" id="tbTotCr"></td><td class="no-export"></td></tr></tfoot></table>`;
   updateTBTotals();
 }
 
@@ -1184,18 +1359,22 @@ function selectedClient(selectId){
 // تنسيق محاسبي: السالب بين قوسين
 function fmtAcc(n){ n = Number(n) || 0; return n < 0 ? `(${fmt(-n)})` : fmt(n); }
 
+// عمود "إيضاح" يظهر إذا كان لأي بند رقم إيضاح (الميزانية وقائمة الدخل)
 function stmtTable(title, sections){
-  let html = `<div class="card"><h2>${title}</h2><div class="table-responsive"><table><thead><tr><th>القسم / البند</th><th class="num" style="width:200px">المبلغ</th></tr></thead><tbody>`;
+  const hasNote = sections.some(sec => (sec.items || []).some(it => it.note));
+  const span = hasNote ? 3 : 2;
+  const noteTd = it => hasNote ? `<td class="note-ref">${esc(it && it.note ? it.note : '')}</td>` : '';
+  let html = `<div class="card"><h2>${title}</h2><div class="table-responsive"><table><thead><tr><th>القسم / البند</th>${hasNote ? '<th class="note-col">إيضاح</th>' : ''}<th class="num" style="width:200px">المبلغ</th></tr></thead><tbody>`;
   sections.forEach(sec=>{
-    if (!sec.isTotal) html += `<tr class="sec-row"><td colspan="2">${esc(sec.section)}</td></tr>`;
+    if (!sec.isTotal) html += `<tr class="sec-row"><td colspan="${span}">${esc(sec.section)}</td></tr>`;
     (sec.items || []).forEach(it=>{
       html += it.heading
-        ? `<tr class="sub-head"><td colspan="2">${esc(it.name)}</td></tr>`
-        : `<tr><td style="padding-right:28px">${esc(it.name)}</td><td class="num">${fmtAcc(it.value)}</td></tr>`;
+        ? `<tr class="sub-head"><td colspan="${span}">${esc(it.name)}</td></tr>`
+        : `<tr><td style="padding-right:28px">${esc(it.name)}</td>${noteTd(it)}<td class="num">${fmtAcc(it.value)}</td></tr>`;
     });
     if (sec.total !== undefined) {
       const label = sec.totalName || (sec.isTotal ? sec.section : 'إجمالي ' + sec.section);
-      html += `<tr class="${sec.isTotal?'stmt-final':'stmt-total'}"><td>${esc(label)}</td><td class="num">${fmtAcc(sec.total)}</td></tr>`;
+      html += `<tr class="${sec.isTotal?'stmt-final':'stmt-total'}"><td>${esc(label)}</td>${noteTd(null)}<td class="num">${fmtAcc(sec.total)}</td></tr>`;
     }
   });
   return html + `</tbody></table></div></div>`;
@@ -1207,11 +1386,12 @@ function renderStatementsUI(res, clientName, year, currency) {
   const bsNotes = (res.bs.notes || []).map(n=>`<div class="msgbar err">${ic('warn')} ${esc(n)}</div>`).join('');
   const bsHtml = bsNotes + stmtTable(`الميزانية العمومية — ${sub}`, res.bs.sections);
 
-  let isHtml = `<div class="card"><h2>قائمة الدخل — ${sub}</h2><div class="table-responsive"><table><thead><tr><th>البند</th><th class="num" style="width:200px">المبلغ</th></tr></thead><tbody>`;
+  const isNote = res.is.items.some(it => it.note);
+  let isHtml = `<div class="card"><h2>قائمة الدخل — ${sub}</h2><div class="table-responsive"><table><thead><tr><th>البند</th>${isNote ? '<th class="note-col">إيضاح</th>' : ''}<th class="num" style="width:200px">المبلغ</th></tr></thead><tbody>`;
   res.is.items.forEach(it=>{
-    if (it.heading) { isHtml += `<tr class="sub-head"><td colspan="2">${esc(it.name)}</td></tr>`; return; }
+    if (it.heading) { isHtml += `<tr class="sub-head"><td colspan="${isNote ? 3 : 2}">${esc(it.name)}</td></tr>`; return; }
     const cls = it.isFinal ? 'stmt-final' : (it.isTotal ? 'stmt-total' : '');
-    isHtml += `<tr class="${cls}"><td ${cls?'':'style="padding-right:28px"'}>${esc(it.name)}</td><td class="num">${fmtAcc(it.value)}</td></tr>`;
+    isHtml += `<tr class="${cls}"><td ${cls?'':'style="padding-right:28px"'}>${esc(it.name)}</td>${isNote ? `<td class="note-ref">${esc(it.note || '')}</td>` : ''}<td class="num">${fmtAcc(it.value)}</td></tr>`;
   });
   isHtml += `</tbody></table></div></div>`;
 
@@ -1266,6 +1446,47 @@ async function loadSavedRatios(){
   const c = selectedClient('ratioClient');
   if (!cid || !year) return toast('اختر العميل والسنة', false);
   try{ const res = await call('getSavedStatements', cid, year); renderRatiosUI(res.ratios, c.name, year); toast('تم تحميل المؤشرات'); } catch(e){}
+}
+
+/* ================= المرفقات (الإيضاحات المتممة) ================= */
+function notesHtml(d){
+  if (!d.notes.length) return `<div class="card">${emptyState('لا توجد بنود لها أرصدة', 'doc')}</div>`;
+  let html = d.hasPrev ? '' : `<div class="msgbar">${ic('info')} لا يوجد ميزان مراجعة لسنة ${esc(d.prevYear)} — أرقام المقارنة تظهر أصفاراً.</div>`;
+  let lastGroup = '';
+  d.notes.forEach(n => {
+    const g = n.stmt + ' — ' + n.group;
+    if (g !== lastGroup) { html += `<div class="notes-group">${esc(g)}</div>`; lastGroup = g; }
+    html += `<div class="card"><h2>إيضاح (${n.no}): ${esc(n.title)}</h2><div class="table-responsive"><table>
+      <thead><tr><th style="width:130px">رقم الحساب</th><th>اسم الحساب</th><th class="num" style="width:170px">${esc(d.year)}</th><th class="num" style="width:170px">${esc(d.prevYear)}</th></tr></thead><tbody>
+      ${n.rows.map(r => `<tr><td class="code">${esc(r.code)}</td><td>${esc(r.name)}</td><td class="num">${fmtAcc(r.cur)}</td><td class="num">${fmtAcc(r.prev)}</td></tr>`).join('')}
+      <tr class="stmt-total"><td colspan="2">الإجمالي — يُنقل إلى ${esc(n.stmt)}</td><td class="num">${fmtAcc(n.totalCur)}</td><td class="num">${fmtAcc(n.totalPrev)}</td></tr>
+      </tbody></table></div></div>`;
+  });
+  return html;
+}
+
+async function loadNotes(){
+  const cid = document.getElementById('notesClient').value;
+  const year = document.getElementById('notesYear').value;
+  if (!cid || !year) return toast('اختر العميل والسنة', false);
+  try { document.getElementById('notesArea').innerHTML = notesHtml(await call('getNotes', cid, year)); } catch(e){}
+}
+
+// القوائم + الإيضاحات في تقرير واحد (كما يُقدَّم التقرير المالي)
+async function printStatementsWithNotes(){
+  const area = document.getElementById('statementsArea');
+  if (!area.innerHTML.trim()) return toast('اعرض القوائم أولاً (إعداد القوائم أو عرض المحفوظ)', false);
+  const cid = document.getElementById('stmtClient').value;
+  const year = document.getElementById('stmtYear').value;
+  const meta = reportMeta('statementsArea');
+  const win = window.open('', '_blank');   // تُفتح قبل انتظار الخادم حتى لا يمنعها المتصفح
+  if (win) win.document.write('<p dir="rtl" style="font-family:Segoe UI,Tahoma;padding:24px">جاري تجهيز التقرير...</p>');
+  try {
+    const d = await call('getNotes', cid, year);
+    printHtml('القوائم المالية والإيضاحات المتممة لها',
+      area.innerHTML + '<div class="page-break"></div><h2 class="notes-title">الإيضاحات المتممة للقوائم المالية</h2>' + notesHtml(d),
+      meta.clientName, meta.year, win);
+  } catch(e){ if (win) win.close(); }
 }
 
 /* ================= ورقة العمل ================= */

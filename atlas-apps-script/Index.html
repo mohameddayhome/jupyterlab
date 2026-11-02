@@ -6,7 +6,7 @@
 <title>أطلس — لوحة البيانات التفاعلية</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -16,6 +16,9 @@
     try{ t = localStorage.getItem('atlas-theme'); }catch(e){}
     if(!t) t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', t);
+    var sk = null;
+    try{ sk = localStorage.getItem('atlas-skin'); }catch(e){}
+    document.documentElement.setAttribute('data-skin', sk === 'executive' || sk === 'nova' ? sk : 'atlas');
     var l = null;
     try{ l = localStorage.getItem('atlas-lang'); }catch(e){}
     l = l === 'en' ? 'en' : 'ar';
@@ -39,6 +42,13 @@
     --c1:#e06b4f; --c2:#2f6878; --c3:#28877b; --c4:#c8953d; --c5:#91627e; --c6:#4c8490; --c7:#b45e52; --c8:#738b5b;
     --shadow:0 1px 2px rgba(23,49,58,0.04), 0 14px 30px -18px rgba(23,49,58,0.22);
     --radius:10px;
+    --font-body:'Geist','IBM Plex Sans Arabic',-apple-system,sans-serif;
+    --font-display:'Fraunces','Noto Naskh Arabic',serif;
+    --font-mono:'Geist Mono','IBM Plex Sans Arabic',monospace;
+    --display-weight:400; --title-weight:500; --btn-radius:4px;
+    --header-ink:var(--ink); --header-muted:var(--muted); --header-line:var(--line-strong); --header-btn-bg:transparent;
+    --header-hover:var(--ink); --header-hover-ink:var(--bg); --header-pill-bg:var(--panel);
+    --p1:#d2502a; --p2:#2b4a6f; --p3:#3f7d5b; --p4:#c08a2b; --p5:#7a3b6e; --p6:#456b7a; --p7:#a44b3a; --p8:#5e6b3a; --p9:#8c5a2b; --p10:#3a5a7a;
     --header-bg:rgba(238,243,242,0.88);
     --soft-bg:#f7faf9;
     --hover-bg:#f4f8f7;
@@ -94,6 +104,121 @@
     color-scheme:dark;
   }
   html,body,.filters-bar,.kpi,.chart-card,.table-card,.totals-card,.upload,th,td,select,input,button{transition:background-color .25s,border-color .25s,color .25s}
+  /* ---------- SKINS ---------- */
+  :root[data-skin="executive"]{
+    --font-body:'Inter','IBM Plex Sans Arabic',-apple-system,sans-serif;
+    --font-display:'Inter','IBM Plex Sans Arabic',sans-serif;
+    --font-mono:'Inter','IBM Plex Sans Arabic',sans-serif;
+    --display-weight:800; --title-weight:700; --radius:14px; --btn-radius:999px;
+    --grain-opacity:0;
+    --header-ink:#ffffff; --header-muted:#9fb3cc; --header-line:rgba(255,255,255,.28); --header-btn-bg:rgba(255,255,255,.06);
+    --header-hover:#14a39a; --header-hover-ink:#ffffff; --header-pill-bg:rgba(255,255,255,.1);
+    --p1:#1d3a5f; --p2:#14a39a; --p3:#2f9e5b; --p4:#e3a21a; --p5:#d64545; --p6:#3b6fd8; --p7:#7b5cc4; --p8:#1f9fc4; --p9:#e07b39; --p10:#6b7a90;
+    --bg:#f3f5f8; --panel:#ffffff; --ink:#0f2240; --ink-soft:#3c4d66; --muted:#6b7a90;
+    --line:#e3e8ef; --line-strong:#ccd5e1; --accent:#14a39a; --accent-soft:#dcf3f1; --good:#2f9e5b; --warn:#e3a21a;
+    --c2:#14a39a; --c3:#2f9e5b; --c4:#e3a21a; --c5:#d64545; --c6:#3b6fd8;
+    --shadow:0 1px 2px rgba(15,34,64,.05), 0 10px 28px -16px rgba(15,34,64,.25);
+    --header-bg:#0f2847;
+    --soft-bg:#f6f8fb; --hover-bg:#f2f6fa; --upload-hover:#f2fbfa; --totals-head:#eef2f7; --totals-first:#f8fafc;
+    --totals-grand:#e7f6f4; --totals-hover:#eef5f9; --error-bg:#fdecec; --error-ink:#9b1c1c;
+    --chart-text:#3c4d66; --chart-grid:#e6ebf2; --chart-tick:#6b7a90; --tooltip-bg:#0f2240;
+    --chart-line:#14a39a; --chart-line-fill:rgba(20,163,154,.10);
+  }
+  :root[data-skin="executive"][data-theme="dark"]{
+    --font-body:'Inter','IBM Plex Sans Arabic',-apple-system,sans-serif;
+    --font-display:'Inter','IBM Plex Sans Arabic',sans-serif;
+    --font-mono:'Inter','IBM Plex Sans Arabic',sans-serif;
+    --display-weight:800; --title-weight:700; --radius:14px; --btn-radius:999px;
+    --grain-opacity:0;
+    --header-ink:#ffffff; --header-muted:#9fb3cc; --header-line:rgba(255,255,255,.28); --header-btn-bg:rgba(255,255,255,.06);
+    --header-hover:#14a39a; --header-hover-ink:#ffffff; --header-pill-bg:rgba(255,255,255,.1);
+    --p1:#1d3a5f; --p2:#14a39a; --p3:#2f9e5b; --p4:#e3a21a; --p5:#d64545; --p6:#3b6fd8; --p7:#7b5cc4; --p8:#1f9fc4; --p9:#e07b39; --p10:#6b7a90;
+    --bg:#0b1524; --panel:#13223a; --ink:#e8eef7; --ink-soft:#b4c1d3; --muted:#8293aa;
+    --line:#22344f; --line-strong:#33496a; --accent:#2cc3b5; --accent-soft:#103a3c; --good:#4cc27e; --warn:#f0b43c;
+    --c2:#2cc3b5; --c3:#4cc27e; --c4:#f0b43c; --c5:#ef6a6a; --c6:#6b95ee;
+    --p1:#6b95ee; --p2:#2cc3b5; --p3:#4cc27e; --p4:#f0b43c; --p5:#ef6a6a; --p6:#9b85e0; --p7:#4fc0e0; --p8:#f09a5b; --p9:#c6d2e3; --p10:#8293aa;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 14px 30px -18px rgba(0,0,0,.7);
+    --header-bg:#071121; --header-hover:#2cc3b5;
+    --soft-bg:#182a45; --hover-bg:#1a2e4b; --upload-hover:#14283a; --totals-head:#1a2d48; --totals-first:#162741;
+    --totals-grand:#123a3c; --totals-hover:#1d3452; --error-bg:#3d1c1c; --error-ink:#ffb4b4;
+    --chart-text:#b4c1d3; --chart-grid:#22344f; --chart-tick:#8293aa; --tooltip-bg:#050c18;
+    --chart-line:#2cc3b5; --chart-line-fill:rgba(44,195,181,.14);
+  }
+  :root[data-skin="nova"]{
+    --font-body:'Plus Jakarta Sans','IBM Plex Sans Arabic',-apple-system,sans-serif;
+    --font-display:'Plus Jakarta Sans','IBM Plex Sans Arabic',sans-serif;
+    --font-mono:'Plus Jakarta Sans','IBM Plex Sans Arabic',sans-serif;
+    --display-weight:800; --title-weight:700; --radius:16px; --btn-radius:999px;
+    --grain-opacity:0;
+    --header-ink:#ffffff; --header-muted:#d4ccff; --header-line:rgba(255,255,255,.32); --header-btn-bg:rgba(255,255,255,.08);
+    --header-hover:#ffffff; --header-hover-ink:#4c1d95; --header-pill-bg:rgba(255,255,255,.14);
+    --bg:#f6f6fb; --panel:#ffffff; --ink:#1e1b4b; --ink-soft:#4b4870; --muted:#8481a6;
+    --line:#e9e8f4; --line-strong:#d3d1e8; --accent:#6d5dfc; --accent-soft:#ece9ff; --good:#10b981; --warn:#f59e0b;
+    --c2:#ec4899; --c3:#14b8a6; --c4:#f59e0b; --c5:#3b82f6; --c6:#8b5cf6;
+    --p1:#6d5dfc; --p2:#ec4899; --p3:#14b8a6; --p4:#f59e0b; --p5:#3b82f6; --p6:#8b5cf6; --p7:#ef4444; --p8:#10b981; --p9:#f97316; --p10:#06b6d4;
+    --shadow:0 1px 2px rgba(30,27,75,.05), 0 16px 34px -20px rgba(76,29,149,.35);
+    --header-bg:linear-gradient(115deg,#312e81 0%,#5b21b6 55%,#7c3aed 100%);
+    --soft-bg:#f8f7fd; --hover-bg:#f3f1fe; --upload-hover:#f5f3ff; --totals-head:#f1effc; --totals-first:#faf9fe;
+    --totals-grand:#efeaff; --totals-hover:#f2effd; --error-bg:#fdeef2; --error-ink:#9d174d;
+    --chart-text:#4b4870; --chart-grid:#ecebf6; --chart-tick:#8481a6; --tooltip-bg:#1e1b4b;
+    --chart-line:#6d5dfc; --chart-line-fill:rgba(109,93,252,.12);
+  }
+  :root[data-skin="nova"][data-theme="dark"]{
+    --font-body:'Plus Jakarta Sans','IBM Plex Sans Arabic',-apple-system,sans-serif;
+    --font-display:'Plus Jakarta Sans','IBM Plex Sans Arabic',sans-serif;
+    --font-mono:'Plus Jakarta Sans','IBM Plex Sans Arabic',sans-serif;
+    --display-weight:800; --title-weight:700; --radius:16px; --btn-radius:999px;
+    --grain-opacity:0;
+    --header-ink:#ffffff; --header-muted:#d4ccff; --header-line:rgba(255,255,255,.32); --header-btn-bg:rgba(255,255,255,.08);
+    --header-hover:#ffffff; --header-hover-ink:#4c1d95; --header-pill-bg:rgba(255,255,255,.14);
+    --bg:#0e0d1a; --panel:#18172b; --ink:#ecebff; --ink-soft:#bdbadf; --muted:#8c89b3;
+    --line:#2a2845; --line-strong:#3b3960; --accent:#8b7dff; --accent-soft:#2c2660; --good:#34d399; --warn:#fbbf24;
+    --c2:#f472b6; --c3:#2dd4bf; --c4:#fbbf24; --c5:#60a5fa; --c6:#a78bfa;
+    --p1:#8b7dff; --p2:#f472b6; --p3:#2dd4bf; --p4:#fbbf24; --p5:#60a5fa; --p6:#a78bfa; --p7:#f87171; --p8:#34d399; --p9:#fb923c; --p10:#22d3ee;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 16px 34px -20px rgba(0,0,0,.75);
+    --header-bg:linear-gradient(115deg,#1e1b4b 0%,#3b0764 60%,#4c1d95 100%);
+    --soft-bg:#1f1d36; --hover-bg:#22203d; --upload-hover:#1d1a38; --totals-head:#221f3e; --totals-first:#1c1a32;
+    --totals-grand:#2c2660; --totals-hover:#262344; --error-bg:#3b1626; --error-ink:#fbb6ce;
+    --chart-text:#bdbadf; --chart-grid:#2a2845; --chart-tick:#8c89b3; --tooltip-bg:#07060f;
+    --chart-line:#8b7dff; --chart-line-fill:rgba(139,125,255,.16);
+  }
+
+  header.top{background:var(--header-bg);color:var(--header-ink)}
+  header.top .brand-tag{color:var(--header-muted);white-space:nowrap}
+  header.top button.ghost,header.top .skin-select{color:var(--header-ink);border-color:var(--header-line);background:var(--header-btn-bg)}
+  header.top button.ghost:hover{background:var(--header-hover);color:var(--header-hover-ink);border-color:var(--header-hover)}
+  header.top .pill{background:var(--header-pill-bg);border-color:var(--header-line);color:var(--header-ink)}
+  header.top .loader{color:var(--header-muted)}
+  .skin-select{font:600 11px var(--font-mono);text-transform:uppercase;letter-spacing:.12em;padding:6px 10px;border:1px solid var(--line-strong);border-radius:var(--btn-radius);cursor:pointer;outline:none}
+  .skin-select option{color:var(--ink);background:var(--panel);text-transform:none}
+  .filter select,.filter input,.multi-select-trigger,.table-search,.chart-controls select,.calc-dialog input,.calc-dialog select{border-radius:calc(var(--radius) * .5) !important}
+
+  /* modern skins: bold sans, top-accent cards, roomier header */
+  :root[data-skin="executive"] header.top,:root[data-skin="nova"] header.top{border-bottom:none;backdrop-filter:none}
+  :root[data-skin="executive"] .top-inner,:root[data-skin="nova"] .top-inner{padding:22px 28px}
+  :root[data-skin="executive"] .brand-mark,:root[data-skin="nova"] .brand-mark{font-style:normal;font-weight:800;letter-spacing:-.03em;color:var(--header-ink)}
+  :root[data-skin="executive"] .brand-mark::after,:root[data-skin="nova"] .brand-mark::after{color:var(--header-hover)}
+  :root[data-skin="nova"] .brand-mark::after{color:#f0abfc}
+  :root[data-skin="executive"] .section-label,:root[data-skin="nova"] .section-label{font-family:var(--font-body);font-size:16px !important;font-weight:800;text-transform:none;letter-spacing:-.01em !important;color:var(--ink);margin-bottom:16px}
+  :root[data-skin="executive"] .section-label::before,:root[data-skin="nova"] .section-label::before{display:none}
+  :root[data-skin="executive"] .kpi::before,:root[data-skin="nova"] .kpi::before{width:auto;height:4px;inset-inline-end:0}
+  :root[data-skin="executive"] .kpi:first-child::before{background:var(--p1)}
+  :root[data-skin="executive"] .kpi,:root[data-skin="nova"] .kpi{padding:22px 22px 20px}
+  :root[data-skin="executive"] .kpi-value,:root[data-skin="nova"] .kpi-value{font-size:36px;letter-spacing:-.03em;color:var(--ink)}
+  :root[data-skin="executive"] .kpi-select,:root[data-skin="nova"] .kpi-select{font-weight:700;letter-spacing:.12em}
+  :root[data-skin="executive"] .chart-title,:root[data-skin="nova"] .chart-title{font-size:17px;letter-spacing:-.01em}
+  :root[data-skin="executive"] .chart-sub,:root[data-skin="nova"] .chart-sub{text-transform:none;letter-spacing:0 !important;font-weight:500}
+  :root[data-skin="executive"] th,:root[data-skin="nova"] th{font-weight:700;letter-spacing:.1em;background:var(--panel)}
+  :root[data-skin="executive"] .upload h1 em,:root[data-skin="nova"] .upload h1 em{font-style:normal}
+  :root[data-skin="executive"] .upload,:root[data-skin="nova"] .upload{border-width:2px;box-shadow:var(--shadow)}
+  :root[data-skin="executive"] .upload-cta{background:var(--accent)}
+  :root[data-skin="nova"] .upload-cta{background:linear-gradient(115deg,#5b21b6,#7c3aed)}
+  :root[data-skin="executive"] .upload-cta:hover,:root[data-skin="nova"] .upload-cta:hover{background:var(--ink);color:var(--panel)}
+  :root[data-skin="nova"] .kpi::before{background:linear-gradient(90deg,var(--accent),var(--c2))}
+  :root[data-skin="nova"] .kpi:nth-child(2)::before{background:linear-gradient(90deg,var(--c2),var(--c4))}
+  :root[data-skin="nova"] .kpi:nth-child(3)::before{background:linear-gradient(90deg,var(--c3),var(--c5))}
+  :root[data-skin="nova"] .kpi:nth-child(4)::before{background:linear-gradient(90deg,var(--c4),var(--c2))}
+  :root[data-skin="nova"] .kpi.add-card::before{display:none}
   /* ---------- ARABIC / RTL ---------- */
   [dir="rtl"] *{letter-spacing:0 !important}
   [dir="rtl"] .upload h1 em,[dir="rtl"] .empty-state{font-style:normal}
@@ -114,12 +239,12 @@
   .calc-formula{display:grid;grid-template-columns:1fr 64px 1fr;gap:8px;margin-bottom:8px}
   .calc-formula select#calcOp{text-align:center;font-weight:700;font-size:16px;padding:6px}
   .calc-const{margin-bottom:8px}
-  .calc-preview{font-size:12px;color:var(--ink-soft);min-height:18px;margin:6px 0 14px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;direction:ltr;text-align:start}
+  .calc-preview{font-size:12px;color:var(--ink-soft);min-height:18px;margin:6px 0 14px;font-family:var(--font-mono);direction:ltr;text-align:start}
   [dir="rtl"] .calc-preview{text-align:end}
   .calc-list{border-top:1px solid var(--line);padding-top:12px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px}
   .calc-list:empty{display:none}
   .calc-item{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
-  .calc-item code{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;color:var(--muted);font-size:11px}
+  .calc-item code{font-family:var(--font-mono);color:var(--muted);font-size:11px}
   .calc-item button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
   .calc-item button:hover{color:var(--accent)}
   .calc-item.inactive{opacity:.55}
@@ -152,19 +277,19 @@
   .sheet-load button{white-space:nowrap}
   @media (max-width:680px){.sheet-load{flex-direction:column}}
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Geist','IBM Plex Sans Arabic',-apple-system,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
   .grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:var(--grain-opacity);mix-blend-mode:var(--grain-blend);
     background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
   header.top{position:sticky;top:0;z-index:50;background:var(--header-bg);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
   .top-inner{display:flex;align-items:baseline;justify-content:space-between;padding:18px 28px;max-width:1600px;margin:0 auto}
   .brand{display:flex;align-items:baseline;gap:12px}
-  .brand-mark{font-family:'Fraunces','Noto Naskh Arabic',serif;font-weight:500;font-size:28px;letter-spacing:-0.02em;font-style:italic}
+  .brand-mark{font-family:var(--font-display);font-weight:500;font-size:28px;letter-spacing:-0.02em;font-style:italic}
   .brand-mark::after{content:"●";color:var(--accent);margin-left:4px;font-style:normal;font-size:18px;vertical-align:middle}
-  .brand-tag{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
-  .top-meta{display:flex;gap:18px;align-items:center;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-soft)}
+  .brand-tag{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .top-meta{display:flex;gap:18px;align-items:center;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-soft)}
   .pill{padding:4px 10px;border:1px solid var(--line-strong);border-radius:999px;background:var(--panel)}
-  button.ghost{background:transparent;border:1px solid var(--line-strong);padding:6px 12px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.14em;cursor:pointer;border-radius:4px;color:var(--ink);transition:all .15s}
+  button.ghost{background:transparent;border:1px solid var(--line-strong);padding:6px 12px;border-radius:var(--btn-radius) !important;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:0.14em;cursor:pointer;border-radius:4px;color:var(--ink);transition:all .15s}
   button.ghost:hover{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 
   main{max-width:1600px;margin:0 auto;padding:32px 28px 80px;position:relative;z-index:2}
@@ -174,29 +299,29 @@
   .upload{width:100%;max-width:760px;background:var(--panel);border:1.5px dashed var(--line-strong);border-radius:var(--radius);padding:64px 40px;text-align:center;transition:all .2s;cursor:pointer;position:relative;overflow:hidden}
   .upload:hover{border-color:var(--accent);background:var(--upload-hover)}
   .upload.drag{border-color:var(--accent);background:var(--accent-soft);transform:scale(1.005)}
-  .upload h1{font-family:'Fraunces','Noto Naskh Arabic',serif;font-weight:400;font-size:48px;line-height:1.05;letter-spacing:-0.02em;margin:0 0 12px}
+  .upload h1{font-family:var(--font-display);font-weight:var(--display-weight);font-size:48px;line-height:1.05;letter-spacing:-0.02em;margin:0 0 12px}
   .upload h1 em{font-style:italic;color:var(--accent)}
   .upload p{color:var(--ink-soft);max-width:480px;margin:0 auto 28px;font-size:15px}
-  .upload-cta{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:var(--bg);padding:12px 22px;border-radius:4px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:12px;text-transform:uppercase;letter-spacing:0.16em;border:none;cursor:pointer;transition:all .15s}
+  .upload-cta{border-radius:var(--btn-radius) !important;display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:var(--bg);padding:12px 22px;border-radius:4px;font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:0.16em;border:none;cursor:pointer;transition:all .15s}
   .upload-cta:hover{background:var(--accent)}
-  .upload-formats{margin-top:20px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
-  .upload-or{display:block;margin:18px 0;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)}
+  .upload-formats{margin-top:20px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .upload-or{display:block;margin:18px 0;font-family:var(--font-mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)}
   .sample-link{background:none;border:none;color:var(--accent);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit;font-size:13px}
   .sample-link:hover{color:var(--ink)}
 
   /* Dashboard layout */
   .dash{display:none}
   .dash.active{display:block}
-  .section-label{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.2em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .section-label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.2em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:10px}
   .section-label::before{content:"";width:24px;height:1px;background:var(--line-strong)}
-  .section-action{margin-inline-start:auto;opacity:0;pointer-events:none;transition:opacity .15s;background:var(--panel);border:1px solid var(--line-strong);border-radius:4px;color:var(--ink-soft);padding:5px 9px;font:700 11px 'Geist Mono','IBM Plex Sans Arabic',monospace;text-transform:uppercase;letter-spacing:.1em;cursor:pointer}
+  .section-action{margin-inline-start:auto;opacity:0;pointer-events:none;transition:opacity .15s;background:var(--panel);border:1px solid var(--line-strong);border-radius:4px;color:var(--ink-soft);padding:5px 9px;font:700 11px var(--font-mono);text-transform:uppercase;letter-spacing:.1em;cursor:pointer}
   .section-label:hover .section-action,.section-label:focus-within .section-action{opacity:1;pointer-events:auto}
   .section-action:hover{background:var(--accent);border-color:var(--accent);color:#fff}
 
   .filters-bar{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 22px;margin-bottom:24px;box-shadow:var(--shadow)}
   .filters-row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
   .filter{display:flex;flex-direction:column;gap:6px;min-width:160px;flex:1 1 180px;max-width:240px}
-  .filter label{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted)}
+  .filter label{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted)}
   .filter select, .filter input{font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);width:100%}
   .filter select[multiple]{min-height:96px;padding:4px 6px}
   .filter select[multiple] option{padding:5px 6px;border-radius:3px}
@@ -211,7 +336,7 @@
   .multi-select-search:focus{outline:none;border-color:var(--accent)}
   .multi-select-options{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:2px}
   .multi-select-actions{display:flex;gap:6px;margin-bottom:6px}
-  .multi-select-action{flex:1;padding:5px 6px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
+  .multi-select-action{flex:1;padding:5px 6px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);font-family:var(--font-mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
   .multi-select-action:hover{background:var(--accent);border-color:var(--accent);color:#fff}
   .multi-select-option{display:flex;align-items:center;gap:8px;padding:6px;border-radius:3px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .multi-select-option:hover{background:var(--accent-soft)}
@@ -227,9 +352,9 @@
   .kpi:nth-child(4)::before{background:var(--c4)}
   .kpi:nth-child(5)::before{background:var(--c5)}
   .kpi:nth-child(6)::before{background:var(--c6)}
-  .kpi-label{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted);margin-bottom:8px}
-  .kpi-value{font-family:'Fraunces','Noto Naskh Arabic',serif;font-size:34px;font-weight:400;letter-spacing:-0.02em;line-height:1.1}
-  .kpi-sub{font-size:11px;color:var(--ink-soft);margin-top:6px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;letter-spacing:0.06em}
+  .kpi-label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted);margin-bottom:8px}
+  .kpi-value{font-family:var(--font-display);font-size:34px;font-weight:var(--display-weight);letter-spacing:-0.02em;line-height:1.1}
+  .kpi-sub{font-size:11px;color:var(--ink-soft);margin-top:6px;font-family:var(--font-mono);letter-spacing:0.06em}
 
   .charts-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px;margin-bottom:28px}
   .chart-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);min-height:340px;display:flex;flex-direction:column}
@@ -241,10 +366,16 @@
     .chart-card.span-8,.chart-card.span-6,.chart-card.span-4{grid-column:span 12}
   }
   .chart-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px}
-  .chart-title{font-family:'Fraunces','Noto Naskh Arabic',serif;font-weight:500;font-size:18px;letter-spacing:-0.01em;margin:0}
-  .chart-sub{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);margin-top:3px}
-  .chart-controls{display:flex;gap:6px;align-items:center}
-  .chart-controls select{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;padding:5px 8px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);cursor:pointer}
+  .chart-title{font-family:var(--font-display);font-weight:var(--title-weight);font-size:18px;letter-spacing:-0.01em;margin:0}
+  .chart-sub{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);margin-top:3px}
+  .chart-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;min-width:0}
+  .chart-controls label{flex-wrap:nowrap;max-width:100%}
+  .chart-controls select{max-width:230px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .table-head > div:first-child{flex:1 1 240px;min-width:0}
+  .table-head .chart-controls{flex:1 1 auto}
+  .top-meta{flex-wrap:wrap;justify-content:flex-end;gap:10px !important}
+  .top-inner{gap:16px}
+  .chart-controls select{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;padding:5px 8px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);cursor:pointer}
   .chart-canvas-wrap{flex:1;position:relative;min-height:260px}
 
   .table-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
@@ -253,7 +384,7 @@
   .table-scroll{overflow:auto;max-height:520px}
   table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
   thead{position:sticky;top:0;background:var(--panel);z-index:1}
-  th{text-align:start;padding:12px 16px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;background:var(--soft-bg)}
+  th{text-align:start;padding:12px 16px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;background:var(--soft-bg)}
   th:hover{color:var(--ink)}
   th .sort-ind{margin-inline-start:4px;opacity:0.4}
   th.sorted .sort-ind{opacity:1;color:var(--accent)}
@@ -262,17 +393,17 @@
   #dataTable{min-width:max-content}
   #dataTable th,#dataTable td{min-width:140px}
   #dataTable td.num{white-space:nowrap;min-width:120px}
-  td.num{text-align:end;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace}
+  td.num{text-align:end;font-family:var(--font-mono)}
 
-  .table-foot{padding:12px 22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;color:var(--ink-soft);letter-spacing:0.06em}
+  .table-foot{padding:12px 22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);letter-spacing:0.06em}
   .pager{display:flex;gap:6px}
   .pager button{background:var(--bg);border:1px solid var(--line-strong);padding:4px 10px;font:inherit;cursor:pointer;border-radius:3px;color:var(--ink)}
   .pager button:disabled{opacity:0.4;cursor:not-allowed}
   .pager button:not(:disabled):hover{background:var(--ink);color:var(--bg)}
 
-  .footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
 
-  .empty-state{text-align:center;padding:60px 20px;color:var(--muted);font-family:'Fraunces','Noto Naskh Arabic',serif;font-style:italic;font-size:18px}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--muted);font-family:var(--font-display);font-style:italic;font-size:18px}
 
   .totals-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:28px}
   .totals-table-wrap{overflow:auto}
@@ -281,13 +412,13 @@
   .totals-table th:first-child,.totals-table td:first-child{text-align:start;min-width:190px;position:sticky;inset-inline-start:0}
   .totals-table th:last-child,.totals-table td:last-child{min-width:140px;background:var(--totals-head);font-weight:700;color:var(--ink)}
   .totals-table th:first-child{background:var(--totals-head)}
-  .totals-table td:first-child{background:var(--totals-first);font-family:'Geist','IBM Plex Sans Arabic',sans-serif;font-weight:600;color:var(--ink)}
-  .totals-table tbody td{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:12px}
+  .totals-table td:first-child{background:var(--totals-first);font-family:var(--font-body);font-weight:600;color:var(--ink)}
+  .totals-table tbody td{font-family:var(--font-mono);font-size:12px}
   .totals-table .totals-grand-row td{border-top:2px solid var(--accent);background:var(--totals-grand);color:var(--ink);font-weight:700}
   .totals-table tbody tr:hover td{background:var(--totals-hover)}
 
   /* Loading */
-  .loader{display:none;align-items:center;gap:10px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
+  .loader{display:none;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted)}
   .loader.show{display:flex}
   .loader::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 1s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:0.3;transform:scale(0.8)}50%{opacity:1;transform:scale(1.1)}}
@@ -307,7 +438,7 @@
 
   /* Dynamic KPI and Chart styling */
   .kpi-label-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:8px;position:relative;padding-inline-end:18px;min-width:0}
-  .kpi-select{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed var(--line-strong);padding:0 2px;cursor:pointer;outline:none;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kpi-select{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed var(--line-strong);padding:0 2px;cursor:pointer;outline:none;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kpi-select.kpi-col{flex:1 1 0;width:0}
   .kpi-select.kpi-agg{flex:0 0 auto}
   .kpi-select option{text-transform:none;color:var(--ink);background:var(--panel)}
@@ -319,7 +450,7 @@
   .kpi.add-card{display:flex;align-items:center;justify-content:center;border:1px dashed var(--line-strong);background:transparent;cursor:pointer;min-height:100px;box-shadow:none;position:relative}
   .kpi.add-card::before{display:none}
   .kpi.add-card:hover{border-color:var(--accent);background:var(--panel)}
-  .kpi-add-btn{font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .kpi-add-btn{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);display:flex;align-items:center;gap:8px}
   .kpi.add-card:hover .kpi-add-btn{color:var(--accent)}
 
   .chart-card.add-card{display:flex;align-items:center;justify-content:center;border:1px dashed var(--line-strong);background:transparent;cursor:pointer;min-height:340px;box-shadow:none;grid-column:span 4}
@@ -329,7 +460,7 @@
   @media print{
     @page{size:auto;margin:12mm}
     body{background:#fff;color:#000}
-    .theme-toggle,.lang-toggle,.sheet-load,.calc-dialog{display:none !important}
+    .theme-toggle,.lang-toggle,.skin-select,.sheet-load,.calc-dialog{display:none !important}
     .grain,header.top,.filters-bar,.section-action,.chart-controls,.chart-remove,.kpi-remove,.table-search,.table-foot,.upload-wrap{display:none !important}
     main{max-width:none;padding:0}
     .dash{display:block !important}
@@ -357,6 +488,11 @@
       <button class="ghost" id="layoutsBtn" style="display:none" data-i18n="layoutsBtn">▦ التخطيطات</button>
       <button class="ghost" id="calcBtn" style="display:none" data-i18n="calcBtn">ƒx عمود محسوب</button>
       <button class="ghost" id="resetBtn" style="display:none" data-i18n="newFile">↻ ملف جديد</button>
+      <select class="skin-select" id="skinSelect" data-i18n-title="skinTitle" title="الثيم">
+        <option value="atlas" data-i18n="skinAtlas">أطلس</option>
+        <option value="executive" data-i18n="skinExecutive">تنفيذي</option>
+        <option value="nova" data-i18n="skinNova">نوفا</option>
+      </select>
       <button class="ghost theme-toggle" id="themeBtn" data-i18n-title="toggleTheme" title="تبديل الوضع الليلي">
         <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -598,7 +734,7 @@ const I18N = {
     calcBtn:'ƒx عمود محسوب', calcTitle:'عمود محسوب', calcHint:'أنشئ عمودًا جديدًا من عمودين رقميين أو عمود ورقم ثابت',
     calcName:'اسم العمود', calcConstPh:'الرقم الثابت', calcConstOpt:'رقم ثابت…', close:'إغلاق', calcAdd:'إضافة العمود',
     calcNeedNum:'لا توجد أعمدة رقمية في البيانات.', calcNeedName:'اكتب اسمًا للعمود.', calcNameTaken:'يوجد عمود بهذا الاسم.',
-    calcNeedConst:'اكتب الرقم الثابت.', calcExample:'مثال: ', calcDefaultName:'{a} {op} {b}', calcRemove:'حذف العمود', calcAdded:'تمت إضافة العمود «{n}» وحفظه تلقائيًا.', calcSavedNote:'الأعمدة المحسوبة تُحفظ تلقائيًا وتُطبَّق على أي ملف يحتوي نفس الأعمدة.', calcSkipped:'محفوظ، لكن أعمدته غير موجودة في هذا الملف', calcExists:'الملف يحتوي عمودًا بنفس الاسم، فتُستخدم قيمه كما هي', layoutsBtn:'▦ التخطيطات', layoutsTitle:'قوالب التخطيط', layoutsHint:'احفظ المؤشرات والرسوم والفلاتر والجداول الحالية كقالب، وطبّقه على أي ملف.', layoutNamePh:'اسم القالب (مثال: تقرير المبيعات الشهري)', layoutSave:'حفظ التخطيط الحالي', layoutApply:'تطبيق', layoutDefault:'افتراضي', layoutMakeDefault:'اجعله القالب الافتراضي', layoutDelete:'حذف القالب', layoutMeta:'{k} مؤشر · {c} رسم · {f} فلتر', layoutDefaultNote:'القالب الافتراضي ★ يُطبَّق تلقائيًا عند رفع أي ملف جديد.', layoutEmpty:'لا توجد قوالب محفوظة بعد.', layoutNeedName:'اكتب اسمًا للقالب.', layoutSaved:'تم حفظ القالب «{n}».', layoutUpdated:'تم تحديث القالب «{n}».', layoutApplied:'تم تطبيق القالب «{n}».', layoutAppliedSkip:'تم تطبيق القالب «{n}»، وتُرك {s} عنصر لأن أعمدته غير موجودة في هذا الملف.', tPie:'دائري بقيمة', pieSub:'{agg} {v} حسب {c}', pieSplit:'{v} حسب {c}', pieSplitSub:'حلقة لكل قيمة من {c}', pieRings:'الحلقات من الخارج للداخل: {list}'
+    calcNeedConst:'اكتب الرقم الثابت.', calcExample:'مثال: ', calcDefaultName:'{a} {op} {b}', calcRemove:'حذف العمود', calcAdded:'تمت إضافة العمود «{n}» وحفظه تلقائيًا.', calcSavedNote:'الأعمدة المحسوبة تُحفظ تلقائيًا وتُطبَّق على أي ملف يحتوي نفس الأعمدة.', calcSkipped:'محفوظ، لكن أعمدته غير موجودة في هذا الملف', calcExists:'الملف يحتوي عمودًا بنفس الاسم، فتُستخدم قيمه كما هي', layoutsBtn:'▦ التخطيطات', layoutsTitle:'قوالب التخطيط', layoutsHint:'احفظ المؤشرات والرسوم والفلاتر والجداول الحالية كقالب، وطبّقه على أي ملف.', layoutNamePh:'اسم القالب (مثال: تقرير المبيعات الشهري)', layoutSave:'حفظ التخطيط الحالي', layoutApply:'تطبيق', layoutDefault:'افتراضي', layoutMakeDefault:'اجعله القالب الافتراضي', layoutDelete:'حذف القالب', layoutMeta:'{k} مؤشر · {c} رسم · {f} فلتر', layoutDefaultNote:'القالب الافتراضي ★ يُطبَّق تلقائيًا عند رفع أي ملف جديد.', layoutEmpty:'لا توجد قوالب محفوظة بعد.', layoutNeedName:'اكتب اسمًا للقالب.', layoutSaved:'تم حفظ القالب «{n}».', layoutUpdated:'تم تحديث القالب «{n}».', layoutApplied:'تم تطبيق القالب «{n}».', layoutAppliedSkip:'تم تطبيق القالب «{n}»، وتُرك {s} عنصر لأن أعمدته غير موجودة في هذا الملف.', tPie:'دائري بقيمة', skinTitle:'الثيم', skinAtlas:'ثيم: أطلس', skinExecutive:'ثيم: تنفيذي', skinNova:'ثيم: نوفا', pieSub:'{agg} {v} حسب {c}', pieSplit:'{v} حسب {c}', pieSplitSub:'حلقة لكل قيمة من {c}', pieRings:'الحلقات من الخارج للداخل: {list}'
   },
   en: {
     docTitle:'Atlas — Dynamic Data Dashboard', brandTag:'Dynamic Dashboard / v1', processing:'Parsing', excel:'Excel',
@@ -640,7 +776,7 @@ const I18N = {
     calcBtn:'ƒx Calculated column', calcTitle:'Calculated column', calcHint:'Create a new column from two numeric columns, or a column and a fixed number',
     calcName:'Column name', calcConstPh:'Fixed number', calcConstOpt:'Fixed number…', close:'Close', calcAdd:'Add column',
     calcNeedNum:'There are no numeric columns in the data.', calcNeedName:'Enter a column name.', calcNameTaken:'A column with this name already exists.',
-    calcNeedConst:'Enter the fixed number.', calcExample:'Example: ', calcDefaultName:'{a} {op} {b}', calcRemove:'Remove column', calcAdded:'Column “{n}” added and saved automatically.', calcSavedNote:'Calculated columns are saved automatically and re-applied to any file with the same columns.', calcSkipped:'saved, but its columns are not in this file', calcExists:'the file already has a column with this name, so its values are used as-is', layoutsBtn:'▦ Layouts', layoutsTitle:'Layout templates', layoutsHint:'Save the current metrics, charts, filters and tables as a template, and apply it to any file.', layoutNamePh:'Template name (e.g. Monthly sales report)', layoutSave:'Save current layout', layoutApply:'Apply', layoutDefault:'Default', layoutMakeDefault:'Make default template', layoutDelete:'Delete template', layoutMeta:'{k} metrics · {c} charts · {f} filters', layoutDefaultNote:'The default template ★ is applied automatically whenever you load a new file.', layoutEmpty:'No saved templates yet.', layoutNeedName:'Enter a template name.', layoutSaved:'Template “{n}” saved.', layoutUpdated:'Template “{n}” updated.', layoutApplied:'Template “{n}” applied.', layoutAppliedSkip:'Template “{n}” applied; {s} item(s) skipped because their columns are not in this file.', tPie:'Pie by value', pieSub:'{agg} of {v} by {c}', pieSplit:'{v} by {c}', pieSplitSub:'One ring per {c} value', pieRings:'Rings, outer to inner: {list}'
+    calcNeedConst:'Enter the fixed number.', calcExample:'Example: ', calcDefaultName:'{a} {op} {b}', calcRemove:'Remove column', calcAdded:'Column “{n}” added and saved automatically.', calcSavedNote:'Calculated columns are saved automatically and re-applied to any file with the same columns.', calcSkipped:'saved, but its columns are not in this file', calcExists:'the file already has a column with this name, so its values are used as-is', layoutsBtn:'▦ Layouts', layoutsTitle:'Layout templates', layoutsHint:'Save the current metrics, charts, filters and tables as a template, and apply it to any file.', layoutNamePh:'Template name (e.g. Monthly sales report)', layoutSave:'Save current layout', layoutApply:'Apply', layoutDefault:'Default', layoutMakeDefault:'Make default template', layoutDelete:'Delete template', layoutMeta:'{k} metrics · {c} charts · {f} filters', layoutDefaultNote:'The default template ★ is applied automatically whenever you load a new file.', layoutEmpty:'No saved templates yet.', layoutNeedName:'Enter a template name.', layoutSaved:'Template “{n}” saved.', layoutUpdated:'Template “{n}” updated.', layoutApplied:'Template “{n}” applied.', layoutAppliedSkip:'Template “{n}” applied; {s} item(s) skipped because their columns are not in this file.', tPie:'Pie by value', skinTitle:'Theme', skinAtlas:'Theme: Atlas', skinExecutive:'Theme: Executive', skinNova:'Theme: Nova', pieSub:'{agg} of {v} by {c}', pieSplit:'{v} by {c}', pieSplitSub:'One ring per {c} value', pieRings:'Rings, outer to inner: {list}'
   }
 };
 let lang = document.documentElement.getAttribute('lang') === 'en' ? 'en' : 'ar';
@@ -676,7 +812,14 @@ function debounce(fn, ms){
 }
 const refreshSoon = debounce(() => refreshAll(), 300);
 
-const palette = ['#d2502a','#2b4a6f','#3f7d5b','#c08a2b','#7a3b6e','#456b7a','#a44b3a','#5e6b3a','#8c5a2b','#3a5a7a'];
+// Chart colours come from the active skin (--p1 … --p10)
+const palette = [];
+function syncPalette(){
+  const colors = [];
+  for(let i = 1; i <= 10; i++){ const c = themeColor('--p' + i); if(c) colors.push(c); }
+  palette.splice(0, palette.length, ...colors);
+}
+syncPalette();
 
 /* =========================================================
    FILE INPUT
@@ -733,9 +876,19 @@ function applyTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
   themeLabel.textContent = theme === 'dark' ? t('day') : t('night');
   try{ localStorage.setItem('atlas-theme', theme); }catch(e){}
+  syncPalette();
   if(state.rows.length) buildCharts(getFilteredRows());
 }
 themeLabel.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? t('day') : t('night');
+
+const skinSelect = document.getElementById('skinSelect');
+skinSelect.value = document.documentElement.getAttribute('data-skin') || 'atlas';
+skinSelect.addEventListener('change', () => {
+  document.documentElement.setAttribute('data-skin', skinSelect.value);
+  try{ localStorage.setItem('atlas-skin', skinSelect.value); }catch(e){}
+  syncPalette();
+  if(state.rows.length) buildCharts(getFilteredRows());
+});
 
 const langBtn = document.getElementById('langBtn');
 function applyLang(next){
@@ -1722,7 +1875,7 @@ function buildFlexiblePivot(rows){
   if(config.valueCol === '__RECORDS__') config.agg = 'count';
 
   const makePivotSelect = (role, label, options, selected) => `
-    <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
+    <label style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
       ${label}<select data-pivot-role="${role}">${options.map(option => `<option value="${escapeHtml(option.value)}" ${option.value===selected?'selected':''}>${escapeHtml(option.label)}</option>`).join('')}</select>
     </label>`;
   const fieldOptions = columns.map(column => ({value:column.name, label:`${column.name} (${typeLabel(column.type)})`}));
@@ -1865,14 +2018,14 @@ function buildTotalsTable(rows){
   if(!valueCols.some(c => c.name === config.valueCol)) config.valueCol = (valueCols.find(c => !looksLikeId(c)) || valueCols[0]).name;
 
   const makeSelect = (role, label, columns, selected) => `
-    <label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
+    <label style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
       ${label}
       <select data-role="${role}">${columns.map(c => `<option value="${escapeHtml(c.name)}" ${c.name===selected?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select>
     </label>`;
   controls.innerHTML = makeSelect('row', t('rows'), rowCols, config.rowCol)
     + makeSelect('date', t('dateLbl'), dateCols, config.dateCol)
     + makeSelect('value', t('values'), valueCols, config.valueCol)
-    + `<label style="display:flex;align-items:center;gap:5px;font-family:'Geist Mono','IBM Plex Sans Arabic',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
+    + `<label style="display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">
       ${t('group')}
       <select data-role="granularity">
         <option value="month" ${config.granularity === 'month' ? 'selected' : ''}>${t('monthly')}</option>
@@ -2472,17 +2625,17 @@ function drawChart(cfg, rows, canvasId){
   const baseOpts = {
     responsive:true, maintainAspectRatio:false,
     plugins:{
-      legend:{rtl:isRTL(), textDirection:isRTL() ? 'rtl' : 'ltr', labels:{font:{family:"'Geist','IBM Plex Sans Arabic', sans-serif", size:11}, color:chartText}},
+      legend:{rtl:isRTL(), textDirection:isRTL() ? 'rtl' : 'ltr', labels:{font:{family:themeColor('--font-body'), size:11}, color:chartText}},
       tooltip:{
         rtl:isRTL(), textDirection:isRTL() ? 'rtl' : 'ltr',
-        backgroundColor:themeColor('--tooltip-bg'), titleFont:{family:"'Geist','IBM Plex Sans Arabic', sans-serif",size:12}, bodyFont:{family:"'Geist Mono','IBM Plex Sans Arabic', monospace", size:11},
+        backgroundColor:themeColor('--tooltip-bg'), titleFont:{family:themeColor('--font-body'),size:12}, bodyFont:{family:themeColor('--font-mono'), size:11},
         padding:10, cornerRadius:4
       }
     },
     scales:{}
   };
   const gridStyle = {color:themeColor('--chart-grid'), drawBorder:false};
-  const tickStyle = {color:themeColor('--chart-tick'), font:{family:"'Geist Mono','IBM Plex Sans Arabic', monospace", size:10}};
+  const tickStyle = {color:themeColor('--chart-tick'), font:{family:themeColor('--font-mono'), size:10}};
 
   let chart;
 
@@ -2662,12 +2815,12 @@ function drawChart(cfg, rows, canvasId){
     }
     chart = new Chart(ctx,{
       type:'scatter',
-      data:{datasets:[{label:`${cfg.xCol} × ${cfg.yCol}`, data, backgroundColor:'rgba(210,80,42,0.55)', borderColor:palette[0], pointRadius:3.5, pointHoverRadius:5}]},
+      data:{datasets:[{label:`${cfg.xCol} × ${cfg.yCol}`, data, backgroundColor:palette[0] + '8c', borderColor:palette[0], pointRadius:3.5, pointHoverRadius:5}]},
       options:{...baseOpts,
         plugins:{...baseOpts.plugins, legend:{display:false}},
         scales:{
-          x:{title:{display:true,text:cfg.xCol,color:chartText,font:{family:"'Geist Mono','IBM Plex Sans Arabic', monospace",size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}},
-          y:{title:{display:true,text:cfg.yCol,color:chartText,font:{family:"'Geist Mono','IBM Plex Sans Arabic', monospace",size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}}
+          x:{title:{display:true,text:cfg.xCol,color:chartText,font:{family:themeColor('--font-mono'),size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}},
+          y:{title:{display:true,text:cfg.yCol,color:chartText,font:{family:themeColor('--font-mono'),size:10}}, grid:gridStyle, ticks:{...tickStyle, callback:v=>fmt.num(v)}}
         }
       }
     });

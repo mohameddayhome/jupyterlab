@@ -34,7 +34,9 @@ const SCHEMA = {
     // Lines of a customer-accounts adjustment (v12): adjustment number + line number.
     ['batchId', 'Adjustment no'], ['lineNo', 'Line no'],
     // Delivery to the customer (v13): days late are counted from here, the due date only marks the revenue period.
-    ['deliveryDate', 'Delivery date']
+    ['deliveryDate', 'Delivery date'],
+    // One collection receipt for several customers (v16): its lines share the voucher and this id.
+    ['receiptGroup', 'Receipt group']
   ],
   CustomerGroups: [['groupId', 'GroupId'], ['groupName', 'GroupName']],
   Users: [
@@ -91,7 +93,7 @@ const PAGE_ACTIONS = {
 const ENTITY_PAGE = { Customers: 'customers', Transactions: 'transactions', CustomerGroups: 'groups', FollowUps: 'followup', Users: 'users', Currencies: 'currencies', Adjustments: 'adjustments' };
 
 /** Must match CLIENT_VERSION in Script.html — a mismatch means Code.gs was not updated/deployed. */
-const APP_VERSION = '15';
+const APP_VERSION = '16';
 function getVersion() { return APP_VERSION; }
 /** Public branding for the sign-in screen (no login needed, nothing sensitive). */
 function getBranding() {
@@ -699,7 +701,12 @@ function deleteRecord(token, entity, id) {
       assertCustomerVisible_(user, t.account);
       if (t.postStatus === 'Posted' && !user.isAdmin) throw new Error('POSTED_LOCKED');
       if (t.batchId) throw new Error('BATCH_LOCKED');
-      updateRow_(entity, t._row, { isDeleted: true, updatedByName: user.fullName || user.username, updatedAt: new Date() });
+      const rows = t.receiptGroup ? readTable('Transactions').filter(function (x) { return x.receiptGroup === t.receiptGroup && !x.isDeleted; }) : [t];
+      rows.forEach(function (x) {
+        assertCustomerVisible_(user, x.account);
+        if (x.postStatus === 'Posted' && !user.isAdmin) throw new Error('POSTED_LOCKED');
+      });
+      rows.forEach(function (x) { updateRow_(entity, x._row, { isDeleted: true, updatedByName: user.fullName || user.username, updatedAt: new Date() }); });
       return true;
     }
     if (entity === 'Customers') {
@@ -800,7 +807,7 @@ function postTransactions(token, ids, unpost, page) {
   if (unpost && !user.isAdmin) throw new Error('NO_PERMISSION');
   return withLock_(function () {
     const set = {};
-    ids.forEach(function (id) { set[id] = true; });
+    withReceiptGroups_(ids).forEach(function (id) { set[id] = true; });
     const sh = sheet_('Transactions');
     const hm = headerMap_(sh);
     const idx = fieldIndex_('Transactions', hm);
@@ -1279,76 +1286,142 @@ function nextReceiptNo_() {
  * r: {account, date, voucher?, payMethod, chequeNo, chequeDate, bankName, payRef, currency, exchange,
  *     description, post, onAccount, allocations: [{voucher, amount}]}  — amounts in local currency.
  */
+/**
+ * Collection receipt — one customer, or several customers under the same receipt number.
+ * r: { rowId | groupId (edit), date, voucher, payMethod, chequeNo, chequeDate, bankName, payRef, currency, exchange,
+ *      description, post, lines: [{ account, allocations: [{ voucher, amount }], onAccount }] }
+ * (the old single form { account, allocations, onAccount } is still accepted).
+ * Each customer is stored as its own Payment row; rows of a multi-customer receipt share voucher + receiptGroup.
+ */
 function saveReceipt(token, r) {
   const user = auth_(token, 'receipts');
-  const editing = !!r.rowId;
+  const editing = !!(r.rowId || r.groupId);
   requireAction_(user, editing ? 'edit' : 'add', 'receipts');
-  assertCustomerVisible_(user, r.account);
   if (PAY_METHODS.indexOf(r.payMethod) === -1) throw new Error('REQUIRED_FIELDS');
   if (r.payMethod === 'Cheque' && !String(r.chequeNo || '').trim()) throw new Error('CHEQUE_REQUIRED');
   if (!r.date) throw new Error('REQUIRED_FIELDS');
-  const allocs = (r.allocations || []).map(function (a) { return { voucher: String(a.voucher), amount: round2_(toNum_(a.amount)) }; })
-    .filter(function (a) { return a.voucher && a.amount > 0; });
-  const onAccount = round2_(Math.max(0, toNum_(r.onAccount)));
+  const lines = (r.lines && r.lines.length ? r.lines : [{ account: r.account, allocations: r.allocations, onAccount: r.onAccount }])
+    .map(function (l) {
+      return {
+        account: String(l.account || '').trim(),
+        allocs: (l.allocations || []).map(function (a) { return { voucher: String(a.voucher), amount: round2_(toNum_(a.amount)) }; })
+          .filter(function (a) { return a.voucher && a.amount > 0; }),
+        onAccount: round2_(Math.max(0, toNum_(l.onAccount)))
+      };
+    }).filter(function (l) { return l.account; });
+  if (!lines.length) throw new Error('REQUIRED_FIELDS');
+  const seenAcc = {};
+  lines.forEach(function (l) {
+    if (seenAcc[l.account]) throw new Error('DUPLICATE_CUSTOMER: ' + l.account);
+    seenAcc[l.account] = true;
+    assertCustomerVisible_(user, l.account);
+  });
   return withLock_(function () {
-    let existing = null;
+    let old = [];
     if (editing) { // only unposted receipts can be changed
-      existing = getById_('Transactions', r.rowId);
-      if (existing.isDeleted || !existing.payMethod) throw new Error('NOT_FOUND');
-      if (existing.postStatus !== 'Draft') throw new Error('POSTED_LOCKED');
-      assertCustomerVisible_(user, existing.account);
+      old = r.groupId
+        ? readTable('Transactions').filter(function (t) { return t.receiptGroup === r.groupId && !t.isDeleted && t.payMethod; })
+        : [getById_('Transactions', r.rowId)];
+      if (!old.length || old.some(function (o) { return o.isDeleted || !o.payMethod; })) throw new Error('NOT_FOUND');
+      old.forEach(function (o) {
+        if (o.postStatus !== 'Draft') throw new Error('POSTED_LOCKED');
+        assertCustomerVisible_(user, o.account);
+      });
     }
-    const open = openInvoices_(user, r.account, editing ? r.rowId : '');
-    if (!allocs.length && !(onAccount > 0 && !open.invoices.length)) throw new Error('INVOICE_REQUIRED');
-    const left = {};
-    open.invoices.forEach(function (i) { left[i.voucher] = round2_((left[i.voucher] || 0) + i.remaining); });
-    allocs.forEach(function (a) {
-      if (left[a.voucher] === undefined || a.amount > left[a.voucher] + 0.01) throw new Error('OVER_ALLOCATED: ' + a.voucher);
-      left[a.voucher] = round2_(left[a.voucher] - a.amount);
+    const oldByAcc = {}, oldIds = {};
+    old.forEach(function (o) { oldByAcc[o.account] = o; oldIds[o.rowId] = true; });
+    let currency = '';
+    lines.forEach(function (l) {
+      const open = openInvoices_(user, l.account, oldByAcc[l.account] ? oldByAcc[l.account].rowId : '');
+      currency = currency || open.currency;
+      if (!l.allocs.length && !(l.onAccount > 0 && !open.invoices.length)) throw new Error('INVOICE_REQUIRED: ' + l.account);
+      const left = {};
+      open.invoices.forEach(function (i) { left[i.voucher] = round2_((left[i.voucher] || 0) + i.remaining); });
+      l.allocs.forEach(function (a) {
+        if (left[a.voucher] === undefined || a.amount > left[a.voucher] + 0.01) throw new Error('OVER_ALLOCATED: ' + a.voucher);
+        left[a.voucher] = round2_(left[a.voucher] - a.amount);
+      });
+      l.total = round2_(l.allocs.reduce(function (s, a) { return s + a.amount; }, 0) + l.onAccount);
     });
-    const total = round2_(allocs.reduce(function (s, a) { return s + a.amount; }, 0) + onAccount);
-    const voucher = String(r.voucher || '').trim() || (existing ? existing.voucher : nextReceiptNo_());
-    if (readTable('Transactions').some(function (t) { return !t.isDeleted && t.payMethod && String(t.voucher) === voucher && t.rowId !== r.rowId; })) throw new Error('DUPLICATE_ID');
+    const voucher = String(r.voucher || '').trim() || (old.length ? old[0].voucher : nextReceiptNo_());
+    if (readTable('Transactions').some(function (t) { return !t.isDeleted && t.payMethod && String(t.voucher) === voucher && !oldIds[t.rowId]; })) throw new Error('DUPLICATE_ID');
+    const group = lines.length > 1 ? (r.groupId || (old[0] && old[0].receiptGroup) || Utilities.getUuid()) : '';
     const now = new Date(), who = user.fullName || user.username;
     const exchange = toNum_(r.exchange) || 1;
     const post = !!r.post && hasAction_(user, 'post', 'receipts');
-    const tx = {
-      voucher: voucher, type: 'Payment', account: r.account, date: r.date, description: r.description || ('Collection - ' + r.payMethod),
-      amountCur: round2_(total / exchange), currency: String(r.currency || open.currency || '').toUpperCase(), exchange: exchange,
-      creditMST: total, debitMST: 0, userAdd: user.username, createdById: user.userId, createdByName: who, createdAt: now,
-      updatedByName: who, updatedAt: now, isDeleted: false, postStatus: post ? 'Posted' : 'Draft',
-      postedBy: post ? who : '', postedAt: post ? now : '', rowId: Utilities.getUuid(),
-      payMethod: r.payMethod, chequeNo: r.chequeNo || '', chequeDate: r.chequeDate || '', bankName: r.bankName || '',
-      payRef: r.payRef || '', collectedBy: user.username
-    };
-    if (existing) { // keep identity and audit fields, replace the rest and the invoice links
-      ['rowId', 'userAdd', 'createdById', 'createdByName', 'createdAt', 'collectedBy'].forEach(function (k) { tx[k] = existing[k]; });
-      updateRow_('Transactions', existing._row, tx);
-      deleteAllocations_(tx.rowId);
-    } else {
-      appendRows('Transactions', [tx]);
-    }
-    appendRows('Allocations', allocs.map(function (a) {
-      return { id: Utilities.getUuid(), paymentRowId: tx.rowId, paymentVoucher: voucher, account: r.account,
-        invoiceVoucher: a.voucher, amount: a.amount, date: r.date, createdBy: who, createdAt: now };
-    }));
-    if (!post && !existing) {
+    const cur = String(r.currency || currency || '').toUpperCase();
+    const used = {}, newAllocs = [], out = [];
+    lines.forEach(function (l, k) {
+      const tx = {
+        voucher: voucher, type: 'Payment', account: l.account, date: r.date, description: r.description || ('Collection - ' + r.payMethod),
+        amountCur: round2_(l.total / exchange), currency: cur, exchange: exchange,
+        creditMST: l.total, debitMST: 0, userAdd: user.username, createdById: user.userId, createdByName: who, createdAt: now,
+        updatedByName: who, updatedAt: now, isDeleted: false, postStatus: post ? 'Posted' : 'Draft',
+        postedBy: post ? who : '', postedAt: post ? now : '', rowId: Utilities.getUuid(),
+        payMethod: r.payMethod, chequeNo: r.chequeNo || '', chequeDate: r.chequeDate || '', bankName: r.bankName || '',
+        payRef: r.payRef || '', collectedBy: user.username, receiptGroup: group, lineNo: group ? k + 1 : ''
+      };
+      const ex = oldByAcc[l.account];
+      if (ex) { // keep identity and audit fields, replace the rest and the invoice links
+        ['rowId', 'userAdd', 'createdById', 'createdByName', 'createdAt', 'collectedBy'].forEach(function (f) { tx[f] = ex[f]; });
+        updateRow_('Transactions', ex._row, tx);
+        deleteAllocations_(tx.rowId);
+        used[ex.rowId] = true;
+      } else {
+        appendRows('Transactions', [tx]);
+      }
+      l.allocs.forEach(function (a) {
+        newAllocs.push({ id: Utilities.getUuid(), paymentRowId: tx.rowId, paymentVoucher: voucher, account: l.account,
+          invoiceVoucher: a.voucher, amount: a.amount, date: r.date, createdBy: who, createdAt: now });
+      });
+      out.push(tx.rowId);
+    });
+    old.forEach(function (o) { // customers removed from the receipt
+      if (used[o.rowId]) return;
+      const row = findRow_('Transactions', o.rowId);
+      if (row > -1) updateRow_('Transactions', row, { isDeleted: true, updatedByName: who, updatedAt: now });
+      deleteAllocations_(o.rowId);
+    });
+    appendRows('Allocations', newAllocs);
+    const total = round2_(lines.reduce(function (s, l) { return s + l.total; }, 0));
+    if (!post && !editing) {
       const posters = readTable('Users').filter(function (u) {
         return u.active && u.username !== user.username && (u.role === 'Admin' || hasAction_(u, 'post', 'receipts'));
       }).map(function (u) { return u.username; });
-      notify_(posters, 'RECEIPT_PENDING', voucher + ' — ' + fmtInt_(total) + ' — ' + who, r.account);
+      notify_(posters, 'RECEIPT_PENDING', voucher + ' — ' + fmtInt_(total) + ' — ' + who, lines[0].account);
     }
-    return { rowId: tx.rowId, voucher: voucher, total: total, postStatus: tx.postStatus };
+    return { rowId: out[0], rowIds: out, voucher: voucher, total: total, customers: lines.length, groupId: group, postStatus: post ? 'Posted' : 'Draft' };
   });
 }
 
-/** Everything needed to print a receipt voucher. */
+/** Everything needed to print / edit a receipt voucher (all customers of a multi-customer receipt). */
 function getReceipt(token, rowId) {
   const user = auth_(token, 'receipts');
   const t = getById_('Transactions', rowId);
   assertCustomerVisible_(user, t.account);
-  const c = visibleCustomers_(user).filter(function (x) { return x.account === t.account; })[0];
-  return { tx: t, customer: c, allocations: allocationsByPayment_()[rowId] || [], settings: publicSettings_() };
+  const custs = {};
+  visibleCustomers_(user).forEach(function (x) { custs[x.account] = x; });
+  const alloc = allocationsByPayment_();
+  let group = null;
+  if (t.receiptGroup) {
+    group = readTable('Transactions').filter(function (x) { return x.receiptGroup === t.receiptGroup && !x.isDeleted && x.payMethod; })
+      .sort(function (a, b) { return (+a.lineNo || 0) - (+b.lineNo || 0); })
+      .map(function (x) {
+        if (!custs[x.account]) throw new Error('NO_PERMISSION');
+        return { tx: x, customer: custs[x.account], allocations: alloc[x.rowId] || [] };
+      });
+  }
+  return { tx: t, customer: custs[t.account], allocations: alloc[rowId] || [], group: group, settings: publicSettings_() };
+}
+
+/** Row ids of every line of the multi-customer receipts the given rows belong to. */
+function withReceiptGroups_(ids) {
+  const set = {}, groups = {};
+  ids.forEach(function (id) { set[id] = true; });
+  const tx = readTable('Transactions');
+  tx.forEach(function (t) { if (set[t.rowId] && t.receiptGroup) groups[t.receiptGroup] = true; });
+  tx.forEach(function (t) { if (t.receiptGroup && groups[t.receiptGroup] && !t.isDeleted) set[t.rowId] = true; });
+  return Object.keys(set);
 }
 
 function publicSettings_() {
@@ -1956,10 +2029,12 @@ function reportPaidInvoices(token, f) {
  */
 function reportOpeningAging(token, f) {
   const user = auth_(token, 'opening');
-  f = f || {};
+  return openingAging_(user, f || {});
+}
+function openingAging_(user, f, L) {
   const asOf = f.asOf || today_();
   const status = f.obStatus === undefined ? 'open' : f.obStatus; // f.status is the customer status filter
-  const L = ledger_(user, asOf, f.currency);
+  L = L || ledger_(user, asOf, f.currency);
   const all = L.invoices.filter(function (i) {
     return isOpening_(i) && customerFilter_(L.cmap[i.account], f) && (!f.year || String(i.date).slice(0, 4) === String(f.year));
   });
@@ -2312,7 +2387,11 @@ function getDashboard(token, currency) {
     collections: (function () { const c = collections_(user, { dateFrom: monthStart, dateTo: today }, L);
       return { byMethod: c.byMethod, collectors: c.collectors, totals: c.totals }; })(),
     performance: (function () { const pf = performance_(user, { dateFrom: monthStart, dateTo: today }, L, od);
-      return { rows: pf.rows.map(function (r) { const o = Object.assign({}, r); delete o.list; return o; }), totals: pf.totals }; })()
+      return { rows: pf.rows.map(function (r) { const o = Object.assign({}, r); delete o.list; return o; }), totals: pf.totals }; })(),
+    // Opening-balance collection delay (all years): totals, age bands, per-year summary, top unpaid.
+    opening: (function () { const o = openingAging_(user, { asOf: today, obStatus: 'open' }, L);
+      return { totals: o.totals, bands: o.bands, years: o.years.map(function (y) { return { year: y.year, count: y.count, open: y.open, amount: y.amount,
+        collected: y.collected, remaining: y.remaining, rate: y.rate }; }), top: o.rows.slice(0, 5) }; })()
   });
 }
 

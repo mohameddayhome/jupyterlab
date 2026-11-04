@@ -329,6 +329,10 @@
   .modal-card { width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 18px; box-shadow: var(--shadow); }
   .modal-card .drawer-head { padding-bottom: 12px; }
   .modal-card.wide { width: min(1100px, 100%); }
+  .ob-mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .ob-mini span { color: var(--subtle); font-size: 11px; }
+  .ob-mini b { font-size: 15px; }
+  .ob-mini small { color: var(--subtle); font-size: 10px; }
   tr.row-err td { background: color-mix(in srgb, var(--red) 9%, transparent); }
   .orient { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
   .orient-btn { display: grid; justify-items: center; gap: 10px; padding: 18px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--page); color: var(--text); font-size: 12px; font-weight: 650; }
@@ -418,6 +422,18 @@
   .bubble-body { font-size: 12px; color: var(--text); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 
   .alloc-box { border: 1px solid var(--border); border-radius: 7px; padding: 10px; background: var(--page); }
+  .rc-lines { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .rc-line, .rc-line .alloc-box { min-width: 0; }
+  .rc-line { border: 1px solid var(--border); border-radius: 9px; padding: 10px; background: var(--surface); }
+  .rc-line-head { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 8px; }
+  .rc-line-head .field { flex: 1 1 auto; min-width: 0; }
+  .rc-no { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: var(--surface-raised); font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+  .rc-lsum { font-size: 11px; color: var(--subtle); white-space: nowrap; margin-bottom: 8px; }
+  .rc-lsum b { color: var(--text); }
+  .rc-line-head .icon-button { margin-bottom: 2px; }
+  .rc-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .rc-grand { font-size: 12px; } .rc-grand b { font-size: 15px; }
+  @media (max-width: 680px) { .rc-line-head { flex-wrap: wrap; } .rc-line-head .field { flex-basis: calc(100% - 70px); } .rc-lsum { order: 3; flex-basis: 100%; margin: 0; } }
   table.alloc { width: 100%; min-width: 520px; }
   table.alloc td, table.alloc th { padding: 7px 8px; }
   table.alloc td:first-child { width: 28px; }

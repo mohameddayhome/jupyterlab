@@ -2,7 +2,7 @@
 /* ═══════════════════════════ CRM Console — client ═══════════════════════════ */
 
 /** Must match APP_VERSION in Code.gs. */
-const CLIENT_VERSION = '15';
+const CLIENT_VERSION = '16';
 
 // ───────── Translations (Arabic default, English toggle) ─────────
 const I18N = {
@@ -24,7 +24,7 @@ const I18N = {
     ob_year: 'سنة الرصيد', ob_status: 'الحالة', ob_open: 'غير مسدد', ob_paid: 'مسدد بالكامل', ob_total: 'الأرصدة الافتتاحية', ob_collected: 'المحصل منها',
     ob_remaining: 'المتبقي', ob_rate: 'نسبة التحصيل', ob_avgAge: 'متوسط عمر المتبقي', ob_years: 'سنة', ob_age: 'العمر', ob_byYear: 'حسب سنة الرصيد الافتتاحي',
     ob_collectedIn: 'حُصّل في {y}', ob_count: 'عدد الأرصدة', ob_openN: 'غير مسدد', ob_detail: 'تفاصيل الأرصدة', ob_paidDate: 'تاريخ السداد الكامل',
-    y1: 'حتى سنة', y2: '1 - 2 سنة', y3: '2 - 3 سنوات', y4: 'أكثر من 3 سنوات', ob_none: 'لا توجد أرصدة افتتاحية مدينة مطابقة.',
+    y1: 'حتى سنة', y2: '1 - 2 سنة', y3: '2 - 3 سنوات', y4: 'أكثر من 3 سنوات', ob_none: 'لا توجد أرصدة افتتاحية مدينة مطابقة.', ob_topUnpaid: 'أكبر الأرصدة الافتتاحية غير المسددة',
     s_credit: 'العملاء الذين تجاوز رصيدهم حد الائتمان (بعملة العميل).',
     s_followup: 'متابعة العملاء المتأخرين وتسجيل الاتصالات والوعود بالسداد.',
     s_collection: 'مسؤول التحصيل، الشركات التابعة له، المتأخرات وأيام التأخير.',
@@ -166,7 +166,10 @@ const I18N = {
     postNow: 'ترحيل مباشر', autoNo: 'تلقائي', printReceipt: 'طباعة سند القبض', receiptTitle: 'سند قبض', receiptNo: 'رقم السند',
     receivedFrom: 'استلمنا من السادة', theSumOf: 'مبلغاً وقدره', forInvoices: 'وذلك سداداً للفواتير التالية', receiver: 'المستلم',
     accountant: 'المحاسب', customerSign: 'توقيع العميل', paidBy: 'سندات السداد', linked: 'مربوط بالفاتورة', fifo: 'تسوية تلقائية',
-    err_INVOICE_REQUIRED: 'اختر فاتورة واحدة على الأقل ليتم التحصيل منها', err_OVER_ALLOCATED: 'المبلغ أكبر من المتبقي على الفاتورة',
+    err_INVOICE_REQUIRED: 'اختر فاتورة واحدة على الأقل ليتم التحصيل منها', err_DUPLICATE_CUSTOMER: 'العميل مكرر في نفس السند',
+    rcCustomers: 'العملاء والفواتير', rcAddCustomer: 'إضافة عميل آخر بنفس رقم السند', rcGrand: 'إجمالي السند',
+    rcSameNoHint: 'يمكن تسجيل تحصيل واحد لأكثر من عميل برقم سند واحد (مثل شيك واحد يغطي عدة شركات)، ولكل عميل فواتيره.',
+    rcNCustomers: '{n} عملاء', rcCustomersCount: 'عدد العملاء', err_OVER_ALLOCATED: 'المبلغ أكبر من المتبقي على الفاتورة',
     err_CHEQUE_REQUIRED: 'رقم الشيك مطلوب', err_RECEIPT_LOCKED: 'سند تحصيل مرتبط بفواتير: احذفه وأعد تسجيله',
     err_EMAIL_REQUIRED: 'أدخل البريد الإلكتروني',
     orientation: 'اتجاه الصفحة', portrait: 'رأسي (Portrait)', landscape: 'أفقي (Landscape)', paperA4: 'مقاس الورق: A4',
@@ -200,7 +203,7 @@ const I18N = {
     ob_year: 'Balance year', ob_status: 'Status', ob_open: 'Unpaid', ob_paid: 'Fully paid', ob_total: 'Opening balances', ob_collected: 'Collected',
     ob_remaining: 'Remaining', ob_rate: 'Collection rate', ob_avgAge: 'Average age of remaining', ob_years: 'yr', ob_age: 'Age', ob_byYear: 'By opening-balance year',
     ob_collectedIn: 'Collected in {y}', ob_count: 'Balances', ob_openN: 'Unpaid', ob_detail: 'Opening balances detail', ob_paidDate: 'Fully paid on',
-    y1: 'Up to 1 year', y2: '1 - 2 years', y3: '2 - 3 years', y4: 'Over 3 years', ob_none: 'No matching debit opening balances.',
+    y1: 'Up to 1 year', y2: '1 - 2 years', y3: '2 - 3 years', y4: 'Over 3 years', ob_none: 'No matching debit opening balances.', ob_topUnpaid: 'Largest unpaid opening balances',
     s_credit: 'Customers whose balance exceeds their credit limit (customer currency).',
     s_followup: 'Follow up late customers, log calls and payment promises.',
     s_collection: 'Collector, assigned companies, overdue amounts and days late.',
@@ -342,7 +345,10 @@ const I18N = {
     postNow: 'Post immediately', autoNo: 'Automatic', printReceipt: 'Print receipt', receiptTitle: 'Receipt voucher', receiptNo: 'Receipt no.',
     receivedFrom: 'Received from', theSumOf: 'The sum of', forInvoices: 'In settlement of the following invoices', receiver: 'Received by',
     accountant: 'Accountant', customerSign: 'Customer signature', paidBy: 'Paid by', linked: 'Linked to invoice', fifo: 'Auto-settled',
-    err_INVOICE_REQUIRED: 'Select at least one invoice to collect against', err_OVER_ALLOCATED: 'Amount exceeds the invoice balance',
+    err_INVOICE_REQUIRED: 'Select at least one invoice to collect against', err_DUPLICATE_CUSTOMER: 'Customer repeated in the same receipt',
+    rcCustomers: 'Customers and invoices', rcAddCustomer: 'Add another customer under the same receipt number', rcGrand: 'Receipt total',
+    rcSameNoHint: 'One collection can cover several customers under one receipt number (e.g. one cheque for several companies), each with its own invoices.',
+    rcNCustomers: '{n} customers', rcCustomersCount: 'Customers', err_OVER_ALLOCATED: 'Amount exceeds the invoice balance',
     err_CHEQUE_REQUIRED: 'Cheque number is required', err_RECEIPT_LOCKED: 'Receipt is linked to invoices: delete and record it again',
     err_EMAIL_REQUIRED: 'Enter an email address',
     orientation: 'Page orientation', portrait: 'Portrait', landscape: 'Landscape', paperA4: 'Paper size: A4',
@@ -468,6 +474,8 @@ function errText(e) {
   if (/is not a function/.test(msg)) return t('err_OUTDATED');
   const line = msg.match(/\b(LINE_ACCOUNT|LINE_AMOUNT): (\d+)/);
   if (line) return t('err_' + line[1]) + ' ' + line[2];
+  const det = msg.match(/\b(INVOICE_REQUIRED|DUPLICATE_CUSTOMER|OVER_ALLOCATED): (.+)$/);
+  if (det) return t('err_' + det[1]) + ' — ' + det[2];
   const code = (msg.match(/\b[A-Z][A-Z_]{4,}\b/) || [])[0];
   return code && I18N.en['err_' + code] ? t('err_' + code) : msg.replace(/^(Exception|Error):\s*/, '');
 }
@@ -857,6 +865,38 @@ function permSummary(r) {
 
 const SETTING_INPUTS = ['AppName', 'CompanyName', 'CompanyAddress', 'CompanyPhone', 'CompanyEmail', 'SessionMinutes'];
 const SETTING_TEXTS = ['BankDetails', 'StatementNote'];
+/** Dashboard block: opening-balance collection delay across the years. */
+function dashOpening(d, cc) {
+  const o = d.opening;
+  if (!o || !o.totals.count) return '';
+  const T = o.totals, pct = v => `<span dir="ltr">${NI.format(v)}%</span>`;
+  const bandTotal = Object.values(o.bands).reduce((a, b) => a + b, 0);
+  const more = hasPage('opening') ? `<button class="section-action" data-go="opening">${t('details')}</button>` : '';
+  return `<section class="section dual">
+        <article class="panel">
+          <div class="section-head"><h2 class="section-title">⌛ ${t('p_opening')} (${esc(cc)})</h2>${more}</div>
+          <div class="mini-stats ob-mini">
+            <div><span>${t('ob_total')}</span><b dir="ltr">${money(T.amount)}</b></div>
+            <div><span>${t('ob_collected')}</span><b dir="ltr" class="pos">${money(T.collected)}</b><small>${pct(T.rate)}</small></div>
+            <div><span>${t('ob_remaining')}</span><b dir="ltr" class="neg">${money(T.remaining)}</b><small>${NI.format(T.open)} ${t('ob_openN')}</small></div>
+            <div><span>${t('ob_avgAge')}</span><b><span dir="ltr">${T.avgYears}</span> ${t('ob_years')}</b></div></div>
+          <div class="method-bars">${['y1', 'y2', 'y3', 'y4'].map((b, i) => {
+            const v = o.bands[b], pc = bandTotal ? Math.round(v / bandTotal * 100) : 0;
+            return `<div class="mrow"><span>${t(b)}</span><div class="meter"><i style="width:${pc}%;background:var(--${['green', 'amber', 'orange', 'red'][i]})"></i></div><b dir="ltr">${money(v)}</b><small>${pc}%</small></div>`;
+          }).join('')}</div>
+        </article>
+        <article class="panel">
+          <div class="section-head"><h2 class="section-title">${t('ob_byYear')}</h2></div>
+          ${table('dashObYears', [{ k: 'year', l: t('ob_year') }, { k: 'amount', l: t('ob_total'), num: true }, { k: 'collected', l: t('ob_collected'), num: true },
+            { k: 'remaining', l: t('ob_remaining'), num: true }, { k: 'rate', l: t('ob_rate'), f: v => `<div class="rate">${pct(v)}<div class="meter"><i style="width:${Math.min(100, v)}%;background:var(--${v >= 80 ? 'green' : v >= 50 ? 'amber' : 'red'})"></i></div></div>` }],
+            o.years, { sortable: false })}
+          ${o.top.length ? `<h3 class="section-title" style="margin:14px 0 8px;font-size:12px">${t('ob_topUnpaid')}</h3>` + table('dashObTop', [{ k: 'name', l: t('f_name'), f: (v, x) => bdi(v) + ` <small class="muted">${esc(x.account)}</small>` },
+            { k: 'year', l: t('ob_year') }, { k: 'remaining', l: t('ob_remaining'), num: true }, { k: 'years', l: t('ob_age'), f: v => `<span dir="ltr">${v}</span> ${t('ob_years')}` }],
+            o.top, { sortable: false, click: true }) : ''}
+        </article>
+      </section>`;
+}
+
 const SETTING_SELECTS = { LateFallback: ['due', 'none'] };
 
 // ───────── Data lists ─────────
@@ -1402,6 +1442,7 @@ const VIEWS = {
                 remaining: d.performance.totals.remaining, rate: { html: d.performance.totals.rate + '%' } }, t('all')) })}
         </article>
       </section>
+      ${dashOpening(d, cc)}
       <section class="panel section">
         <div class="section-head"><h2 class="section-title">${t('topCustomers')}</h2>${hasPage('balances') ? `<button class="section-action" data-go="balances">${t('viewAll')}</button>` : ''}</div>
         ${table('dashTop', topCols, d.top, { click: true })}
@@ -2226,6 +2267,7 @@ function statementDoc(r) {
 
 // ───────── Receipt voucher document ─────────
 function receiptDoc(rc) {
+  if (rc.group && rc.group.length > 1) return receiptGroupDoc(rc);
   S.lastSettings = rc.settings;
   const tx = rc.tx, c = rc.customer || {}, cc = tx.currency || localCur();
   const total = (+tx.creditMST || 0) - (+tx.debitMST || 0);
@@ -2245,6 +2287,38 @@ function receiptDoc(rc) {
       [{ k: 'invoiceVoucher', l: t('f_voucher') }, { k: 'amount', l: t('amount') + ' ' + localCur(), num: true }], rc.allocations, { amount: sumAlloc })}` : '') +
     `<table class="sign"><tr><td><span>${t('receiver')}: ${esc(tx.createdByName || '')}</span></td><td><span>${t('accountant')}</span></td><td><span>${t('customerSign')}</span></td></tr></table>`;
 }
+/** One receipt voucher covering several customers (same receipt number). */
+function receiptGroupDoc(rc) {
+  S.lastSettings = rc.settings;
+  const tx = rc.tx, lc = localCur();
+  const amt = x => (+x.tx.creditMST || 0) - (+x.tx.debitMST || 0);
+  const total = rc.group.reduce((s, x) => s + amt(x), 0);
+  const kv = (k, v) => v ? `<tr><td class="k">${esc(k)}</td><td colspan="3">${v}</td></tr>` : '';
+  const draft = rc.group.some(x => x.tx.postStatus === 'Draft');
+  const allocs = [];
+  rc.group.forEach(x => {
+    const name = (x.customer || {}).name || '';
+    x.allocations.forEach(a => allocs.push({ customer: x.tx.account + ' — ' + name, invoiceVoucher: a.invoiceVoucher, amount: a.amount }));
+    const onAcc = amt(x) - x.allocations.reduce((s, a) => s + a.amount, 0);
+    if (onAcc > 0.005) allocs.push({ customer: x.tx.account + ' — ' + name, invoiceVoucher: t('onAccount'), amount: onAcc });
+  });
+  return companyHeader(t('receiptTitle'), [[t('receiptNo'), tx.voucher], [t('f_date'), tx.date], [t('f_status'), t(draft ? 'Draft' : 'Posted')]]) +
+    (draft ? `<p><span class="stamp">${t('Draft')}</span></p>` : '') +
+    `<table class="dkv">
+      ${kv(t('receivedFrom'), `<b>${t('rcNCustomers', { n: rc.group.length })}</b>`)}
+      ${kv(t('theSumOf'), `<span class="big">${money(total)} ${esc(lc)}</span>`)}
+      ${kv(t('f_payMethod'), esc(methodName(tx.payMethod)))}
+      ${kv(t('f_chequeNo'), esc(tx.chequeNo))}${kv(t('f_chequeDate'), esc(tx.chequeDate))}
+      ${kv(t('f_bankName'), esc(tx.bankName))}${kv(t('f_payRef'), esc(tx.payRef))}
+      ${kv(t('f_description'), esc(tx.description))}
+    </table>
+    <h2>${t('rcCustomers')}</h2>${printTableHtml([{ k: 'lineNo', l: t('lineNo') }, { k: 'account', l: t('f_account') }, { k: 'name', l: t('f_name') },
+      { k: 'amount', l: t('amount') + ' ' + lc, num: true }],
+      rc.group.map((x, i) => ({ lineNo: i + 1, account: x.tx.account, name: (x.customer || {}).name || '', amount: amt(x) })), { amount: total })}
+    ${allocs.length ? `<h2>${t('forInvoices')}</h2>${printTableHtml([{ k: 'customer', l: t('f_name') }, { k: 'invoiceVoucher', l: t('f_voucher') },
+      { k: 'amount', l: t('amount') + ' ' + lc, num: true }], allocs, { amount: allocs.reduce((s, a) => s + a.amount, 0) })}` : ''}
+    <table class="sign"><tr><td><span>${t('receiver')}: ${esc(tx.createdByName || '')}</span></td><td><span>${t('accountant')}</span></td><td><span>${t('customerSign')}</span></td></tr></table>`;
+}
 async function printReceipt(rowId) {
   const rc = await call('getReceipt', rowId);
   askPrint(() => receiptDoc(rc), 'portrait');
@@ -2256,17 +2330,17 @@ function closeModal() { $('#modal').hidden = true; $('#modalCard').innerHTML = '
 
 // ───────── Collection receipt form (invoice-linked) ─────────
 const payOpts = () => (S.lookups.payMethods || ['Cash', 'Cheque', 'Transfer']).map(m => [m, t(m)]);
-/** New collection, or edit of an unposted receipt when rc (from getReceipt) is given. */
+/** New collection, or edit of an unposted receipt when rc (from getReceipt) is given.
+ *  One receipt can hold several customers (same receipt number), each with its own invoices. */
 function openCollect(account, rc) {
-  S.rcOpen = [];
-  S.rcEdit = rc || null;
+  const lines = rc ? (rc.group || [{ tx: rc.tx, allocations: rc.allocations }]) : [];
+  S.rcEdit = rc ? { tx: rc.tx, groupId: rc.tx.receiptGroup || '', lines: Object.fromEntries(lines.map(l => [l.tx.account, l])) } : null;
+  S.rcLines = {}; S.rcSeq = 0;
   const x = rc ? rc.tx : {};
-  if (rc) account = x.account;
   openDrawer(`
     <div class="drawer-head"><h2>${rc ? '✎ ' + t('editReceipt') + ' — ' + esc(x.voucher) : '⊕ ' + t('collect')}</h2><button class="icon-button" data-act="closeDrawer" aria-label="${t('close')}">×</button></div>
     <form class="form-panel" id="rcForm" style="padding:16px 0 0">
       <div class="form-grid">
-        <label class="field span2">${t('f_account')} <span class="req">*</span><select name="account" required><option value=""></option>${opts(customerOpts(), account)}</select></label>
         <label class="field">${t('f_date')} <span class="req">*</span><input type="date" name="date" value="${esc(x.date || today())}" required></label>
         <label class="field">${t('receiptNo')}<input name="voucher" value="${esc(x.voucher || '')}" placeholder="${t('autoNo')}"></label>
         <label class="field">${t('f_payMethod')} <span class="req">*</span><select name="payMethod">${opts(payOpts(), x.payMethod || 'Cash')}</select></label>
@@ -2277,41 +2351,66 @@ function openCollect(account, rc) {
         <label class="field" data-m="Transfer">${t('f_payRef')}<input name="payRef" value="${esc(x.payRef || '')}"></label>
         <label class="field">${t('f_exchange')}<input name="exchange" type="text" inputmode="decimal" data-num value="${esc(fmtInputNum(x.exchange || 1))}"></label>
       </div>
-      <div class="field">${t('pickInvoices')} <span class="req">*</span><div id="allocBox" class="alloc-box"><div class="empty">${t('chooseCustomer')}</div></div></div>
+      <div class="field">${t('rcCustomers')} <span class="req">*</span>
+        <div id="rcLines" class="rc-lines"></div>
+        <div class="rc-foot"><button type="button" class="button-ghost" data-act="rcAddLine">＋ ${t('rcAddCustomer')}</button>
+          <span class="rc-grand">${t('rcGrand')}: <b id="rcGrand" dir="ltr">0</b> <small class="cur">${esc(localCur())}</small></span></div>
+        <small class="muted">${t('rcSameNoHint')}</small></div>
       <label class="field">${t('f_description')}<textarea name="description">${esc(/^Collection - (Cash|Cheque|Transfer)$/.test(x.description || '') ? '' : (x.description || ''))}</textarea></label>
       ${can('post', 'receipts') ? `<label class="check"><input type="checkbox" name="post">${t('postNow')}</label>` : ''}
       <div class="form-actions"><button type="button" class="button-ghost" data-act="closeDrawer">${t('cancel')}</button><button class="button-primary" type="submit">${t('save')}</button></div>
     </form>`, true);
   rcMethod();
-  if (account) loadAlloc(account);
+  const accs = lines.length ? lines.map(l => l.tx.account) : [account || ''];
+  accs.forEach(a => rcAddLine(a));
+}
+function rcAddLine(account) {
+  const k = ++S.rcSeq;
+  S.rcLines[k] = { open: [] };
+  const box = $('#rcLines');
+  box.insertAdjacentHTML('beforeend', `<div class="rc-line" data-ln="${k}">
+      <div class="rc-line-head"><span class="rc-no"></span>
+        <label class="field">${t('f_account')}<select name="acc"><option value=""></option>${opts(customerOpts(), account || '')}</select></label>
+        <span class="rc-lsum">${t('allocated')}: <b dir="ltr">0</b></span>
+        <button type="button" class="icon-button" data-act="rcDelLine" title="${t('del')}">×</button></div>
+      <div class="alloc-box"><div class="empty">${t('chooseCustomer')}</div></div></div>`);
+  const el = box.lastElementChild;
+  enhance(el);
+  rcRenumber();
+  if (account) loadAlloc(el, account);
+}
+function rcRenumber() {
+  const ls = $$('#rcLines .rc-line');
+  ls.forEach((l, i) => { $('.rc-no', l).textContent = i + 1; $('[data-act=rcDelLine]', l).hidden = ls.length < 2; });
 }
 function rcMethod() {
   const f = $('#rcForm'); if (!f) return;
   const m = f.elements.payMethod.value;
   $$('[data-m]', f).forEach(el => { el.hidden = el.dataset.m.split(' ').indexOf(m) === -1; });
 }
-async function loadAlloc(account) {
-  const box = $('#allocBox');
-  if (!account) { box.innerHTML = `<div class="empty">${t('chooseCustomer')}</div>`; return; }
+async function loadAlloc(line, account) {
+  const k = line.dataset.ln, box = $('.alloc-box', line);
+  S.rcLines[k] = { open: [] };
+  if (!account) { box.innerHTML = `<div class="empty">${t('chooseCustomer')}</div>`; rcSum(); return; }
   box.innerHTML = `<div class="skeleton">${t('loading')}</div>`;
-  const ed = S.rcEdit && S.rcEdit.tx.account === account ? S.rcEdit : null;
+  const ed = S.rcEdit && S.rcEdit.lines[account];
   const r = await call('getOpenInvoices', account, ed ? ed.tx.rowId : '');
-  S.rcOpen = r.invoices;
+  if (!line.isConnected || $('[name=acc]', line).value !== account) return; // changed meanwhile
+  const open = S.rcLines[k].open = r.invoices;
   const lc = r.currency;
-  box.innerHTML = r.invoices.length ? `
-    <label class="field" style="margin-bottom:8px">${t('amountToCollect')} (${esc(lc)})<input id="rcTotal" type="text" inputmode="decimal" data-num></label>
+  box.innerHTML = open.length ? `
+    <label class="field" style="margin-bottom:8px">${t('amountToCollect')} (${esc(lc)})<input class="rc-total" type="text" inputmode="decimal" data-num></label>
     <div class="table-wrap"><table class="alloc"><thead><tr><th></th><th>${t('f_voucher')}</th><th>${t('f_date')}</th><th>${t('f_deliveryDate')}</th><th>${t('days')}</th>
       <th class="num">${t('remaining')}</th><th class="num">${t('amount')}</th></tr></thead>
-      <tbody>${r.invoices.map((i, k) => `<tr><td><input type="checkbox" data-ai="${k}"></td><td><b>${esc(i.voucher)}</b></td><td>${esc(i.date)}</td><td>${esc(i.deliveryDate || '—')}</td>
+      <tbody>${open.map((i, n) => `<tr><td><input type="checkbox" data-ai="${n}"></td><td><b>${esc(i.voucher)}</b></td><td>${esc(i.date)}</td><td>${esc(i.deliveryDate || '—')}</td>
         <td>${i.days ? daysPill(i.days) : ''}</td><td class="num">${money(i.remaining)}${i.pending ? `<br><small class="cur">${t('Draft')}: ${money(i.pending)}</small>` : ''}</td>
-        <td class="num"><input class="alloc-amt" type="text" inputmode="decimal" data-num data-aamt="${k}"></td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="6">${t('allocated')}</td><td class="num"><b id="rcSum">0.00</b> <small class="cur">${esc(lc)}</small></td></tr></tfoot></table></div>`
+        <td class="num"><input class="alloc-amt" type="text" inputmode="decimal" data-num data-aamt="${n}"></td></tr>`).join('')}</tbody></table></div>`
     : `<div class="empty">${t('noOpenInvoices')}</div><label class="field">${t('onAccount')} (${esc(lc)})<input name="onAccount" type="text" inputmode="decimal" data-num></label>`;
   if (ed) { // put back the amounts this receipt already pays
     const left = {};
     ed.allocations.forEach(a => { left[a.invoiceVoucher] = (left[a.invoiceVoucher] || 0) + a.amount; });
     $$('[data-aamt]', box).forEach(el => {
-      const inv = S.rcOpen[+el.dataset.aamt], v = Math.min(left[inv.voucher] || 0, inv.remaining);
+      const inv = open[+el.dataset.aamt], v = Math.min(left[inv.voucher] || 0, inv.remaining);
       if (v > 0) { el.value = groupDigits(String(Math.round(v * 100) / 100)); left[inv.voucher] -= v; }
     });
     const onAcc = $('[name=onAccount]', box);
@@ -2319,29 +2418,36 @@ async function loadAlloc(account) {
       const total = (+ed.tx.creditMST || 0) - (+ed.tx.debitMST || 0) - ed.allocations.reduce((s, a) => s + a.amount, 0);
       if (total > 0) onAcc.value = groupDigits(String(Math.round(total * 100) / 100));
     }
-    rcSum();
   }
+  rcSum();
 }
 async function editReceipt(rowId) {
   const rc = await call('getReceipt', rowId);
-  if (rc.tx.postStatus !== 'Draft') { toast(t('err_POSTED_LOCKED'), 'error'); return; }
+  if ((rc.group || [rc]).some(l => l.tx.postStatus !== 'Draft')) { toast(t('err_POSTED_LOCKED'), 'error'); return; }
   openCollect(rc.tx.account, rc);
 }
 function rcSum() {
-  let s = 0;
-  $$('[data-aamt]').forEach(el => {
-    const i = +el.dataset.aamt, v = parseNum(el.value);
-    el.classList.toggle('over', v > S.rcOpen[i].remaining + 0.005);
-    $(`[data-ai="${i}"]`).checked = v > 0;
-    s += v;
+  let grand = 0;
+  $$('#rcLines .rc-line').forEach(line => {
+    const open = (S.rcLines[line.dataset.ln] || {}).open || [];
+    let s = 0;
+    $$('[data-aamt]', line).forEach(el => {
+      const i = +el.dataset.aamt, v = parseNum(el.value);
+      el.classList.toggle('over', v > open[i].remaining + 0.005);
+      $(`[data-ai="${i}"]`, line).checked = v > 0;
+      s += v;
+    });
+    const oa = $('[name=onAccount]', line); if (oa) s += parseNum(oa.value);
+    $('.rc-lsum b', line).textContent = money(s);
+    grand += s;
   });
-  const el = $('#rcSum'); if (el) el.textContent = money(s);
+  const g = $('#rcGrand'); if (g) g.textContent = money(grand);
 }
-function rcDistribute(total) {
+function rcDistribute(line, total) {
+  const open = S.rcLines[line.dataset.ln].open;
   let left = total;
-  $$('[data-aamt]').forEach(el => {
-    const rem = S.rcOpen[+el.dataset.aamt].remaining;
-    const a = Math.max(0, Math.min(left, rem));
+  $$('[data-aamt]', line).forEach(el => {
+    const a = Math.max(0, Math.min(left, open[+el.dataset.aamt].remaining));
     el.value = a ? groupDigits(String(Math.round(a * 100) / 100)) : '';
     left -= a;
   });
@@ -2349,21 +2455,29 @@ function rcDistribute(total) {
 }
 async function submitReceipt(form) {
   const E = form.elements;
-  const allocations = $$('[data-aamt]', form).map(el => ({ voucher: S.rcOpen[+el.dataset.aamt].voucher, amount: parseNum(el.value) })).filter(a => a.amount > 0);
   if (E.payMethod.value === 'Cheque' && !E.chequeNo.value.trim()) { toast(t('err_CHEQUE_REQUIRED'), 'error'); E.chequeNo.focus(); return; }
   if ($$('.alloc-amt.over', form).length) { toast(t('err_OVER_ALLOCATED'), 'error'); return; }
-  const onAccount = E.onAccount ? parseNum(E.onAccount.value) : 0;
-  if (!allocations.length && !onAccount) { toast(t('err_INVOICE_REQUIRED'), 'error'); return; }
+  const lines = $$('#rcLines .rc-line', form).map(line => {
+    const open = S.rcLines[line.dataset.ln].open, oa = $('[name=onAccount]', line);
+    return {
+      account: $('[name=acc]', line).value,
+      allocations: $$('[data-aamt]', line).map(el => ({ voucher: open[+el.dataset.aamt].voucher, amount: parseNum(el.value) })).filter(a => a.amount > 0),
+      onAccount: oa ? parseNum(oa.value) : 0
+    };
+  }).filter(l => l.account);
+  if (!lines.length) { toast(t('chooseCustomer'), 'error'); return; }
+  const empty = lines.find(l => !l.allocations.length && !l.onAccount);
+  if (empty) { toast(t('err_INVOICE_REQUIRED') + ' — ' + empty.account + ' ' + custName(empty.account), 'error'); return; }
   const b = form.querySelector('button[type=submit]'); b.disabled = true;
   try {
     const r = await call('saveReceipt', {
-      rowId: S.rcEdit ? S.rcEdit.tx.rowId : '',
-      account: E.account.value, date: E.date.value, voucher: E.voucher.value.trim(), payMethod: E.payMethod.value,
+      rowId: S.rcEdit && !S.rcEdit.groupId ? S.rcEdit.tx.rowId : '', groupId: S.rcEdit ? S.rcEdit.groupId : '',
+      date: E.date.value, voucher: E.voucher.value.trim(), payMethod: E.payMethod.value,
       chequeNo: E.chequeNo.value.trim(), chequeDate: E.chequeDate.value, bankName: E.bankName.value.trim(), payRef: E.payRef.value.trim(),
       currency: E.currency.value, exchange: parseNum(E.exchange.value) || 1, description: E.description.value.trim(),
-      post: E.post ? E.post.checked : false, onAccount: onAccount, allocations: allocations
+      post: E.post ? E.post.checked : false, lines
     });
-    toast(t('saved') + ' — ' + r.voucher + ' · ' + money(r.total));
+    toast(t('saved') + ' — ' + r.voucher + ' · ' + money(r.total) + (r.customers > 1 ? ' · ' + t('rcNCustomers', { n: r.customers }) : ''));
     closeDrawer();
     if (S.view === 'receipts' || S.view === 'transactions') reload();
     printReceipt(r.rowId);
@@ -2629,6 +2743,8 @@ const ACT = {
     box.insertAdjacentHTML('beforeend', adjLineHtml({}, box.children.length, false));
     enhance(box.lastElementChild);
   },
+  rcAddLine() { rcAddLine(''); },
+  rcDelLine(el) { el.closest('.rc-line').remove(); rcRenumber(); rcSum(); },
   adjDelLine(el) { el.closest('.adj-line').remove(); if (!$$('#adjLines .adj-line').length) ACT.adjAddLine(); adjRenumber(); adjTotals(); },
   async adjPost(el) { await call('postAdjustment', el.dataset.id, false); toast(t('adjPosted')); loadList('adjustments'); },
   async adjUnpost(el) { await call('postAdjustment', el.dataset.id, true); toast(t('unpostedN', { n: el.dataset.id })); loadList('adjustments'); },
@@ -2723,7 +2839,7 @@ function rowOf(el) {
 }
 
 // Rows that open the customer 360 drawer when clicked.
-const ROW_CUSTOMER_VIEWS = ['opening', 'collectionsDet', 'perfDrawer', 'receipts', 'customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'credit', 'collFlat', 'collDrawer'];
+const ROW_CUSTOMER_VIEWS = ['dashObTop', 'opening', 'collectionsDet', 'perfDrawer', 'receipts', 'customers', 'dashTop', 'balances', 'paid', 'overdue', 'overdueCust', 'credit', 'collFlat', 'collDrawer'];
 
 document.addEventListener('click', e => {
   const goEl = e.target.closest('[data-go]');
@@ -2762,8 +2878,8 @@ document.addEventListener('input', e => {
       adjTotals();
       return;
     }
-    if (e.target.id === 'rcTotal') rcDistribute(parseNum(e.target.value));
-    else if (e.target.dataset.aamt !== undefined) rcSum();
+    if (e.target.classList.contains('rc-total')) rcDistribute(e.target.closest('.rc-line'), parseNum(e.target.value));
+    else if (e.target.dataset.aamt !== undefined || (e.target.name === 'onAccount' && e.target.closest('#rcLines'))) rcSum();
     if (FORM && FORM.entity === 'Transactions' && e.target.form && e.target.form.id === 'recForm') txFormCalc(e.target.form, e.target.name);
     return;
   }
@@ -2803,14 +2919,20 @@ document.addEventListener('change', e => {
   }
   if (e.target.form && e.target.form.id === 'rcForm') {
     const n = e.target.name;
-    if (n === 'account') loadAlloc(e.target.value);
+    if (n === 'acc') {
+      const line = e.target.closest('.rc-line'), v = e.target.value;
+      if (v && $$('#rcLines [name=acc]').some(x => x !== e.target && x.value === v)) { // one line per customer
+        toast(t('err_DUPLICATE_CUSTOMER') + ' — ' + v, 'error'); setComboValue(e.target, ''); return;
+      }
+      loadAlloc(line, v);
+    }
     else if (n === 'payMethod') rcMethod();
     else if (n === 'currency') {
       const r = rateOf(e.target.value), l = rateOf(localCur());
       if (r && l) e.target.form.elements.exchange.value = groupDigits(String(+(r / l).toFixed(6)));
     } else if (e.target.dataset.ai !== undefined) {
-      const i = e.target.dataset.ai, amt = $(`[data-aamt="${i}"]`);
-      amt.value = e.target.checked ? groupDigits(String(S.rcOpen[+i].remaining)) : '';
+      const line = e.target.closest('.rc-line'), i = e.target.dataset.ai, amt = $(`[data-aamt="${i}"]`, line);
+      amt.value = e.target.checked ? groupDigits(String(S.rcLines[line.dataset.ln].open[+i].remaining)) : '';
       rcSum();
     }
     return;

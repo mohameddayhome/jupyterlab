@@ -383,6 +383,15 @@
   .top-inner{gap:16px}
   .chart-controls select{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;padding:5px 8px;border:1px solid var(--line-strong);border-radius:3px;background:var(--bg);color:var(--ink-soft);cursor:pointer}
   .chart-canvas-wrap{flex:1;position:relative;min-height:260px}
+  .chart-expand,.chart-remove{background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 6px;line-height:1;display:inline-flex;align-items:center;font-size:16px}
+  .chart-expand:hover,.chart-remove:hover{color:var(--accent)}
+  .chart-expand svg{width:15px;height:15px}
+  .chart-card.fullscreen{position:fixed;inset:16px;z-index:300;margin:0;min-height:0;box-shadow:0 0 0 100vmax rgba(8,16,24,.62);animation:fsIn .18s ease-out}
+  .chart-card.fullscreen .chart-canvas-wrap{min-height:0}
+  .chart-card.fullscreen .chart-title{font-size:22px}
+  body.chart-fullscreen-open{overflow:hidden}
+  body.chart-fullscreen-open main{z-index:400}  /* main is its own stacking context; lift it above the sticky header */
+  @keyframes fsIn{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}
 
   .table-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
   .table-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
@@ -479,7 +488,7 @@
     @page{size:auto;margin:12mm}
     body{background:#fff;color:#000}
     .theme-toggle,.lang-toggle,.skin-select,.sheet-load,.calc-dialog{display:none !important}
-    .grain,header.top,.filters-bar,.section-action,.chart-controls,.chart-remove,.kpi-remove,.table-search,.table-foot,.upload-wrap{display:none !important}
+    .grain,header.top,.filters-bar,.section-action,.chart-controls,.chart-expand,.chart-remove,.kpi-remove,.table-search,.table-foot,.upload-wrap{display:none !important}
     main{max-width:none;padding:0}
     .dash{display:block !important}
     .chart-card,.totals-card,.table-card,.kpi{box-shadow:none;border:1px solid #bbb;break-inside:avoid}
@@ -768,7 +777,7 @@ const I18N = {
     calcBtn:'ƒx عمود محسوب', calcTitle:'عمود محسوب', calcHint:'أنشئ عمودًا جديدًا من عمودين رقميين أو عمود ورقم ثابت',
     calcName:'اسم العمود', calcConstPh:'الرقم الثابت', calcConstOpt:'رقم ثابت…', close:'إغلاق', calcAdd:'إضافة العمود',
     calcNeedNum:'لا توجد أعمدة رقمية في البيانات.', calcNeedName:'اكتب اسمًا للعمود.', calcNameTaken:'يوجد عمود بهذا الاسم.',
-    calcNeedConst:'اكتب الرقم الثابت.', calcExample:'مثال: ', calcDefaultName:'{a} {op} {b}', calcRemove:'حذف العمود', calcAdded:'تمت إضافة العمود «{n}» وحفظه تلقائيًا.', calcSavedNote:'الأعمدة المحسوبة تُحفظ تلقائيًا وتُطبَّق على أي ملف يحتوي نفس الأعمدة.', calcSkipped:'محفوظ، لكن أعمدته غير موجودة في هذا الملف', calcExists:'الملف يحتوي عمودًا بنفس الاسم، فتُستخدم قيمه كما هي', layoutsBtn:'▦ التخطيطات', layoutsTitle:'قوالب التخطيط', layoutsHint:'احفظ المؤشرات والرسوم والفلاتر والجداول الحالية كقالب، وطبّقه على أي ملف.', layoutNamePh:'اسم القالب (مثال: تقرير المبيعات الشهري)', layoutSave:'حفظ التخطيط الحالي', layoutApply:'تطبيق', layoutDefault:'افتراضي', layoutMakeDefault:'اجعله القالب الافتراضي', layoutDelete:'حذف القالب', layoutMeta:'{k} مؤشر · {c} رسم · {f} فلتر', layoutDefaultNote:'القالب الافتراضي ★ يُطبَّق تلقائيًا عند رفع أي ملف جديد.', layoutEmpty:'لا توجد قوالب محفوظة بعد.', layoutNeedName:'اكتب اسمًا للقالب.', layoutSaved:'تم حفظ القالب «{n}».', layoutUpdated:'تم تحديث القالب «{n}».', layoutApplied:'تم تطبيق القالب «{n}».', layoutAppliedSkip:'تم تطبيق القالب «{n}»، وتُرك {s} عنصر لأن أعمدته غير موجودة في هذا الملف.', tPie:'دائري بقيمة', skinTitle:'الثيم', skinAtlas:'ثيم: أطلس', skinExecutive:'ثيم: تنفيذي', skinNova:'ثيم: نوفا', pieSub:'{agg} {v} حسب {c}', pieSplit:'{v} حسب {c}', pieSplitSub:'حلقة لكل قيمة من {c}', pieRings:'الحلقات من الخارج للداخل: {list}'
+    calcNeedConst:'اكتب الرقم الثابت.', calcExample:'مثال: ', calcDefaultName:'{a} {op} {b}', calcRemove:'حذف العمود', calcAdded:'تمت إضافة العمود «{n}» وحفظه تلقائيًا.', calcSavedNote:'الأعمدة المحسوبة تُحفظ تلقائيًا وتُطبَّق على أي ملف يحتوي نفس الأعمدة.', calcSkipped:'محفوظ، لكن أعمدته غير موجودة في هذا الملف', calcExists:'الملف يحتوي عمودًا بنفس الاسم، فتُستخدم قيمه كما هي', layoutsBtn:'▦ التخطيطات', layoutsTitle:'قوالب التخطيط', layoutsHint:'احفظ المؤشرات والرسوم والفلاتر والجداول الحالية كقالب، وطبّقه على أي ملف.', layoutNamePh:'اسم القالب (مثال: تقرير المبيعات الشهري)', layoutSave:'حفظ التخطيط الحالي', layoutApply:'تطبيق', layoutDefault:'افتراضي', layoutMakeDefault:'اجعله القالب الافتراضي', layoutDelete:'حذف القالب', layoutMeta:'{k} مؤشر · {c} رسم · {f} فلتر', layoutDefaultNote:'القالب الافتراضي ★ يُطبَّق تلقائيًا عند رفع أي ملف جديد.', layoutEmpty:'لا توجد قوالب محفوظة بعد.', layoutNeedName:'اكتب اسمًا للقالب.', layoutSaved:'تم حفظ القالب «{n}».', layoutUpdated:'تم تحديث القالب «{n}».', layoutApplied:'تم تطبيق القالب «{n}».', layoutAppliedSkip:'تم تطبيق القالب «{n}»، وتُرك {s} عنصر لأن أعمدته غير موجودة في هذا الملف.', tPie:'دائري بقيمة', tBox:'صندوقي (Boxplot)', boxTitle:'توزيع {v} حسب {c}', boxSub:'الصندوق: من الربيع الأول للثالث · الخط: الوسيط · الشوارب: 1.5× المدى الربيعي', boxN:'العدد', boxMax:'الأعلى', boxQ3:'الربيع الثالث', boxMed:'الوسيط', boxQ1:'الربيع الأول', boxMin:'الأدنى', boxMean:'المتوسط', boxOut:'قيم شاذة', boxMore:'عرض أكثر {n} فئة من {m}', expand:'ملء الشاشة', collapse:'تصغير (Esc)', skinTitle:'الثيم', skinAtlas:'ثيم: أطلس', skinExecutive:'ثيم: تنفيذي', skinNova:'ثيم: نوفا', pieSub:'{agg} {v} حسب {c}', pieSplit:'{v} حسب {c}', pieSplitSub:'حلقة لكل قيمة من {c}', pieRings:'الحلقات من الخارج للداخل: {list}'
   },
   en: {
     docTitle:'Atlas — Dynamic Data Dashboard', brandTag:'Dynamic Dashboard / v1', processing:'Parsing', excel:'Excel',
@@ -810,7 +819,7 @@ const I18N = {
     calcBtn:'ƒx Calculated column', calcTitle:'Calculated column', calcHint:'Create a new column from two numeric columns, or a column and a fixed number',
     calcName:'Column name', calcConstPh:'Fixed number', calcConstOpt:'Fixed number…', close:'Close', calcAdd:'Add column',
     calcNeedNum:'There are no numeric columns in the data.', calcNeedName:'Enter a column name.', calcNameTaken:'A column with this name already exists.',
-    calcNeedConst:'Enter the fixed number.', calcExample:'Example: ', calcDefaultName:'{a} {op} {b}', calcRemove:'Remove column', calcAdded:'Column “{n}” added and saved automatically.', calcSavedNote:'Calculated columns are saved automatically and re-applied to any file with the same columns.', calcSkipped:'saved, but its columns are not in this file', calcExists:'the file already has a column with this name, so its values are used as-is', layoutsBtn:'▦ Layouts', layoutsTitle:'Layout templates', layoutsHint:'Save the current metrics, charts, filters and tables as a template, and apply it to any file.', layoutNamePh:'Template name (e.g. Monthly sales report)', layoutSave:'Save current layout', layoutApply:'Apply', layoutDefault:'Default', layoutMakeDefault:'Make default template', layoutDelete:'Delete template', layoutMeta:'{k} metrics · {c} charts · {f} filters', layoutDefaultNote:'The default template ★ is applied automatically whenever you load a new file.', layoutEmpty:'No saved templates yet.', layoutNeedName:'Enter a template name.', layoutSaved:'Template “{n}” saved.', layoutUpdated:'Template “{n}” updated.', layoutApplied:'Template “{n}” applied.', layoutAppliedSkip:'Template “{n}” applied; {s} item(s) skipped because their columns are not in this file.', tPie:'Pie by value', skinTitle:'Theme', skinAtlas:'Theme: Atlas', skinExecutive:'Theme: Executive', skinNova:'Theme: Nova', pieSub:'{agg} of {v} by {c}', pieSplit:'{v} by {c}', pieSplitSub:'One ring per {c} value', pieRings:'Rings, outer to inner: {list}'
+    calcNeedConst:'Enter the fixed number.', calcExample:'Example: ', calcDefaultName:'{a} {op} {b}', calcRemove:'Remove column', calcAdded:'Column “{n}” added and saved automatically.', calcSavedNote:'Calculated columns are saved automatically and re-applied to any file with the same columns.', calcSkipped:'saved, but its columns are not in this file', calcExists:'the file already has a column with this name, so its values are used as-is', layoutsBtn:'▦ Layouts', layoutsTitle:'Layout templates', layoutsHint:'Save the current metrics, charts, filters and tables as a template, and apply it to any file.', layoutNamePh:'Template name (e.g. Monthly sales report)', layoutSave:'Save current layout', layoutApply:'Apply', layoutDefault:'Default', layoutMakeDefault:'Make default template', layoutDelete:'Delete template', layoutMeta:'{k} metrics · {c} charts · {f} filters', layoutDefaultNote:'The default template ★ is applied automatically whenever you load a new file.', layoutEmpty:'No saved templates yet.', layoutNeedName:'Enter a template name.', layoutSaved:'Template “{n}” saved.', layoutUpdated:'Template “{n}” updated.', layoutApplied:'Template “{n}” applied.', layoutAppliedSkip:'Template “{n}” applied; {s} item(s) skipped because their columns are not in this file.', tPie:'Pie by value', tBox:'Box plot', boxTitle:'{v} distribution by {c}', boxSub:'Box: Q1 to Q3 · line: median · whiskers: 1.5× IQR', boxN:'Count', boxMax:'Max', boxQ3:'Q3', boxMed:'Median', boxQ1:'Q1', boxMin:'Min', boxMean:'Mean', boxOut:'Outliers', boxMore:'showing top {n} of {m} categories', expand:'Full screen', collapse:'Exit full screen (Esc)', skinTitle:'Theme', skinAtlas:'Theme: Atlas', skinExecutive:'Theme: Executive', skinNova:'Theme: Nova', pieSub:'{agg} of {v} by {c}', pieSplit:'{v} by {c}', pieSplitSub:'One ring per {c} value', pieRings:'Rings, outer to inner: {list}'
   }
 };
 let lang = document.documentElement.getAttribute('lang') === 'en' ? 'en' : 'ar';
@@ -1220,6 +1229,18 @@ function ingestNow(rawRows){
     });
   }
 
+  // Box plot: distribution of the first numeric per category
+  if (catColsForChart.length && numColsForKpi.length && !looksLikeId(numColsForKpi[0])) {
+    const boxCat = state.columns.find(c => c.type === 'category') || catColsForChart[0];
+    state.chartConfigs.push({
+      id: 'chart_' + Date.now() + '_box',
+      type: 'box',
+      span: 12,
+      catCol: boxCat.name,
+      valueCol: numColsForKpi[0].name
+    });
+  }
+
   // 5. Scatter Chart: two numerics
   if (numColsForKpi.length >= 2) {
     state.chartConfigs.push({
@@ -1535,7 +1556,7 @@ document.getElementById('layoutForm').addEventListener('submit', e => { e.preven
 const stripId = ({id, ...rest}) => rest;
 function chartColumns(cfg){
   const cols = {line:[cfg.dateCol, cfg.valueCol], bar:[cfg.catCol, cfg.valueCol], doughnut:[cfg.catCol], pie:[cfg.catCol, cfg.valueCol],
-    scatter:[cfg.xCol, cfg.yCol], histogram:[cfg.valueCol], 'bar-count':[cfg.catCol]}[cfg.type] || [];
+    scatter:[cfg.xCol, cfg.yCol], histogram:[cfg.valueCol], 'bar-count':[cfg.catCol], box:[cfg.catCol, cfg.valueCol]}[cfg.type] || [];
   return cols.filter(Boolean);
 }
 
@@ -2411,6 +2432,8 @@ function destroyCharts(){
 
 function buildCharts(rows){
   destroyCharts();
+  if(state.fullscreenChart && !state.chartConfigs.some(c => c.id === state.fullscreenChart)) state.fullscreenChart = null;
+  document.body.classList.toggle('chart-fullscreen-open', !!state.fullscreenChart);
   const grid = document.getElementById('chartsGrid');
   grid.innerHTML='';
 
@@ -2465,12 +2488,21 @@ function buildCharts(rows){
   grid.appendChild(addCard);
 }
 
+const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+const ICON_COLLAPSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape' || !state.fullscreenChart) return;
+  const btn = document.querySelector('.chart-card.fullscreen .chart-expand');
+  if(btn) btn.click();
+});
+
 function chartTitle(cfg){
   switch(cfg.type){
     case 'line': return t('overTime', {v:cfg.valueCol});
     case 'bar': return cfg.valueCol ? t('vBy', {v:cfg.valueCol, c:cfg.catCol}) : t('countBy', {c:cfg.catCol});
     case 'doughnut': return t('recordsBy', {c:cfg.catCol});
     case 'pie': return t('pieSplit', {v:cfg.valueCol, c:cfg.catCol});
+    case 'box': return t('boxTitle', {v:cfg.valueCol, c:cfg.catCol});
     case 'scatter': return t('vs', {x:cfg.xCol, y:cfg.yCol});
     case 'histogram': return t('distOf', {v:cfg.valueCol});
     case 'bar-count': return t('topValues', {c:cfg.catCol});
@@ -2483,6 +2515,7 @@ function chartSub(cfg){
     case 'line': return t('byDate', {d:cfg.dateCol});
     case 'bar': return cfg.valueCol ? t('aggSub', {agg:aggLabel(cfg.agg || 'sum')}) : t('recordCount');
     case 'doughnut': return t('share');
+    case 'box': return t('boxSub');
     case 'pie': return state.columns.some(c => c.name === cfg.valueCol && c.type === 'number')
       ? t('pieSub', {agg:aggLabel(cfg.agg || 'sum'), v:cfg.valueCol, c:cfg.catCol})
       : t('pieSplitSub', {c:cfg.catCol});
@@ -2510,6 +2543,7 @@ function renderChart(cfg, rows, grid){
       <option value="line" ${cfg.type==='line'?'selected':''}>${t('tLine')}</option>
       <option value="doughnut" ${cfg.type==='doughnut'?'selected':''}>${t('tDoughnut')}</option>
       <option value="pie" ${cfg.type==='pie'?'selected':''}>${t('tPie')}</option>
+      <option value="box" ${cfg.type==='box'?'selected':''}>${t('tBox')}</option>
       <option value="scatter" ${cfg.type==='scatter'?'selected':''}>${t('tScatter')}</option>
       <option value="histogram" ${cfg.type==='histogram'?'selected':''}>${t('tHist')}</option>
       <option value="bar-count" ${cfg.type==='bar-count'?'selected':''}>${t('tCounts')}</option>
@@ -2551,6 +2585,15 @@ function renderChart(cfg, rows, grid){
         ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
       </select>
     `;
+  } else if(cfg.type === 'box'){
+    paramHtml += `
+      <select data-role="cat" title="${t('catField')}">
+        ${catCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.catCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+      <select data-role="val" title="${t('valueField')}">
+        ${numCols.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cfg.valueCol?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+    `;
   } else if(cfg.type === 'pie'){
     const valueIsNumber = numCols.some(c => c.name === cfg.valueCol);
     paramHtml += `
@@ -2588,7 +2631,8 @@ function renderChart(cfg, rows, grid){
   }
 
   const removeBtnHtml = `
-    <button class="chart-remove" title="${t('removeChart')}" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px;">&times;</button>
+    <button class="chart-expand" title="${t('expand')}">${ICON_EXPAND}</button>
+    <button class="chart-remove" title="${t('removeChart')}">&times;</button>
   `;
 
   card.innerHTML = `
@@ -2606,8 +2650,22 @@ function renderChart(cfg, rows, grid){
     <div class="chart-canvas-wrap"><canvas id="${canvasId}"></canvas></div>`;
   grid.appendChild(card);
 
+  // full screen: a fixed overlay (the Fullscreen API is not always allowed inside the Apps Script iframe)
+  card.dataset.chartId = cfg.id;
+  const expandBtn = card.querySelector('.chart-expand');
+  const setFullscreen = on => {
+    card.classList.toggle('fullscreen', on);
+    document.body.classList.toggle('chart-fullscreen-open', on);
+    state.fullscreenChart = on ? cfg.id : null;
+    expandBtn.title = t(on ? 'collapse' : 'expand');
+    expandBtn.innerHTML = on ? ICON_COLLAPSE : ICON_EXPAND;
+  };
+  expandBtn.addEventListener('click', () => setFullscreen(!card.classList.contains('fullscreen')));
+  if(state.fullscreenChart === cfg.id) setFullscreen(true);
+
   // remove event
   card.querySelector('.chart-remove').addEventListener('click', () => {
+    if(state.fullscreenChart === cfg.id) setFullscreen(false);
     state.chartConfigs = state.chartConfigs.filter(x => x.id !== cfg.id);
     buildCharts(rows);
   });
@@ -2631,6 +2689,10 @@ function renderChart(cfg, rows, grid){
           cfg.agg = 'sum';
         } else if (val === 'doughnut') {
           cfg.catCol = catCols[0]?.name || state.columns[0]?.name || '';
+        } else if (val === 'box') {
+          const cats = state.columns.filter(c => c.type === 'category');
+          cfg.catCol = cats[0]?.name || state.columns[0]?.name || '';
+          cfg.valueCol = numCols.find(c => !looksLikeId(c) && !c.isYear)?.name || numCols[0]?.name || '';
         } else if (val === 'pie') {
           const cats = state.columns.filter(c => c.type === 'category');
           cfg.catCol = cats[0]?.name || state.columns[0]?.name || '';
@@ -2801,6 +2863,82 @@ function drawChart(cfg, rows, canvasId){
       }
     });
 
+  } else if(cfg.type==='box'){
+    // Box plot like seaborn: box = Q1..Q3, line = median, whiskers = last value within 1.5×IQR, dots = outliers
+    const groups = {};
+    rows.forEach(r => {
+      const k = r[cfg.catCol], v = r[cfg.valueCol];
+      if(k === null || k === undefined || v === null || v === undefined || isNaN(v)) return;
+      const key = k instanceof Date ? k.toISOString().slice(0, 10) : String(k);
+      (groups[key] = groups[key] || []).push(Number(v));
+    });
+    const quantile = (sorted, q) => {
+      const pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+      return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+    };
+    const allKeys = Object.keys(groups);
+    // keep the 20 largest groups, shown in natural order
+    const keys = allKeys.sort((a, b) => groups[b].length - groups[a].length).slice(0, 20).sort(collator.compare);
+    const stats = keys.map(key => {
+      const v = groups[key].sort((a, b) => a - b);
+      const q1 = quantile(v, .25), med = quantile(v, .5), q3 = quantile(v, .75), iqr = q3 - q1;
+      const loFence = q1 - 1.5 * iqr, hiFence = q3 + 1.5 * iqr;
+      let lo = v[0], hi = v[v.length - 1];
+      for(const x of v){ if(x >= loFence){ lo = x; break; } }
+      for(let i = v.length - 1; i >= 0; i--){ if(v[i] <= hiFence){ hi = v[i]; break; } }
+      const out = v.filter(x => x < lo || x > hi);
+      const step = Math.max(1, Math.ceil(out.length / 150));  // draw at most ~150 outliers per box
+      const drawn = out.filter((_, i) => i % step === 0);
+      if(out.length){ drawn.push(out[0], out[out.length - 1]); }
+      return {key, n:v.length, q1, med, q3, lo, hi, mean:v.reduce((a, b) => a + b, 0) / v.length, outCount:out.length, outliers:drawn, min:v[0], max:v[v.length - 1]};
+    });
+    const yMin = Math.min(...stats.map(s => s.min)), yMax = Math.max(...stats.map(s => s.max));
+    const ink = themeColor('--ink-soft');
+    const boxPlugin = {
+      id:'boxWhiskers',
+      afterDatasetsDraw(c){
+        const meta = c.getDatasetMeta(0), y = c.scales.y, g = c.ctx;
+        g.save();
+        g.strokeStyle = ink; g.lineWidth = 1.3;
+        meta.data.forEach((bar, i) => {
+          const st = stats[i]; if(!st) return;
+          const x = bar.x, half = bar.width / 2, cap = bar.width * .28;
+          const line = (x1, y1, x2, y2) => { g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
+          line(x, y.getPixelForValue(st.q3), x, y.getPixelForValue(st.hi));
+          line(x, y.getPixelForValue(st.q1), x, y.getPixelForValue(st.lo));
+          line(x - cap, y.getPixelForValue(st.hi), x + cap, y.getPixelForValue(st.hi));
+          line(x - cap, y.getPixelForValue(st.lo), x + cap, y.getPixelForValue(st.lo));
+          g.lineWidth = 2.2; line(x - half, y.getPixelForValue(st.med), x + half, y.getPixelForValue(st.med)); g.lineWidth = 1.3;
+          g.fillStyle = 'transparent';
+          st.outliers.forEach(o => { g.beginPath(); g.arc(x, y.getPixelForValue(o), 2.6, 0, Math.PI * 2); g.stroke(); });
+        });
+        g.restore();
+      }
+    };
+    chart = new Chart(ctx, {
+      type:'bar',
+      data:{labels:keys, datasets:[{label:cfg.valueCol, data:stats.map(st => [st.q1, st.q3]),
+        backgroundColor:palette[1] + 'cc', borderColor:ink, borderWidth:1.3, borderSkipped:false, maxBarThickness:140}]},
+      options:{...baseOpts,
+        plugins:{...baseOpts.plugins, legend:{display:false},
+          tooltip:{...baseOpts.plugins.tooltip, callbacks:{
+            label:c => { const st = stats[c.dataIndex]; return [
+              `${t('boxN')}: ${n0(st.n)}`, `${t('boxMax')}: ${fmt.full(st.hi)}`, `${t('boxQ3')}: ${fmt.full(st.q3)}`,
+              `${t('boxMed')}: ${fmt.full(st.med)}`, `${t('boxQ1')}: ${fmt.full(st.q1)}`, `${t('boxMin')}: ${fmt.full(st.lo)}`,
+              `${t('boxMean')}: ${fmt.full(st.mean)}`, `${t('boxOut')}: ${n0(st.outCount)}`]; }
+          }}},
+        scales:{
+          x:{grid:{display:false}, ticks:{...tickStyle, maxRotation:45, minRotation:0}, title:{display:true, text:cfg.catCol, color:chartText, font:{family:themeColor('--font-mono'), size:11}}},
+          y:{grid:gridStyle, ticks:{...tickStyle, callback:v => fmt.num(v)}, suggestedMin:yMin, suggestedMax:yMax,
+             title:{display:true, text:cfg.valueCol, color:chartText, font:{family:themeColor('--font-mono'), size:11}}}
+        }
+      },
+      plugins:[boxPlugin]
+    });
+    if(allKeys.length > keys.length){
+      const subEl = ctx.canvas.closest('.chart-card')?.querySelector('.chart-sub');
+      if(subEl) subEl.textContent = t('boxSub') + ' · ' + t('boxMore', {n:keys.length, m:n0(allKeys.length)});
+    }
   } else if(cfg.type==='pie'){
     // Numeric value: one pie, slices = categories, size = sum/avg/count of the value.
     // Text value (e.g. grade by gender): one ring per category, slices = value counts.

@@ -26,7 +26,8 @@
 2. من القائمة: **Extensions ← Apps Script**.
 3. أنشئ الملفات التالية وانسخ محتواها من هذا المجلد بنفس الأسماء:
    - ملفات Script: `Config.gs`, `Utils.gs`, `Auth.gs`, `Api.gs`, `Docs.gs`, `Setup.gs`
-   - ملفات HTML: `Index`, `Styles`, `App`, `Docs` (بدون الامتداد `.html`)
+   - ملفات HTML: `Index`, `Styles`, `App`, `DocsUI` (بدون الامتداد `.html`)
+   > ⚠️ لا يسمح Apps Script بملفين بنفس الاسم حتى لو اختلف النوع؛ لذلك ملف الواجهة اسمه `DocsUI` وليس `Docs`.
 4. اختر الدالة `setupApp` واضغط **Run** ووافق على الصلاحيات.
    - تُنشأ الشيتات: `Users`, `ChartOfAccounts`, `Projects`, `Lookups`, `AuditLog`
      + `Receipts`, `ReceiptLines`, `Payments`, `PaymentLines`.
@@ -67,7 +68,7 @@
 - النظام يمنع حذف مشروع أو حساب أو بنك مستخدم في سند.
 
 ### الترقية من المرحلة الأولى
-انسخ الملفات الجديدة/المعدلة (`Config.gs`, `Utils.gs`, `Api.gs`, `Setup.gs`, **`Docs.gs`**, `Index`, `Styles`, `App`, **`Docs`**)
+انسخ الملفات الجديدة/المعدلة (`Config.gs`, `Utils.gs`, `Api.gs`, `Setup.gs`, **`Docs.gs`**, `Index`, `Styles`, `App`, **`DocsUI`**)
 ثم شغّل `setupApp` مرة أخرى (يضيف الأعمدة والشيتات `Payments` و`PaymentLines` دون حذف بيانات)،
 ثم **Deploy ← Manage deployments ← Edit ← New version**.
 امنح المستخدمين صلاحيات الصفحات الجديدة (سندات الصرف، أرصدة المشروعات) من صفحة المستخدمين.

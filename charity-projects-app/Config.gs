@@ -26,6 +26,7 @@ var ACTIONS = [
 var PAGES = [
   { key: 'dashboard', title: 'الرئيسية', group: 'الرئيسية', icon: 'home', actions: ['view'] },
   { key: 'projects', title: 'المشروعات', group: 'المشروعات', icon: 'folder', actions: ['view', 'add', 'edit', 'delete'] },
+  { key: 'statement', title: 'كشف حساب مشروع', group: 'المشروعات', icon: 'statement', actions: ['view'] },
   { key: 'balances', title: 'أرصدة المشروعات', group: 'المشروعات', icon: 'chart', actions: ['view'] },
   { key: 'accounts', title: 'دليل الحسابات', group: 'المالية', icon: 'book', actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'receipts', title: 'سندات التحويل', group: 'المالية', icon: 'receipt', actions: ['view', 'add', 'edit', 'delete', 'post'] },
@@ -197,8 +198,6 @@ ENTITIES.receipts = {
       { name: 'ProjectId', label: 'المشروع', type: 'select', source: { entity: 'projects' }, required: true, text: true, width: 220 },
       { name: 'AccountId', label: 'كود الحساب', type: 'text', required: true, derive: { from: 'ProjectId', entity: 'projects', field: 'AccountId' }, text: true, width: 90 },
       { name: 'AccountName', label: 'اسم الحساب', type: 'text', derive: { from: 'ProjectId', entity: 'projects', field: 'AccountName' }, width: 150 },
-      { name: 'StatItemNo', label: 'رقم البند الإحصائي', type: 'text', text: true, width: 100 },
-      { name: 'StatItemName', label: 'اسم البند الإحصائي', type: 'text', width: 140 },
       { name: 'AddressNo', label: 'رقم مخاطبة', type: 'text', text: true, width: 100 },
       { name: 'TransferFormNo', label: 'رقم نموذج التحويل', type: 'text', text: true, width: 100 },
       { name: 'Description', label: 'وصف المعاملة', type: 'text', width: 180 },

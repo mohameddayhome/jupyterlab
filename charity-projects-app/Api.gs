@@ -158,7 +158,19 @@ function apiList(token, entity) {
       });
     }
     if (entity === 'audit') rows = rows.slice(-APP.auditListLimit).reverse();
-    return rows.map(function (r) { return serialize_(cfg, r); });
+    var out = rows.map(function (r) { return serialize_(cfg, r); });
+    if (entity === 'receipts') {
+      // نص بحث مخفي: أرقام وأسماء مشروعات السطور حتى يمكن البحث عن السند بالمشروع
+      var names = {};
+      readTable_('Projects').forEach(function (p) { names[String(p.ProjectId)] = p.Description; });
+      var byDoc = {};
+      readTable_('ReceiptLines').forEach(function (l) {
+        var k = String(l.DocumentNumber), pid = String(l.ProjectId);
+        (byDoc[k] = byDoc[k] || []).push(pid + ' ' + (names[pid] || ''));
+      });
+      out.forEach(function (o) { o._search = (byDoc[String(o.DocumentNumber)] || []).join(' | '); });
+    }
+    return out;
   });
 }
 

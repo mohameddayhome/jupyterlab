@@ -26,6 +26,7 @@ const ICONS = {
   chart: 'M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z',
   post: 'M2.01 21L23 12 2.01 3 2 10l15 2-15 2z',
   unpost: 'M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62A7.95 7.95 0 0 1 12.5 10.5c3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z',
+  statement: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM8 18v-2h8v2H8zm0-4v-2h8v2H8zm5-5V3.5L18.5 9H13z',
   print: 'M19 8H5a3 3 0 0 0-3 3v6h4v4h12v-4h4v-6a3 3 0 0 0-3-3zm-3 11H8v-5h8v5zm3-7a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm-1-9H6v4h12V3z',
   lock: 'M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3.1-9H8.9V6a3.1 3.1 0 0 1 6.2 0v2z'
 };
@@ -171,6 +172,7 @@ async function navigate(key) {
   setActiveNav(key);
   if (key === 'dashboard') return openDashboard();
   if (key === 'balances') return openBalances();
+  if (key === 'statement') return openStatement();
   if (S.boot.entities[key]) return openList(key);
 }
 
@@ -238,7 +240,7 @@ async function openList(entity, keepState) {
     <div class="content">
       <div class="view-head">
         <div class="view-title">${icon(cfg.icon)}<span class="chip"><select id="viewSel">${viewsFor(entity).map(v => `<option value="${v.id}">${esc(v.label)}</option>`).join('')}</select></span></div>
-        <div class="search">${icon('search')}<input id="q" placeholder="البحث في هذا العرض" value="${esc(S.search)}"></div>
+        <div class="search">${icon('search')}<input id="q" placeholder="${cfg.doc ? 'بحث برقم السند أو رقم/اسم المشروع' : 'البحث في هذا العرض'}" value="${esc(S.search)}"></div>
       </div>
       <div class="grid-wrap" id="gridWrap"><div class="empty">جارٍ التحميل…</div></div>
     </div>`;
@@ -284,7 +286,10 @@ function filteredRows(entity) {
   const cols = cfg.fields.filter(f => f.list);
   const q = S.search.trim().toLowerCase();
   let rows = S.rows.filter(view.fn);
-  if (q) rows = rows.filter(r => cols.some(f => String(r[f.name] == null ? '' : r[f.name]).toLowerCase().includes(q)));
+  if (q) rows = rows.filter(r => {
+    const text = (cols.map(f => String(r[f.name] == null ? '' : r[f.name])).join(' ') + ' ' + (r._search || '') + ' ' + (r.ProjectName || '')).toLowerCase();
+    return q.split(/\s+/).every(w => text.includes(w));
+  });
   if (S.sort) {
     const { f, dir } = S.sort;
     rows = rows.slice().sort((a, b) => {
@@ -415,6 +420,9 @@ function fieldControl(f, v, editable) {
   const attrs = `data-f="${f.name}" id="f_${f.name}" ${ro ? 'readonly disabled' : ''} ${f.required ? 'aria-required="true"' : ''}`;
   if (f.type === 'checkbox') return `<div><input type="checkbox" ${attrs} ${v ? 'checked' : ''}></div>`;
   if (f.type === 'textarea') return `<textarea class="ctrl" ${attrs}>${esc(v)}</textarea>`;
+  if (f.type === 'select' && f.source.entity && !ro) {
+    return comboHtml(f.source.entity, v, attrs, f.source.entity === S.form.entity ? String(S.form.key == null ? '' : S.form.key) : '');
+  }
   if (f.type === 'select') {
     let opts = [];
     if (f.source.static) opts = f.source.static;
@@ -454,6 +462,7 @@ function renderForm() {
         <button class="cmd" id="fSaveClose">${icon('saveclose')}<span>حفظ وإغلاق</span></button>` : ''}
       ${can(cfg.page, 'add') && !cfg.readOnly ? `<button class="cmd" id="fNew">${icon('add')}<span>جديد</span></button>` : ''}
       ${F.mode === 'edit' && can(cfg.page, 'delete') && !cfg.readOnly ? `<button class="cmd danger" id="fDel">${icon('del')}<span>حذف</span></button>` : ''}
+      ${F.mode === 'edit' && F.entity === 'projects' && can('statement', 'view') ? `<span class="cmd-sep"></span><button class="cmd" id="fStmt">${icon('statement')}<span>كشف حساب</span></button>` : ''}
       ${F.mode === 'edit' ? `<span class="cmd-sep"></span><button class="cmd" id="fRef">${icon('refresh')}<span>تحديث</span></button>` : ''}
     </div>
     ${F.notice ? `<div class="notice ${F.notice.type}">${esc(F.notice.msg)}</div>` : ''}
@@ -480,6 +489,7 @@ function renderForm() {
   if ($('#fSaveClose')) $('#fSaveClose').onclick = () => saveForm(true);
   if ($('#fNew')) $('#fNew').onclick = async () => { if (await leaveForm()) openForm(F.entity, null); };
   if ($('#fDel')) $('#fDel').onclick = () => deleteRecords(F.entity, [String(F.key)], () => { S.form = null; openList(F.entity, true); });
+  if ($('#fStmt')) $('#fStmt').onclick = async () => { if (await leaveForm()) { setActiveNav('statement'); openStatement(String(F.key)); } };
   if ($('#fRef')) $('#fRef').onclick = async () => { if (await leaveForm()) { await loadRows(F.entity); openForm(F.entity, F.key); } };
 
   bindFormInputs(body);
@@ -592,8 +602,7 @@ function validateForm() {
   if (F.entity === 'users' && F.mode === 'add' && !F.data.Password) missing.push({ name: 'Password', label: 'كلمة المرور' });
   if (missing.length) {
     if (F.tab !== 'general') { F.tab = 'general'; renderForm(); }
-    missing.forEach(f => { const el = $('#f_' + f.name); if (el) el.classList.add('invalid'); });
-    const first = $('#f_' + missing[0].name); if (first) first.focus();
+    missing.forEach((f, i) => { const el = $('#f_' + f.name); if (el) markInvalid(el, i === 0); });
     return 'الحقول التالية مطلوبة: ' + missing.map(f => f.label).join('، ');
   }
   if (F.entity === 'users' && F.data.Password && F.data.Password !== F.data.ConfirmPassword) return 'كلمة المرور وتأكيدها غير متطابقين.';
@@ -659,6 +668,96 @@ function changePasswordDlg(forced) {
       if ($('#cpOut', d)) $('#cpOut', d).onclick = () => { close(); logout(); };
     });
 }
+
+
+/* ---------------- حقل اختيار بالبحث (رقم أو اسم) ---------------- */
+function comboHtml(entity, v, hiddenAttrs, exclude) {
+  const o = (S.boot.options[entity] || []).find(x => x.v === String(v));
+  const label = o ? o.l : (v == null ? '' : v);
+  return `<div class="combo"><input class="ctrl combo-in" type="text" data-combo="${entity}" data-exclude="${esc(exclude || '')}"
+    value="${esc(label)}" placeholder="ابحث بالرقم أو الاسم…" autocomplete="off" role="combobox" aria-autocomplete="list"><input type="hidden" ${hiddenAttrs} value="${esc(v == null ? '' : v)}"></div>`;
+}
+const Combo = { el: null, items: [], idx: -1 };
+function comboListEl() {
+  let l = $('#comboList');
+  if (!l) {
+    l = document.createElement('div'); l.id = 'comboList'; l.className = 'combo-list hidden'; l.setAttribute('role', 'listbox');
+    document.body.appendChild(l);
+    l.addEventListener('mousedown', e => { const it = e.target.closest('[data-v]'); e.preventDefault(); if (it) comboPick(it.dataset.v); });
+  }
+  return l;
+}
+function comboPosition() {
+  if (!Combo.el) return;
+  const l = comboListEl(), r = Combo.el.getBoundingClientRect();
+  const w = Math.max(r.width, 300);
+  l.style.width = w + 'px';
+  l.style.left = Math.max(4, r.right - w) + 'px';
+  if (window.innerHeight - r.bottom < 270 && r.top > 270) { l.style.top = 'auto'; l.style.bottom = (window.innerHeight - r.top + 2) + 'px'; }
+  else { l.style.bottom = 'auto'; l.style.top = (r.bottom + 2) + 'px'; }
+}
+function comboFilter(showAll) {
+  const inp = Combo.el; if (!inp) return;
+  const words = showAll ? [] : inp.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const all = (S.boot.options[inp.dataset.combo] || []).filter(o => o.v !== inp.dataset.exclude);
+  Combo.items = all.filter(o => words.every(w => o.l.toLowerCase().includes(w))).slice(0, 80);
+  Combo.idx = Combo.items.length ? 0 : -1;
+  comboRender();
+}
+function comboRender() {
+  const l = comboListEl();
+  l.innerHTML = Combo.items.length
+    ? Combo.items.map((o, i) => `<div data-v="${esc(o.v)}" class="${i === Combo.idx ? 'on' : ''}" role="option"><b>${esc(o.v)}</b> ${esc(o.name != null ? o.name : o.l)}</div>`).join('')
+    : '<div class="none">لا توجد نتائج</div>';
+  l.classList.remove('hidden');
+  comboPosition();
+  const on = $('.on', l); if (on) on.scrollIntoView({ block: 'nearest' });
+}
+function comboPick(v) {
+  const inp = Combo.el; if (!inp) return;
+  const hidden = inp.nextElementSibling;
+  const o = (S.boot.options[inp.dataset.combo] || []).find(x => x.v === v);
+  inp.value = o ? o.l : '';
+  inp.classList.remove('invalid');
+  if (hidden.value !== v) {
+    hidden.value = v;
+    hidden.dispatchEvent(new Event('input', { bubbles: true }));
+    hidden.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  comboClose();
+}
+function comboClose() { const l = $('#comboList'); if (l) l.classList.add('hidden'); Combo.el = null; }
+function markInvalid(el, focus) {
+  const t = el.type === 'hidden' && el.previousElementSibling ? el.previousElementSibling : el;
+  t.classList.add('invalid'); if (focus) t.focus();
+}
+document.addEventListener('focusin', e => { const t = e.target; if (t.classList && t.classList.contains('combo-in')) { Combo.el = t; t.select(); comboFilter(true); } });
+document.addEventListener('input', e => { if (e.target === Combo.el) comboFilter(false); });
+document.addEventListener('keydown', e => {
+  if (!Combo.el || e.target !== Combo.el) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!Combo.items.length) return;
+    Combo.idx = (Combo.idx + (e.key === 'ArrowDown' ? 1 : -1) + Combo.items.length) % Combo.items.length;
+    comboRender();
+  } else if (e.key === 'Enter') {
+    e.preventDefault(); if (Combo.idx >= 0) comboPick(Combo.items[Combo.idx].v);
+  } else if (e.key === 'Escape') { e.stopPropagation(); Combo.el.blur(); }
+});
+document.addEventListener('focusout', e => {
+  const inp = e.target;
+  if (!inp.classList || !inp.classList.contains('combo-in')) return;
+  const hidden = inp.nextElementSibling;
+  if (!inp.value.trim()) {
+    if (hidden.value) { hidden.value = ''; hidden.dispatchEvent(new Event('input', { bubbles: true })); hidden.dispatchEvent(new Event('change', { bubbles: true })); }
+  } else {
+    const o = (S.boot.options[inp.dataset.combo] || []).find(x => x.v === hidden.value);
+    inp.value = o ? o.l : hidden.value;
+  }
+  if (Combo.el === inp) comboClose();
+});
+window.addEventListener('scroll', () => comboPosition(), true);
+window.addEventListener('resize', () => comboPosition());
 
 /* ---------------- الربط العام ---------------- */
 hydrateIcons();

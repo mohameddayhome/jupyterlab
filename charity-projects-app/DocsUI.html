@@ -60,6 +60,7 @@ function lineCell(f, l, i, editable) {
     return `<td class="ro ${isNum ? 'num' : ''}" data-lc="${f.name}" data-i="${i}">${shown}</td>`;
   }
   const a = `class="ctrl ${isNum ? 'num' : ''}" data-lf="${f.name}" data-i="${i}" aria-label="${esc(f.label)} - سطر ${i + 1}"`;
+  if (f.type === 'select' && f.source.entity) return `<td>${comboHtml(f.source.entity, v, `data-lf="${f.name}" data-i="${i}"`, '')}</td>`;
   if (f.type === 'select') {
     const opts = optionsFor(f);
     const has = v === '' || v == null || opts.some(o => o.v === String(v));
@@ -256,7 +257,7 @@ function validateDoc() {
       const v = l[f.name];
       const bad = (f.required && (v === '' || v == null)) || (f.positive && v !== '' && !(Number(v) > 0));
       if (bad) {
-        const el = $(`[data-lf="${f.name}"][data-i="${i}"]`); if (el) { el.classList.add('invalid'); el.focus(); }
+        const el = $(`[data-lf="${f.name}"][data-i="${i}"]`); if (el) markInvalid(el, true);
         return `السطر ${i + 1}: ${f.positive && v !== '' ? 'يجب أن يكون "' + f.label + '" أكبر من صفر' : 'الحقل مطلوب: ' + f.label}`;
       }
     }
@@ -363,7 +364,10 @@ async function openBalances() {
         ${nums.map(([k, , d]) => `<td class="num ${k.startsWith('bal') && r[k] < 0 ? 'diff' : ''}" style="${k.startsWith('bal') ? 'font-weight:600' : ''}${k.startsWith('bal') && r[k] < 0 ? ';color:var(--danger)' : ''}">${fmtNum(r[k], d)}</td>`).join('')}</tr>`).join('')
         : `<tr><td colspan="${cols.length + nums.length}" class="empty">لا توجد مشروعات</td></tr>`}</tbody>
       <tfoot><tr style="font-weight:700;background:#f3f2f1"><td colspan="${cols.length}">الإجمالي</td>${nums.map(([k, , d]) => `<td class="num">${fmtNum(sum(k), d)}</td>`).join('')}</tr></tfoot></table>`;
-    if (can('projects', 'view')) $$('#balWrap tr[data-p]').forEach(tr => tr.onclick = () => { setActiveNav('projects'); openForm('projects', tr.dataset.p); });
+    $$('#balWrap tr[data-p]').forEach(tr => tr.onclick = () => {
+      if (can('statement', 'view')) { setActiveNav('statement'); openStatement(tr.dataset.p); }
+      else if (can('projects', 'view')) { setActiveNav('projects'); openForm('projects', tr.dataset.p); }
+    });
   };
   const loadB = async () => { try { rows = await api('apiBalances', S.token); draw(); } catch (e) { toast(e.message, 'err'); } };
   $('#bq').oninput = draw;

@@ -1,0 +1,138 @@
+<script>
+/* =========================================================
+ *  المرحلة الثالثة: كشف حساب تفصيلي لكل مشروع
+ * ========================================================= */
+const ST = { pid: '', from: '', to: '', cur: 'KWD', data: null };
+const curInfo = (c) => CUR.find(x => x[0] === c) || CUR[0];
+
+async function openStatement(pid) {
+  S.view = { type: 'statement', entity: 'statement' }; S.form = null;
+  if (pid) ST.pid = String(pid);
+  const main = $('#main');
+  main.innerHTML = `
+    <div class="cmdbar">
+      <button class="cmd" id="sRef">${icon('refresh')}<span>تحديث</span></button>
+      <button class="cmd" id="sPrint" disabled>${icon('print')}<span>طباعة</span></button>
+      <button class="cmd" id="sExp" disabled>${icon('export')}<span>تصدير إلى Excel</span></button>
+    </div>
+    <div class="content">
+      <div class="view-head"><div class="view-title">${icon('statement')} كشف حساب مشروع <span class="fh-sub">(من السندات المرحّلة فقط)</span></div></div>
+      <div class="st-filters">
+        <label class="w-proj">المشروع (ابحث بالرقم أو الاسم)${comboHtml('projects', ST.pid, 'id="stPid"', '')}</label>
+        <label>من تاريخ<input class="ctrl" type="date" id="stFrom" value="${esc(ST.from)}"></label>
+        <label>إلى تاريخ<input class="ctrl" type="date" id="stTo" value="${esc(ST.to)}"></label>
+        <label>عرض المبالغ بـ<select class="ctrl" id="stCur">${CUR.map(([c, n]) => `<option value="${c}" ${ST.cur === c ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      </div>
+      <div id="stBody"><div class="empty">اختر المشروع لعرض كشف الحساب.</div></div>
+    </div>`;
+  $('#stPid').addEventListener('input', () => { ST.pid = $('#stPid').value; loadStatement(); });
+  $('#stFrom').onchange = () => { ST.from = $('#stFrom').value; loadStatement(); };
+  $('#stTo').onchange = () => { ST.to = $('#stTo').value; loadStatement(); };
+  $('#stCur').onchange = () => { ST.cur = $('#stCur').value; drawStatement(); };
+  $('#sRef').onclick = loadStatement;
+  $('#sPrint').onclick = printStatement;
+  $('#sExp').onclick = exportStatement;
+  if (ST.pid) loadStatement();
+}
+
+async function loadStatement() {
+  ST.data = null;
+  const body = $('#stBody'); if (!body) return;
+  if (!ST.pid) { body.innerHTML = '<div class="empty">اختر المشروع لعرض كشف الحساب.</div>'; return drawButtons(); }
+  body.innerHTML = '<div class="empty">جارٍ التحميل…</div>';
+  try { ST.data = await api('apiStatement', S.token, ST.pid, ST.from, ST.to); }
+  catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return drawButtons(); }
+  if (S.view && S.view.type === 'statement') drawStatement();
+}
+
+function drawButtons() {
+  if ($('#sPrint')) $('#sPrint').disabled = !ST.data;
+  if ($('#sExp')) $('#sExp').disabled = !ST.data;
+}
+
+function statementTable(d, c, forPrint) {
+  const [, n, dec] = curInfo(c);
+  const f = (v) => fmtNum(v, dec);
+  const docLink = (r) => !forPrint && can(r.entity, 'view') ? `<span class="link" data-doc="${esc(r.doc)}" data-ent="${r.entity}">${esc(r.doc)}</span>` : esc(r.doc);
+  const orig = (r) => `${fmtNum(r.amount, curInfo(r.currency)[2])} ${esc(curInfo(r.currency)[1])}`;
+  return `<table class="grid st-table"><thead><tr>
+      <th>التاريخ</th><th>النوع</th><th>رقم السند</th><th>البيان</th><th>الحساب</th><th>المبلغ الأصلي</th>
+      <th>وارد (${n})</th><th>منصرف (${n})</th><th>الرصيد (${n})</th></tr></thead>
+    <tbody>
+      <tr class="opening"><td>${esc(d.from || '')}</td><td colspan="5">الرصيد الافتتاحي${d.from ? '' : ' (من بداية المشروع)'}</td><td></td><td></td>
+        <td class="num ${d.opening[c] < 0 ? 'neg' : ''}">${f(d.opening[c])}</td></tr>
+      ${d.rows.length ? d.rows.map(r => `<tr>
+        <td>${esc(r.date)}</td><td>${r.entity === 'receipts' ? '<span class="st posted">' + esc(r.type) + '</span>' : '<span class="st draft">' + esc(r.type) + '</span>'}</td>
+        <td>${docLink(r)}</td><td title="${esc(r.desc)}">${esc(r.desc)}</td><td title="${esc(r.account)}">${esc(r.account)}</td>
+        <td class="num">${orig(r)}</td>
+        <td class="num in">${r['in' + c] ? f(r['in' + c]) : ''}</td>
+        <td class="num out">${r['out' + c] ? f(r['out' + c]) : ''}</td>
+        <td class="num ${r['bal' + c] < 0 ? 'neg' : ''}">${f(r['bal' + c])}</td></tr>`).join('')
+        : '<tr><td colspan="9" class="empty">لا توجد حركات مرحّلة في هذه الفترة</td></tr>'}
+    </tbody>
+    <tfoot><tr style="font-weight:700;background:#f3f2f1"><td colspan="6">الإجمالي / الرصيد الختامي</td>
+      <td class="num in">${f(d.totals['in' + c])}</td><td class="num out">${f(d.totals['out' + c])}</td>
+      <td class="num ${d.closing[c] < 0 ? 'neg' : ''}">${f(d.closing[c])}</td></tr></tfoot></table>`;
+}
+
+function drawStatement() {
+  const d = ST.data, body = $('#stBody');
+  drawButtons();
+  if (!d || !body) return;
+  const c = ST.cur, [, n, dec] = curInfo(c);
+  const card = (label, v, cls) => `<div class="card" style="cursor:default"><small>${label}</small><b class="${cls || ''}" style="direction:ltr;text-align:right">${fmtNum(v, dec)}</b><small>${n}</small></div>`;
+  body.innerHTML = `
+    <div class="st-info">
+      <span>المشروع: <b>${esc(d.project.id)} - ${esc(d.project.name)}</b></span>
+      <span>المجموعة: <b>${esc(d.project.group)}</b></span><span>النوع: <b>${esc(d.project.type)}</b></span>
+      <span>الحساب: <b>${esc(d.project.account)}</b></span>
+      ${d.rates.rUSD ? `<span>متوسط المعامل دينار/دولار: <b>${d.rates.rUSD}</b> — دولار/فرنك: <b>${d.rates.rDJF}</b></span>` : ''}
+    </div>
+    <div class="cards">
+      ${card('الرصيد الافتتاحي', d.opening[c])}
+      ${card('إجمالي الوارد', d.totals['in' + c])}
+      ${card('إجمالي المنصرف', d.totals['out' + c])}
+      ${card('الرصيد الختامي', d.closing[c], d.closing[c] < 0 ? 'diff' : '')}
+    </div>
+    <div class="grid-wrap">${statementTable(d, c, false)}</div>
+    <div class="hint" style="margin-top:8px">المنصرف بأي عملة يُحوَّل إلى العملات الثلاث بمتوسط سعر التحويلات الواردة للمشروع، وعمود "المبلغ الأصلي" يعرض المبلغ بعملته كما في السند.</div>`;
+  $$('[data-doc]', body).forEach(el => el.onclick = () => { setActiveNav(el.dataset.ent); openForm(el.dataset.ent, el.dataset.doc); });
+}
+
+function printStatement() {
+  const d = ST.data; if (!d) return;
+  const c = ST.cur, [, n] = curInfo(c);
+  const period = (d.from || d.to) ? `الفترة: ${d.from || 'البداية'} — ${d.to || 'اليوم'}` : 'كل الفترات';
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف حساب ${esc(d.project.id)}</title>
+    <style>body{font-family:'Segoe UI',Tahoma,sans-serif;font-size:11px;margin:20px;color:#000}h1{font-size:18px;margin:0}
+    .top{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #002050;padding-bottom:8px;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}td,th{border:1px solid #999;padding:4px 5px;text-align:right}th{background:#eee}
+    .num{direction:ltr;text-align:left;white-space:nowrap}.neg{color:#a4262c;font-weight:700}tr.opening td,tfoot td{background:#f3f3f3;font-weight:700}
+    .st{font-weight:600}.link{color:#000}@media print{body{margin:8mm}}</style></head><body>
+    <div class="top"><div><b>${esc(S.boot.app.orgName)}</b><h1>كشف حساب مشروع</h1></div>
+      <div style="text-align:left">${esc(d.project.id)} - ${esc(d.project.name)}<br>${period}<br>المبالغ بـ${n}</div></div>
+    <p>المجموعة: <b>${esc(d.project.group)}</b> — النوع: <b>${esc(d.project.type)}</b> — الحساب: <b>${esc(d.project.account)}</b></p>
+    ${statementTable(d, c, true)}
+    <p style="color:#777;margin-top:16px">من السندات المرحّلة فقط — طُبع بواسطة ${esc(S.boot.user.fullName)} — ${new Date().toLocaleString('en-GB')}</p>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) return toast('اسمح بالنوافذ المنبثقة لهذا الموقع لتتمكن من الطباعة.', 'err');
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+function exportStatement() {
+  const d = ST.data; if (!d) return;
+  const cell = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head = ['التاريخ', 'النوع', 'رقم السند', 'البيان', 'الحساب', 'المبلغ الأصلي', 'العملة']
+    .concat(...CUR.map(([, n]) => [`وارد ${n}`, `منصرف ${n}`, `الرصيد ${n}`]));
+  const lines = [head.map(cell).join(',')];
+  lines.push([d.from, 'رصيد افتتاحي', '', '', '', '', ''].concat(...CUR.map(([c]) => ['', '', d.opening[c]])).map(cell).join(','));
+  d.rows.forEach(r => lines.push([r.date, r.type, r.doc, r.desc, r.account, r.amount, r.currency]
+    .concat(...CUR.map(([c]) => [r['in' + c], r['out' + c], r['bal' + c]])).map(cell).join(',')));
+  lines.push(['', 'الإجمالي', '', '', '', '', ''].concat(...CUR.map(([c]) => [d.totals['in' + c], d.totals['out' + c], d.closing[c]])).map(cell).join(','));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = `كشف حساب ${d.project.id}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+</script>

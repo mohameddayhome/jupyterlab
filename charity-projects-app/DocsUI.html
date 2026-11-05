@@ -23,18 +23,18 @@ function newLine(cfg) {
 async function openDoc(entity, key) {
   const cfg = cfgOf(entity);
   if (!S.view || S.view.entity !== entity) { S.sel = new Set(); S.search = ''; S.sort = null; S.pageNo = 1; S.viewId = 'default'; }
-  let header, lines, balance = null;
+  let header, lines, balance = null, attachments = [];
   if (key != null) {
     try {
       const d = await api('apiGetDoc', S.token, entity, key);
-      header = d.header; lines = d.lines; balance = d.balance || null;
+      header = d.header; lines = d.lines; balance = d.balance || null; attachments = d.attachments || [];
     } catch (e) { return toast(e.message, 'err'); }
   } else {
     header = { Status: 'Draft', Date: todayStr() };
     lines = [newLine(cfg)];
   }
   S.view = { type: 'form', entity };
-  S.form = { entity, doc: true, mode: key == null ? 'add' : 'edit', key, data: header, lines, balance, tab: 'general', dirty: false, notice: null };
+  S.form = { entity, doc: true, mode: key == null ? 'add' : 'edit', key, data: header, lines, balance, attachments, tab: 'general', dirty: false, notice: null };
   renderDoc();
 }
 
@@ -82,7 +82,10 @@ function renderDoc() {
   const title = F.mode === 'add' ? `${cfg.singular} جديد` : d[cfg.key];
   const L = cfg.lines;
   const tabs = [{ id: 'general', label: 'عام' }];
-  if (F.mode === 'edit') tabs.push({ id: 'system', label: 'معلومات النظام' });
+  if (F.mode === 'edit') {
+    tabs.push({ id: 'files', label: `المرفقات (${(F.attachments || []).length})` });
+    tabs.push({ id: 'system', label: 'معلومات النظام' });
+  }
 
   const main = $('#main');
   main.innerHTML = `
@@ -112,7 +115,9 @@ function renderDoc() {
     <div class="content" id="formBody"></div>`;
 
   const body = $('#formBody');
-  if (F.tab === 'system') {
+  if (F.tab === 'files') {
+    body.innerHTML = attachmentsTab();
+  } else if (F.tab === 'system') {
     body.innerHTML = `<div class="sections"><div class="section"><h3>معلومات النظام</h3>
       ${cfg.fields.filter(f => f.system).map(f => fieldRow(f, d[f.name], false)).join('')}</div></div>`;
   } else {
@@ -145,6 +150,7 @@ function renderDoc() {
   if ($('#fRef')) $('#fRef').onclick = async () => { if (await leaveForm()) openDoc(F.entity, F.key); };
 
   if (F.tab === 'general') bindDoc(body, editable);
+  if (F.tab === 'files') bindAttachments(body);
   recalcDoc();
 }
 
@@ -270,7 +276,7 @@ function applyDocResult(d) {
   const k = String(d.header[cfg.key]);
   const i = S.rows.findIndex(r => String(r[cfg.key]) === k);
   if (i >= 0) S.rows[i] = d.header; else S.rows.push(d.header);
-  S.form = { entity: F.entity, doc: true, mode: 'edit', key: k, data: d.header, lines: d.lines, balance: d.balance || null, tab: F.tab, dirty: false, notice: null };
+  S.form = { entity: F.entity, doc: true, mode: 'edit', key: k, data: d.header, lines: d.lines, balance: d.balance || null, attachments: d.attachments || F.attachments || [], tab: F.tab, dirty: false, notice: null };
 }
 
 async function saveDoc(close) {
@@ -308,6 +314,91 @@ async function postDoc(unpost) {
     toast(unpost ? 'تم إلغاء الترحيل' : 'تم ترحيل السند', 'ok');
     renderDoc();
   } catch (e) { F.notice = { type: 'err', msg: e.message }; renderDoc(); }
+}
+
+
+/* ---------------- المرفقات (Google Drive) ---------------- */
+const ATT_EXT = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv'];
+const ATT_MAX_MB = 10;
+const fmtSize = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+
+function canAttach() { const cfg = cfgOf(S.form.entity); return can(cfg.page, 'add') || can(cfg.page, 'edit'); }
+
+function attachmentsTab() {
+  const F = S.form, list = F.attachments || [];
+  const canDel = canAttach() && (!docPosted() || S.boot.user.isAdmin);
+  const kind = (m) => /^image\//.test(m) ? 'صورة' : m === 'application/pdf' ? 'PDF' : /sheet|excel|csv/.test(m) ? 'Excel' : /word/.test(m) ? 'Word' : 'ملف';
+  return `<div class="section">
+    <h3>مرفقات السند (${list.length})</h3>
+    ${canAttach() ? `<div class="drop" id="drop">
+        ${icon('attach')} اسحب الملفات هنا أو <button class="btn" id="pickFiles" type="button">اختر ملفات</button>
+        <input type="file" id="fileIn" multiple hidden accept="${ATT_EXT.map(e => '.' + e).join(',')}">
+        <div class="hint">PDF، صور، Word، Excel، نص — حتى ${ATT_MAX_MB} ميجابايت للملف. تُحفظ في Google Drive الخاص بالجمعية.</div>
+        <div id="upStatus" class="hint"></div>
+      </div>` : ''}
+    ${list.length ? `<table class="grid"><thead><tr><th>الملف</th><th>النوع</th><th>الحجم</th><th>رفع بواسطة</th><th>التاريخ</th><th></th></tr></thead><tbody>
+      ${list.map(a => `<tr><td>${icon('attach')} ${esc(a.name)}</td><td>${kind(a.mime)}</td><td>${fmtSize(a.size)}</td><td>${esc(a.by)}</td><td>${esc(a.at)}</td>
+        <td><button class="cmd" data-dl="${a.id}" title="تنزيل">${icon('export')}<span>تنزيل</span></button>
+          ${S.boot.user.isAdmin ? `<a class="cmd" href="${esc(a.url)}" target="_blank" rel="noopener" title="فتح في Google Drive">Drive</a>` : ''}
+          ${canDel ? `<button class="cmd danger" data-rm="${a.id}" title="حذف">${icon('del')}</button>` : ''}</td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty">لا توجد مرفقات لهذا السند.</div>'}
+  </div>`;
+}
+
+function readBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(',')[1] || '');
+    r.onerror = () => rej(new Error('تعذر قراءة الملف ' + file.name));
+    r.readAsDataURL(file);
+  });
+}
+
+async function uploadFiles(files) {
+  const F = S.form;
+  const st = $('#upStatus');
+  let ok = 0;
+  for (const file of Array.from(files)) {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!ATT_EXT.includes(ext)) { toast(`"${file.name}": نوع الملف غير مسموح.`, 'err'); continue; }
+    if (file.size > ATT_MAX_MB * 1048576) { toast(`"${file.name}": الحجم أكبر من ${ATT_MAX_MB} ميجابايت.`, 'err'); continue; }
+    if (st) st.textContent = `جارٍ رفع ${file.name}…`;
+    try {
+      const data = await readBase64(file);
+      F.attachments = await api('apiUploadAttachment', S.token, F.entity, F.key, { name: file.name, mimeType: file.type, data });
+      ok++;
+    } catch (e) { toast(`"${file.name}": ${e.message}`, 'err'); }
+  }
+  if (ok) toast(`تم رفع ${ok} ملف`, 'ok');
+  if (S.form === F) renderDoc();
+}
+
+function bindAttachments(body) {
+  const F = S.form;
+  const inp = $('#fileIn', body), drop = $('#drop', body);
+  if ($('#pickFiles', body)) $('#pickFiles', body).onclick = () => inp.click();
+  if (inp) inp.onchange = () => { if (inp.files.length) uploadFiles(inp.files); };
+  if (drop) {
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => { if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
+  }
+  $$('[data-dl]', body).forEach(b => b.onclick = async () => {
+    try {
+      const f = await api('apiGetAttachment', S.token, b.dataset.dl);
+      const bin = atob(f.data), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([bytes], { type: f.mime }));
+      a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { toast(e.message, 'err'); }
+  });
+  $$('[data-rm]', body).forEach(b => b.onclick = async () => {
+    const a = (F.attachments || []).find(x => String(x.id) === b.dataset.rm);
+    if (!(await confirmDlg('حذف المرفق', `هل تريد حذف "${a ? a.name : ''}"؟ سيُنقل الملف إلى سلة مهملات Drive.`, 'حذف', true))) return;
+    try { F.attachments = await api('apiDeleteAttachment', S.token, b.dataset.rm); toast('تم حذف المرفق', 'ok'); renderDoc(); }
+    catch (e) { toast(e.message, 'err'); }
+  });
 }
 
 /* ---------------- الطباعة ---------------- */

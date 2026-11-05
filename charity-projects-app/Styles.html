@@ -254,4 +254,25 @@
   .st-table td:nth-child(4), .st-table td:nth-child(5) { white-space: normal; min-width: 150px; max-width: 260px; }
   tr.opening td { background: #faf9f8; font-weight: 600; }
   td.in { color: var(--ok); } td.out { color: var(--danger); } td.neg { color: var(--danger); font-weight: 700; }
+
+  /* المرفقات */
+  .drop { border: 2px dashed var(--border-strong); padding: 20px; text-align: center; margin-bottom: 12px; display: grid; gap: 6px; justify-items: center; color: var(--muted); }
+  .drop.over { border-color: var(--accent); background: var(--accent-light); }
+  a.cmd { text-decoration: none; color: var(--accent); }
+
+  /* التقارير */
+  .pbar { display: inline-block; width: 90px; height: 8px; background: #edebe9; vertical-align: middle; margin-inline-end: 6px; }
+  .pbar span { display: block; height: 100%; background: var(--accent); }
+  .pbar.warn span { background: #d83b01; } .pbar.bad span { background: var(--danger); } .pbar.good span { background: var(--ok); }
+  .es { display: inline-block; padding: 1px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .es-ontrack { background: var(--ok-bg); color: var(--ok); } .es-done { background: var(--accent-light); color: var(--accent-dark); }
+  .es-late { background: #fed9cc; color: #a33b00; } .es-expired, .es-over { background: var(--danger-bg); color: var(--danger); }
+  .es-notstarted, .es-notplanned { background: #edebe9; color: var(--muted); }
+  .card.on { outline: 2px solid var(--accent); }
+  tr.items-row > td { background: #faf9f8; padding: 8px 16px 12px; white-space: normal; }
+  table.items { width: 100%; border-collapse: collapse; } .items th, .items td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: start; font-size: 13px; }
+  .ex-table td { height: auto; padding-top: 6px; padding-bottom: 6px; }
+  .ex-table td:first-child { white-space: normal; min-width: 160px; }
+  .ex-table .pbar { width: 60px; }
+  .exp { display: inline-block; width: 16px; color: var(--muted); }
 </style>

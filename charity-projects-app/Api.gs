@@ -230,6 +230,9 @@ function saveGeneric_(u, entity, cfg, rec, mode, origKey) {
     }
   });
   if (entity === 'accounts' && clean.MainAccount) checkAccountCycle_(rows, String(key), String(clean.MainAccount));
+  if (entity === 'projects' && clean.ProjectedStartDate && clean.ProjectedEndDate && clean.ProjectedEndDate < clean.ProjectedStartDate) {
+    throw new Error('تاريخ الانتهاء المتوقع يجب أن يكون بعد تاريخ البدء.');
+  }
 
   // قيود التفرد المركبة
   (cfg.unique || []).forEach(function (combo) {

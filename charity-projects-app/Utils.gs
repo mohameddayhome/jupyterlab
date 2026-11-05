@@ -154,6 +154,8 @@ function normalize_(f, v) {
       if (v === '' || v === null || v === undefined) return '';
       var n = Number(v);
       if (isNaN(n)) throw new Error('قيمة رقمية غير صحيحة في الحقل: ' + f.label);
+      if (f.min !== undefined && n < f.min) throw new Error('"' + f.label + '" يجب ألا يقل عن ' + f.min + '.');
+      if (f.max !== undefined && n > f.max) throw new Error('"' + f.label + '" يجب ألا يزيد عن ' + f.max + '.');
       return n;
     case 'date':
       if (!v) return '';

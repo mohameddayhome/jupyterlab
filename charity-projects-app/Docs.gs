@@ -37,6 +37,7 @@ function docOut_(entity, cfg, key) {
     lines: readLines_(cfg, key).map(function (l) { return serialize_(cfg.lines, l); })
   };
   if (entity === 'payments' && h.ProjectId) out.balance = projectBalance_(h.ProjectId, key);
+  out.attachments = listAttachments_(entity, key);
   return out;
 }
 
@@ -206,59 +207,85 @@ function deleteDocs_(u, entity, cfg, targets) {
   deleteRows_(cfg.sheet, targets.map(function (t) { return t._row; }));
   var lines = readTable_(cfg.lines.sheet).filter(function (l) { return keys.indexOf(String(l[cfg.lines.fk])) >= 0; });
   deleteRows_(cfg.lines.sheet, lines.map(function (l) { return l._row; }));
+  deleteDocAttachments_(entity, keys);
   targets.forEach(function (t) { audit_(u, 'حذف', entity, t[cfg.key]); });
   return targets.length;
 }
 
 /* ================= الأرصدة ================= */
 
-/** أرصدة كل المشروعات من السندات المرحّلة فقط */
-function projectBalances_(excludeVoucher) {
+/**
+ * تجميع حركات المشروعات من السندات المرحّلة فقط.
+ * o.exclude: سند صرف يُستبعد — o.from/o.to: فترة (yyyy-MM-dd) — o.items: تجميع بنود الصرف حسب الحساب.
+ * المعاملات (rUSD, rDJF لكل دينار) تُحسب من كل التحويلات المرحّلة للمشروع بغض النظر عن الفترة،
+ * ويُحوَّل كل صرف بها إلى العملات الثلاث حتى تبقى الأرصدة متسقة.
+ */
+function projectAgg_(o) {
+  o = o || {};
+  var from = o.from || '', to = o.to || '';
+  function inRange(d) { var k = dateKey_(d); return (!from || k >= from) && (!to || k <= to); }
   var res = {};
   function b(p) {
     p = String(p);
-    return res[p] || (res[p] = { inKWD: 0, inUSD: 0, inDJF: 0, outKWD: 0, outUSD: 0, outDJF: 0 });
+    return res[p] || (res[p] = { inKWD: 0, inUSD: 0, inDJF: 0, outKWD: 0, outUSD: 0, outDJF: 0,
+      allKWD: 0, allUSD: 0, allDJF: 0, rawOutKWD: 0, rawOutUSD: 0, rawOutDJF: 0, rUSD: 0, rDJF: 0, items: {} });
   }
-  var posted = {};
-  readTable_('Receipts').forEach(function (h) { if (h.Status === 'Posted') posted[String(h.DocumentNumber)] = true; });
+  var rc = {};
+  readTable_('Receipts').forEach(function (h) { if (h.Status === 'Posted') rc[String(h.DocumentNumber)] = h; });
   readTable_('ReceiptLines').forEach(function (l) {
-    if (!posted[String(l.DocumentNumber)]) return;
+    var h = rc[String(l.DocumentNumber)];
+    if (!h) return;
     var x = b(l.ProjectId);
-    x.inKWD += Number(l.AmountKWD) || 0; x.inUSD += Number(l.AmountUSD) || 0; x.inDJF += Number(l.AmountDJF) || 0;
+    var k = Number(l.AmountKWD) || 0, u = Number(l.AmountUSD) || 0, d = Number(l.AmountDJF) || 0;
+    x.allKWD += k; x.allUSD += u; x.allDJF += d;
+    if (inRange(h.Date)) { x.inKWD += k; x.inUSD += u; x.inDJF += d; }
+  });
+  Object.keys(res).forEach(function (p) {
+    var x = res[p];
+    if (x.allKWD > 0) { x.rUSD = x.allUSD / x.allKWD; x.rDJF = x.allDJF / x.allKWD; }
   });
   var pv = {};
   readTable_('Payments').forEach(function (h) {
-    if (h.Status === 'Posted' && String(h.VoucherNo) !== String(excludeVoucher || '')) pv[String(h.VoucherNo)] = h.ProjectId;
+    if (h.Status === 'Posted' && String(h.VoucherNo) !== String(o.exclude || '') && inRange(h.Date)) pv[String(h.VoucherNo)] = h;
   });
   readTable_('PaymentLines').forEach(function (l) {
-    var p = pv[String(l.VoucherNo)];
-    if (p === undefined) return;
-    var k = 'out' + l.Currency;
-    var x = b(p);
-    if (x[k] !== undefined) x[k] += Number(l.Amount) || 0;
+    var h = pv[String(l.VoucherNo)];
+    if (!h) return;
+    var x = b(h.ProjectId);
+    var amt = Number(l.Amount) || 0;
+    if (x['rawOut' + l.Currency] === undefined) return;
+    x['rawOut' + l.Currency] += amt;
+    var e = toEq_(amt, l.Currency, x);
+    x.outKWD += e.KWD; x.outUSD += e.USD; x.outDJF += e.DJF;
+    if (o.items) {
+      var acc = String(l.AccountId);
+      var it = x.items[acc] || (x.items[acc] = { AccountId: acc, AccountName: l.AccountName, outKWD: 0, outUSD: 0, outDJF: 0, lines: 0 });
+      it.outKWD += e.KWD; it.outUSD += e.USD; it.outDJF += e.DJF; it.lines++;
+    }
   });
-  // التحويل الواحد مُعبَّر عنه بثلاث عملات؛ لذلك يُحوَّل كل صرف إلى العملات الثلاث
-  // بمتوسط سعر التحويلات الواردة للمشروع حتى تبقى الأرصدة متسقة.
+  var C = [['KWD', 3], ['USD', 2], ['DJF', 0]];
   Object.keys(res).forEach(function (p) {
     var x = res[p];
-    x.rawOutKWD = x.outKWD; x.rawOutUSD = x.outUSD; x.rawOutDJF = x.outDJF;
-    if (x.inKWD > 0) {
-      x.rUSD = x.inUSD / x.inKWD; x.rDJF = x.inDJF / x.inKWD;
-      var eqKWD = x.outKWD + (x.rUSD ? x.outUSD / x.rUSD : 0) + (x.rDJF ? x.outDJF / x.rDJF : 0);
-      x.outKWD = eqKWD; x.outUSD = eqKWD * x.rUSD; x.outDJF = eqKWD * x.rDJF;
-    } else { x.rUSD = 0; x.rDJF = 0; }
-    [['KWD', 3], ['USD', 2], ['DJF', 0]].forEach(function (c) {
-      x['in' + c[0]] = round_(x['in' + c[0]], c[1]);
-      x['out' + c[0]] = round_(x['out' + c[0]], c[1]);
-      x['rawOut' + c[0]] = round_(x['rawOut' + c[0]], c[1]);
+    C.forEach(function (c) {
+      ['in', 'out', 'all', 'rawOut'].forEach(function (k) { x[k + c[0]] = round_(x[k + c[0]], c[1]); });
       x['bal' + c[0]] = round_(x['in' + c[0]] - x['out' + c[0]], c[1]);
     });
+    x.items = Object.keys(x.items).map(function (k) {
+      var it = x.items[k];
+      C.forEach(function (c) { it['out' + c[0]] = round_(it['out' + c[0]], c[1]); });
+      return it;
+    }).sort(function (a, b2) { return b2.outKWD - a.outKWD; });
   });
   return res;
 }
 
+/** أرصدة كل المشروعات (كل الفترات) */
+function projectBalances_(excludeVoucher) {
+  return projectAgg_({ exclude: excludeVoucher });
+}
+
 function emptyBalance_() {
-  return { inKWD: 0, inUSD: 0, inDJF: 0, outKWD: 0, outUSD: 0, outDJF: 0, balKWD: 0, balUSD: 0, balDJF: 0, rUSD: 0, rDJF: 0 };
+  return { inKWD: 0, inUSD: 0, inDJF: 0, outKWD: 0, outUSD: 0, outDJF: 0, balKWD: 0, balUSD: 0, balDJF: 0, rUSD: 0, rDJF: 0, items: [] };
 }
 
 function projectBalance_(projectId, excludeVoucher) {

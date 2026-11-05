@@ -26,15 +26,19 @@ var ACTIONS = [
 var PAGES = [
   { key: 'dashboard', title: 'الرئيسية', group: 'الرئيسية', icon: 'home', actions: ['view'] },
   { key: 'projects', title: 'المشروعات', group: 'المشروعات', icon: 'folder', actions: ['view', 'add', 'edit', 'delete'] },
-  { key: 'statement', title: 'كشف حساب مشروع', group: 'المشروعات', icon: 'statement', actions: ['view'] },
-  { key: 'balances', title: 'أرصدة المشروعات', group: 'المشروعات', icon: 'chart', actions: ['view'] },
   { key: 'accounts', title: 'دليل الحسابات', group: 'المالية', icon: 'book', actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'receipts', title: 'سندات التحويل', group: 'المالية', icon: 'receipt', actions: ['view', 'add', 'edit', 'delete', 'post'] },
   { key: 'payments', title: 'سندات الصرف', group: 'المالية', icon: 'payment', actions: ['view', 'add', 'edit', 'delete', 'post'] },
+  { key: 'statement', title: 'كشف حساب مشروع', group: 'التقارير', icon: 'statement', actions: ['view'] },
+  { key: 'balances', title: 'أرصدة المشروعات', group: 'التقارير', icon: 'chart', actions: ['view'] },
+  { key: 'performance', title: 'تقرير أداء المشروعات', group: 'التقارير', icon: 'perf', actions: ['view'] },
+  { key: 'execution', title: 'نسبة التنفيذ والمخصصات', group: 'التقارير', icon: 'speed', actions: ['view'] },
   { key: 'lookups', title: 'القوائم المساعدة', group: 'الإعدادات', icon: 'tag', actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'users', title: 'المستخدمون والصلاحيات', group: 'الإعدادات', icon: 'users', actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'audit', title: 'سجل العمليات', group: 'الإعدادات', icon: 'history', actions: ['view'] }
 ];
+
+var CURRENCIES = [{ v: 'KWD', l: 'دينار كويتي' }, { v: 'USD', l: 'دولار أمريكي' }, { v: 'DJF', l: 'فرنك جيبوتي' }];
 
 /** أنواع القوائم المساعدة */
 var LOOKUP_TYPES = [
@@ -79,7 +83,11 @@ var ENTITIES = {
       { name: 'Description', label: 'الوصف', section: 'بيانات المشروع', type: 'text', required: true, list: true },
       { name: 'ProjectGroup', label: 'مجموعة المشروع', section: 'بيانات المشروع', type: 'select', source: { lookup: 'ProjectGroup' }, required: true, list: true },
       { name: 'ProjectType', label: 'نوع المشروع', section: 'بيانات المشروع', type: 'select', source: { lookup: 'ProjectType' }, required: true, list: true },
-      { name: 'ProjectedStartDate', label: 'تاريخ البدء المتوقع', section: 'بيانات المشروع', type: 'date', list: true },
+      { name: 'ProjectedStartDate', label: 'تاريخ البدء المتوقع', section: 'التخطيط والمخصصات', type: 'date', list: true },
+      { name: 'ProjectedEndDate', label: 'تاريخ الانتهاء المتوقع', section: 'التخطيط والمخصصات', type: 'date', list: true },
+      { name: 'Budget', label: 'المخصص المالي', section: 'التخطيط والمخصصات', type: 'number', decimals: 3, min: 0, list: true },
+      { name: 'BudgetCurrency', label: 'عملة المخصص', section: 'التخطيط والمخصصات', type: 'select', source: { "static": CURRENCIES }, "default": 'KWD' },
+      { name: 'CompletionPct', label: 'نسبة الإنجاز الفعلي %', section: 'التخطيط والمخصصات', type: 'number', decimals: 0, min: 0, max: 100, placeholder: 'اختياري 0 - 100' },
       { name: 'AccountId', label: 'كود الحساب', section: 'الربط المحاسبي', type: 'select', source: { entity: 'accounts' }, required: true, list: true, text: true },
       { name: 'AccountName', label: 'اسم الحساب', section: 'الربط المحاسبي', type: 'text', derive: { from: 'AccountId', entity: 'accounts', field: 'AccountName' }, list: true },
       { name: 'CreatedDateTime', label: 'تاريخ ووقت الإنشاء', type: 'datetime', system: true, list: true },
@@ -154,10 +162,21 @@ var ENTITIES = {
 var USER_COLUMNS = ['UserId', 'Username', 'FullName', 'Email', 'PasswordHash', 'Salt', 'IsActive', 'IsAdmin',
   'MustChangePassword', 'Permissions', 'LastLogin', 'CreatedAt', 'CreatedBy', 'ModifiedAt', 'ModifiedBy'];
 
+/* ================= المرحلة الرابعة: المرفقات ================= */
+var ATTACH = {
+  sheet: 'Attachments',
+  columns: ['AttachmentId', 'Entity', 'DocKey', 'FileId', 'FileName', 'MimeType', 'Size', 'UploadedAt', 'UploadedBy'],
+  labels: ['المعرف', 'الصفحة', 'رقم السند', 'معرف الملف في Drive', 'اسم الملف', 'نوع الملف', 'الحجم (بايت)', 'تاريخ الرفع', 'رفع بواسطة'],
+  maxMB: 10,
+  ext: { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+    doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    txt: 'text/plain', csv: 'text/csv' }
+};
+
 /* ================= المرحلة الثانية: السندات (رأس + سطور) ================= */
 
 var DOC_STATUS = [{ v: 'Draft', l: 'مسودة' }, { v: 'Posted', l: 'مرحّل' }];
-var CURRENCIES = [{ v: 'KWD', l: 'دينار كويتي' }, { v: 'USD', l: 'دولار أمريكي' }, { v: 'DJF', l: 'فرنك جيبوتي' }];
 
 function docSystemFields_() {
   return [

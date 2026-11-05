@@ -45,6 +45,8 @@ function setupApp() {
       [L.fk].concat(L.fields.filter(function (f) { return f.text; }).map(function (f) { return f.name; })));
   });
 
+  ensureSheet_(ss, ATTACH.sheet, ATTACH.columns, ATTACH.labels, ['DocKey', 'FileId']);
+
   seedAdmin_();
   seedLookups_();
 

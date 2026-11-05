@@ -1,0 +1,233 @@
+<script>
+/* =========================================================
+ *  المرحلة الرابعة: تقرير أداء المشروعات + تقرير نسبة التنفيذ والمخصصات
+ * ========================================================= */
+const PF = { from: '', to: '', group: '', cur: 'KWD', q: '', open: new Set(), data: null };
+const EX = { asOf: '', group: '', status: '', q: '', data: null };
+
+function groupOptions(sel) {
+  return `<option value="">كل المجموعات</option>` + (S.boot.options.lookup_ProjectGroup || [])
+    .map(o => `<option value="${esc(o.v)}" ${sel === o.v ? 'selected' : ''}>${esc(o.l)}</option>`).join('');
+}
+function pctBar(p, cls) {
+  if (p === null || p === undefined) return '<span class="fh-sub">—</span>';
+  const w = Math.max(0, Math.min(100, p));
+  return `<span class="pbar ${cls || ''}"><span style="width:${w}%"></span></span><b>${fmtNum(p, 1)}%</b>`;
+}
+function downloadCsv(name, rows) {
+  const cell = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+function printHtml(title, sub, inner) {
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title>
+    <style>body{font-family:'Segoe UI',Tahoma,sans-serif;font-size:11px;margin:20px;color:#000}h1{font-size:18px;margin:0}
+    .top{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #002050;padding-bottom:8px;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse;margin-bottom:8px}td,th{border:1px solid #999;padding:4px 5px;text-align:right}th{background:#eee}
+    .num{direction:ltr;text-align:left;white-space:nowrap}.items-row td{background:#fafafa}.items td,.items th{font-size:10px}
+    .pbar{display:none}.es{font-weight:700}.link{color:#000}.exp{display:none}@media print{body{margin:8mm}}</style></head><body>
+    <div class="top"><div><b>${esc(S.boot.app.orgName)}</b><h1>${esc(title)}</h1></div><div style="text-align:left">${sub}</div></div>
+    ${inner}<p style="color:#777;margin-top:16px">من السندات المرحّلة فقط — طُبع بواسطة ${esc(S.boot.user.fullName)} — ${new Date().toLocaleString('en-GB')}</p>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) return toast('اسمح بالنوافذ المنبثقة لهذا الموقع لتتمكن من الطباعة.', 'err');
+  w.document.open(); w.document.write(html); w.document.close();
+}
+function reportShell(iconName, title, sub, filtersHtml) {
+  $('#main').innerHTML = `
+    <div class="cmdbar">
+      <button class="cmd" id="rRef">${icon('refresh')}<span>تحديث</span></button>
+      <button class="cmd" id="rPrint">${icon('print')}<span>طباعة</span></button>
+      <button class="cmd" id="rExp">${icon('export')}<span>تصدير إلى Excel</span></button>
+      <span id="rExtra"></span>
+    </div>
+    <div class="content">
+      <div class="view-head"><div class="view-title">${icon(iconName)} ${title} <span class="fh-sub">${sub}</span></div></div>
+      <div class="st-filters">${filtersHtml}</div>
+      <div id="rBody"><div class="empty">جارٍ التحميل…</div></div>
+    </div>`;
+}
+
+/* ======================= تقرير أداء المشروعات ======================= */
+async function openPerformance() {
+  S.view = { type: 'performance', entity: 'performance' }; S.form = null;
+  reportShell('perf', 'تقرير أداء المشروعات', '(المستلم / المنصرف / بنود الصرف / المتبقي)', `
+    <label>من تاريخ<input class="ctrl" type="date" id="pfFrom" value="${esc(PF.from)}"></label>
+    <label>إلى تاريخ<input class="ctrl" type="date" id="pfTo" value="${esc(PF.to)}"></label>
+    <label>مجموعة المشروع<select class="ctrl" id="pfGroup">${groupOptions(PF.group)}</select></label>
+    <label>عرض المبالغ بـ<select class="ctrl" id="pfCur">${CUR.map(([c, n]) => `<option value="${c}" ${PF.cur === c ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+    <label class="w-proj">بحث<input class="ctrl" id="pfQ" placeholder="رقم أو اسم المشروع" value="${esc(PF.q)}"></label>`);
+  $('#rExtra').innerHTML = `<button class="cmd" id="pfAll">${icon('list')}<span>عرض كل البنود</span></button>`;
+  $('#pfFrom').onchange = () => { PF.from = $('#pfFrom').value; loadPerformance(); };
+  $('#pfTo').onchange = () => { PF.to = $('#pfTo').value; loadPerformance(); };
+  $('#pfGroup').onchange = () => { PF.group = $('#pfGroup').value; drawPerformance(); };
+  $('#pfCur').onchange = () => { PF.cur = $('#pfCur').value; drawPerformance(); };
+  $('#pfQ').oninput = () => { PF.q = $('#pfQ').value; drawPerformance(); };
+  $('#pfAll').onclick = () => {
+    const rows = pfRows();
+    const allOpen = rows.every(r => PF.open.has(r.ProjectId));
+    rows.forEach(r => allOpen ? PF.open.delete(r.ProjectId) : PF.open.add(r.ProjectId));
+    drawPerformance();
+  };
+  $('#rRef').onclick = loadPerformance;
+  $('#rPrint').onclick = () => {
+    if (!PF.data) return;
+    const n = curInfo(PF.cur)[1];
+    printHtml('تقرير أداء المشروعات', `${PF.data.from || PF.data.to ? `الفترة: ${PF.data.from || 'البداية'} — ${PF.data.to || 'اليوم'}` : 'كل الفترات'}<br>المبالغ بـ${n}`, performanceTable(pfRows(), true));
+  };
+  $('#rExp').onclick = exportPerformance;
+  await loadPerformance();
+}
+
+async function loadPerformance() {
+  try { PF.data = await api('apiPerformance', S.token, PF.from, PF.to); }
+  catch (e) { PF.data = null; const b = $('#rBody'); if (b) b.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (S.view && S.view.type === 'performance') drawPerformance();
+}
+
+function pfRows() {
+  if (!PF.data) return [];
+  const words = PF.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return PF.data.rows.filter(r => (!PF.group || r.ProjectGroup === PF.group) &&
+    words.every(w => (r.ProjectId + ' ' + r.Description).toLowerCase().includes(w)));
+}
+
+function performanceTable(rows, forPrint) {
+  const c = PF.cur, [, n, dec] = curInfo(c), f = v => fmtNum(v, dec);
+  const sum = k => rows.reduce((s, r) => s + (Number(r[k + c]) || 0), 0);
+  const totIn = sum('in'), totOut = sum('out');
+  const body = rows.map(r => {
+    const inV = r['in' + c], outV = r['out' + c], bal = r['bal' + c];
+    const pct = inV ? outV / inV * 100 : (outV ? 100 : null);
+    const open = forPrint || PF.open.has(r.ProjectId);
+    const main = `<tr data-p="${esc(r.ProjectId)}" style="cursor:pointer">
+      <td><span class="exp">${r.items.length ? (open ? '▾' : '◂') : ''}</span><span class="link">${esc(r.ProjectId)}</span></td>
+      <td>${esc(r.Description)}</td><td>${esc(r.ProjectGroup)}</td>
+      <td class="num in">${f(inV)}</td><td class="num out">${f(outV)}</td>
+      <td class="num" style="font-weight:700;${bal < 0 ? 'color:var(--danger)' : ''}">${f(bal)}</td>
+      <td>${pctBar(pct, pct > 100 ? 'bad' : pct > 85 ? 'warn' : '')}</td><td class="num">${r.items.length}</td></tr>`;
+    if (!open || !r.items.length) return main;
+    return main + `<tr class="items-row"><td colspan="8"><table class="items"><thead><tr><th>بند الصرف (الحساب)</th><th>المبلغ (${n})</th><th>من المنصرف</th><th>عدد السطور</th></tr></thead><tbody>
+      ${r.items.map(it => { const p = outV ? it['out' + c] / outV * 100 : 0; return `<tr><td>${esc(it.AccountId)} - ${esc(it.AccountName)}</td><td class="num">${f(it['out' + c])}</td><td>${pctBar(p)}</td><td class="num">${it.lines}</td></tr>`; }).join('')}
+      </tbody></table></td></tr>`;
+  }).join('');
+  return `<table class="grid"><thead><tr><th>المشروع</th><th>الوصف</th><th>المجموعة</th><th>المستلم (${n})</th><th>المنصرف (${n})</th>
+      <th>المتبقي (${n})</th><th>نسبة الصرف من المستلم</th><th>بنود الصرف</th></tr></thead>
+    <tbody>${body || '<tr><td colspan="8" class="empty">لا توجد مشروعات</td></tr>'}</tbody>
+    <tfoot><tr style="font-weight:700;background:#f3f2f1"><td colspan="3">الإجمالي (${rows.length} مشروع)</td><td class="num">${f(totIn)}</td><td class="num">${f(totOut)}</td>
+      <td class="num">${f(totIn - totOut)}</td><td>${pctBar(totIn ? totOut / totIn * 100 : null)}</td><td></td></tr></tfoot></table>`;
+}
+
+function drawPerformance() {
+  const body = $('#rBody'); if (!body || !PF.data) return;
+  const rows = pfRows(), c = PF.cur, [, n, dec] = curInfo(c);
+  const sum = k => rows.reduce((s, r) => s + (Number(r[k + c]) || 0), 0);
+  const active = rows.filter(r => r['in' + c] || r['out' + c]).length;
+  const card = (l, v, sub, cls) => `<div class="card" style="cursor:default"><small>${l}</small><b class="${cls || ''}" style="direction:ltr;text-align:right">${v}</b><small>${sub}</small></div>`;
+  const totIn = sum('in'), totOut = sum('out');
+  body.innerHTML = `<div class="cards">
+      ${card('المشروعات', rows.length, active + ' مشروع عليه حركة')}
+      ${card('إجمالي المستلم', fmtNum(totIn, dec), n)}
+      ${card('إجمالي المنصرف', fmtNum(totOut, dec), n)}
+      ${card('إجمالي المتبقي', fmtNum(totIn - totOut, dec), n, totIn - totOut < 0 ? 'diff' : '')}
+      ${card('نسبة الصرف', totIn ? fmtNum(totOut / totIn * 100, 1) + '%' : '—', 'من المستلم')}
+    </div>
+    <div class="grid-wrap">${performanceTable(rows, false)}</div>
+    <div class="hint" style="margin-top:8px">اضغط على المشروع لعرض بنود الصرف (مجمّعة حسب حساب الصرف). المنصرف بأي عملة محوّل بمتوسط سعر تحويلات المشروع.</div>`;
+  $$('tr[data-p]', body).forEach(tr => tr.onclick = (e) => {
+    const p = tr.dataset.p;
+    if (e.target.classList.contains('link') && can('statement', 'view')) { setActiveNav('statement'); return openStatement(p); }
+    PF.open.has(p) ? PF.open.delete(p) : PF.open.add(p); drawPerformance();
+  });
+}
+
+function exportPerformance() {
+  if (!PF.data) return;
+  const rows = [['المشروع', 'الوصف', 'المجموعة', 'بند الصرف', ...CUR.flatMap(([, n]) => [`المستلم ${n}`, `المنصرف ${n}`, `المتبقي ${n}`])]];
+  pfRows().forEach(r => {
+    rows.push([r.ProjectId, r.Description, r.ProjectGroup, 'الإجمالي', ...CUR.flatMap(([c]) => [r['in' + c], r['out' + c], r['bal' + c]])]);
+    r.items.forEach(it => rows.push([r.ProjectId, r.Description, r.ProjectGroup, `${it.AccountId} - ${it.AccountName}`, ...CUR.flatMap(([c]) => ['', it['out' + c], ''])]));
+  });
+  downloadCsv('تقرير أداء المشروعات.csv', rows);
+}
+
+/* ======================= تقرير نسبة التنفيذ والمخصصات ======================= */
+async function openExecution() {
+  S.view = { type: 'execution', entity: 'execution' }; S.form = null;
+  if (!EX.asOf) EX.asOf = todayStr();
+  reportShell('speed', 'نسبة التنفيذ والمتبقي من المخصصات', '(حسب المدة الزمنية للمشروع)', `
+    <label>حتى تاريخ<input class="ctrl" type="date" id="exAsOf" value="${esc(EX.asOf)}"></label>
+    <label>مجموعة المشروع<select class="ctrl" id="exGroup">${groupOptions(EX.group)}</select></label>
+    <label class="w-proj">بحث<input class="ctrl" id="exQ" placeholder="رقم أو اسم المشروع" value="${esc(EX.q)}"></label>`);
+  $('#exAsOf').onchange = () => { EX.asOf = $('#exAsOf').value || todayStr(); loadExecution(); };
+  $('#exGroup').onchange = () => { EX.group = $('#exGroup').value; drawExecution(); };
+  $('#exQ').oninput = () => { EX.q = $('#exQ').value; drawExecution(); };
+  $('#rRef').onclick = loadExecution;
+  $('#rPrint').onclick = () => { if (EX.data) printHtml('تقرير نسبة التنفيذ والمخصصات', `حتى تاريخ: ${EX.data.asOf}`, executionTable(exRows(), true)); };
+  $('#rExp').onclick = exportExecution;
+  await loadExecution();
+}
+
+async function loadExecution() {
+  try { EX.data = await api('apiExecution', S.token, EX.asOf); }
+  catch (e) { EX.data = null; const b = $('#rBody'); if (b) b.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (S.view && S.view.type === 'execution') drawExecution();
+}
+
+function exRows(ignoreStatus) {
+  if (!EX.data) return [];
+  const words = EX.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return EX.data.rows.filter(r => (!EX.group || r.ProjectGroup === EX.group) && (ignoreStatus || !EX.status || r.status === EX.status) &&
+    words.every(w => (r.ProjectId + ' ' + r.Description).toLowerCase().includes(w)));
+}
+
+function executionTable(rows, forPrint) {
+  const amt = (v, c) => v === null || v === undefined ? '—' : `${fmtNum(v, curInfo(c)[2])} <small>${c}</small>`;
+  return `<table class="grid ex-table"><thead><tr><th>المشروع</th><th>الحالة</th><th>الفترة</th>
+      <th>المدة المنقضية</th><th>الإنجاز الفعلي</th><th>التنفيذ المالي</th><th>المخصص</th><th>المنصرف</th><th>المتبقي من المخصص</th>
+      <th>المستلم من المخصص</th></tr></thead><tbody>
+    ${rows.length ? rows.map(r => `<tr>
+      <td title="${esc(r.Description)}"><span class="${forPrint ? '' : 'link'}" data-p="${esc(r.ProjectId)}">${esc(r.ProjectId)}</span><br><small>${esc(r.Description)}</small></td>
+      <td><span class="es es-${r.status}">${esc(r.statusLabel)}</span>${r.gap !== null && r.status === 'late' ? `<br><small class="fh-sub">فجوة ${fmtNum(r.gap, 1)}%</small>` : ''}</td>
+      <td><small>${r.StartDate ? esc(r.StartDate) + ' ← ' + esc(r.EndDate || '—') : 'غير محددة'}</small>${r.durationDays === null ? '' : `<br><small class="fh-sub">${r.durationDays} يوم${r.remainingDays ? ` — متبقي ${r.remainingDays}` : ''}</small>`}</td>
+      <td>${pctBar(r.elapsedPct)}</td>
+      <td>${r.CompletionPct === null ? '<span class="fh-sub">غير مُدخل</span>' : pctBar(r.CompletionPct, 'good')}</td>
+      <td>${pctBar(r.finPct, r.finPct > 100 ? 'bad' : r.finPct > 85 ? 'warn' : '')}</td>
+      <td class="num">${amt(r.Budget, r.BudgetCurrency)}</td><td class="num">${amt(r.spent, r.BudgetCurrency)}</td>
+      <td class="num" style="font-weight:700;${r.remainingBudget < 0 ? 'color:var(--danger)' : ''}">${amt(r.remainingBudget, r.BudgetCurrency)}</td>
+      <td>${pctBar(r.fundedPct, 'good')}</td>
+    </tr>`).join('') : '<tr><td colspan="10" class="empty">لا توجد مشروعات</td></tr>'}</tbody></table>`;
+}
+
+function drawExecution() {
+  const body = $('#rBody'); if (!body || !EX.data) return;
+  const all = exRows(true), rows = exRows(false);
+  const counts = {};
+  all.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1; });
+  const order = ['ontrack', 'late', 'over', 'expired', 'done', 'notstarted', 'notplanned'];
+  body.innerHTML = `<div class="cards">
+      <div class="card ${!EX.status ? 'on' : ''}" data-st=""><small>كل المشروعات</small><b>${all.length}</b><small>حتى ${esc(EX.data.asOf)}</small></div>
+      ${order.filter(s => counts[s]).map(s => `<div class="card ${EX.status === s ? 'on' : ''}" data-st="${s}"><small><span class="es es-${s}">${esc(EX.data.statuses[s])}</span></small><b>${counts[s]}</b><small>اضغط للتصفية</small></div>`).join('')}
+    </div>
+    <div class="grid-wrap">${executionTable(rows, false)}</div>
+    <div class="hint" style="margin-top:8px;line-height:1.8">
+      <b>المدة المنقضية</b> = الأيام من تاريخ البدء حتى التاريخ المختار ÷ مدة المشروع. —
+      <b>التنفيذ المالي</b> = المنصرف ÷ المخصص. —
+      <b>متأخر</b>: المدة المنقضية تزيد عن الإنجاز بأكثر من 20 نقطة (الإنجاز = نسبة الإنجاز الفعلي إن أُدخلت، وإلا التنفيذ المالي). —
+      أدخل تواريخ المشروع والمخصص ونسبة الإنجاز من نموذج المشروع (قسم "التخطيط والمخصصات").</div>`;
+  $$('[data-st]', body).forEach(c => c.onclick = () => { EX.status = c.dataset.st; drawExecution(); });
+  $$('[data-p]', body).forEach(el => el.onclick = () => {
+    if (can('projects', 'view')) { setActiveNav('projects'); openForm('projects', el.dataset.p); }
+  });
+}
+
+function exportExecution() {
+  if (!EX.data) return;
+  const rows = [['المشروع', 'الوصف', 'المجموعة', 'البدء', 'الانتهاء', 'المدة (يوم)', 'الأيام المتبقية', 'المدة المنقضية %', 'الإنجاز الفعلي %',
+    'التنفيذ المالي %', 'العملة', 'المخصص', 'المستلم', 'المنصرف', 'المتبقي من المخصص', 'المستلم من المخصص %', 'الحالة']];
+  exRows().forEach(r => rows.push([r.ProjectId, r.Description, r.ProjectGroup, r.StartDate, r.EndDate, r.durationDays, r.remainingDays,
+    r.elapsedPct, r.CompletionPct, r.finPct, r.BudgetCurrency, r.Budget, r.received, r.spent, r.remainingBudget, r.fundedPct, r.statusLabel]));
+  downloadCsv(`تقرير نسبة التنفيذ ${EX.data.asOf}.csv`, rows);
+}
+</script>

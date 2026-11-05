@@ -34,7 +34,7 @@ async function openDoc(entity, key) {
     lines = [newLine(cfg)];
   }
   S.view = { type: 'form', entity };
-  S.form = { entity, doc: true, mode: key == null ? 'add' : 'edit', key, data: header, lines, balance, attachments, tab: 'general', dirty: false, notice: null };
+  S.form = { entity, doc: true, mode: key == null ? 'add' : 'edit', key, data: header, lines, balance, attachments, tab: 'general', dirty: false, notice: null, uid: Date.now() };
   renderDoc();
 }
 
@@ -77,6 +77,11 @@ function lineCell(f, l, i, editable) {
 
 function renderDoc() {
   const F = S.form, cfg = cfgOf(F.entity), d = F.data;
+  // الحفاظ على موضع التمرير (رأسياً وأفقياً) عند إعادة رسم نفس السند ونفس التبويب
+  const sig = F.uid + '|' + F.tab;
+  const prevBody = $('#formBody'), prevLines = $('.lines-scroll');
+  const keep = S._docSig === sig && prevBody ? { top: prevBody.scrollTop, left: prevLines ? prevLines.scrollLeft : 0 } : null;
+  S._docSig = sig;
   const editable = docEditable();
   const posted = docPosted();
   const title = F.mode === 'add' ? `${cfg.singular} جديد` : d[cfg.key];
@@ -129,11 +134,13 @@ function renderDoc() {
         <div class="lines-scroll"><table class="lines">
           <thead><tr>${cols.map(f => `<th style="min-width:${f.width || 100}px">${esc(f.label)}${f.required && editable && !f.derive ? '<span class="req" style="color:var(--danger)">*</span>' : ''}</th>`).join('')}${editable ? '<th></th>' : ''}</tr></thead>
           <tbody>${F.lines.length ? F.lines.map((l, i) => `<tr>${cols.map(f => lineCell(f, l, i, editable)).join('')}
-              ${editable ? `<td><button class="row-del" data-del="${i}" title="حذف السطر" aria-label="حذف السطر ${i + 1}">${icon('del')}</button></td>` : ''}</tr>`).join('')
+              ${editable ? `<td class="row-acts"><button class="row-btn" data-dup="${i}" title="نسخ السطر أسفله" aria-label="نسخ السطر ${i + 1}">${icon('copy')}</button><button class="row-del" data-del="${i}" title="حذف السطر" aria-label="حذف السطر ${i + 1}">${icon('del')}</button></td>` : ''}</tr>`).join('')
             : `<tr><td colspan="${cols.length + 1}" class="empty">لا توجد سطور</td></tr>`}</tbody>
           ${F.entity === 'receipts' ? `<tfoot><tr>${cols.map((f, i) => i === 0 ? '<td>الإجمالي</td>'
             : (f.type === 'number' && f.name !== 'LineId' ? `<td class="num" data-tot="${f.name}"></td>` : '<td></td>')).join('')}${editable ? '<td></td>' : ''}</tr></tfoot>` : ''}
         </table></div>
+        ${editable ? `<div class="lines-foot"><button class="btn" id="addLine2">${icon('add')} إضافة سطر</button>
+          <span class="hint">Enter ينقلك للسطر التالي، وفي آخر سطر يضيف سطراً جديداً — ${icon('copy')} ينسخ السطر أسفله</span></div>` : ''}
       </div>
       <div class="totals" id="totals"></div>`;
   }
@@ -152,6 +159,66 @@ function renderDoc() {
   if (F.tab === 'general') bindDoc(body, editable);
   if (F.tab === 'files') bindAttachments(body);
   recalcDoc();
+  if (keep) {
+    body.scrollTop = keep.top;
+    const ls = $('.lines-scroll'); if (ls) ls.scrollLeft = keep.left;
+  }
+}
+
+/** ينقل التركيز إلى حقل في سطر معيّن ويُظهر السطر دون القفز لأعلى الصفحة */
+function focusLine(i, fieldName) {
+  const rows = $$('.lines tbody tr');
+  const row = rows[Math.max(0, Math.min(i, rows.length - 1))];
+  if (!row) return;
+  let el = null;
+  if (fieldName) {
+    const h = $(`[data-lf="${fieldName}"]`, row);
+    el = h && (h.type === 'hidden' ? h.previousElementSibling : h);
+  }
+  el = el || $('.combo-in, input:not([type=hidden]), select', row);
+  row.scrollIntoView({ block: 'nearest' });
+  if (el) el.focus({ preventScroll: true });
+}
+
+function addLineAt(index, line) {
+  const F = S.form, cfg = cfgOf(F.entity);
+  collectDoc();
+  const at = index == null ? F.lines.length : index;
+  F.lines.splice(at, 0, line || newLine(cfg));
+  F.dirty = true;
+  renderDoc();
+  focusLine(at);
+}
+
+function deleteLine(i) {
+  const F = S.form;
+  collectDoc();
+  const removed = F.lines.splice(i, 1)[0];
+  F.dirty = true;
+  renderDoc();
+  if (F.lines.length) focusLine(Math.min(i, F.lines.length - 1));
+  toastAction(`تم حذف السطر ${i + 1}`, 'تراجع', () => {
+    if (S.form !== F) return;
+    collectDoc(); F.lines.splice(i, 0, removed); renderDoc(); focusLine(i);
+  });
+}
+
+function duplicateLine(i) {
+  const F = S.form, cfg = cfgOf(F.entity);
+  collectDoc();
+  const copy = {};
+  cfg.lines.fields.forEach(f => { copy[f.name] = F.lines[i][f.name]; });
+  addLineAt(i + 1, copy);
+}
+
+function toastAction(msg, label, fn) {
+  $$('.toast-undo').forEach(x => x.remove()); // زر تراجع واحد فقط: لآخر حذف
+  const t = document.createElement('div');
+  t.className = 'toast toast-undo';
+  t.innerHTML = `<span>${esc(msg)}</span> <button class="toast-btn">${esc(label)}</button>`;
+  $('button', t).onclick = () => { t.remove(); fn(); };
+  $('#toasts').appendChild(t);
+  setTimeout(() => t.remove(), 7000);
 }
 
 function markDocDirty() {
@@ -185,14 +252,20 @@ function bindDoc(body, editable) {
       recalcDoc();
     });
   });
-  const add = $('#addLine', body);
-  if (add) add.onclick = () => {
-    collectDoc(); F.lines.push(newLine(cfg)); F.dirty = true; renderDoc();
-    const last = $$('.lines tbody tr').pop(); const first = last && $('[data-lf]', last); if (first) first.focus();
-  };
-  $$('[data-del]', body).forEach(b => b.onclick = () => {
-    collectDoc(); F.lines.splice(Number(b.dataset.del), 1); F.dirty = true; renderDoc();
-  });
+  ['#addLine', '#addLine2'].forEach(id => { const b = $(id, body); if (b) b.onclick = () => addLineAt(null); });
+  $$('[data-del]', body).forEach(b => b.onclick = () => deleteLine(Number(b.dataset.del)));
+  $$('[data-dup]', body).forEach(b => b.onclick = () => duplicateLine(Number(b.dataset.dup)));
+  // Enter: الانتقال لنفس الحقل في السطر التالي، وفي آخر سطر إضافة سطر جديد
+  $$('.lines tbody', body).forEach(tb => tb.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
+    const el = e.target;
+    if (el.classList.contains('combo-in')) return; // Enter في حقل البحث يختار النتيجة
+    const field = el.dataset.lf;
+    if (!field) return;
+    e.preventDefault();
+    const i = Number(el.dataset.i);
+    if (i >= F.lines.length - 1) addLineAt(null); else focusLine(i + 1, field);
+  }));
 }
 
 function collectDoc() {
@@ -276,7 +349,7 @@ function applyDocResult(d) {
   const k = String(d.header[cfg.key]);
   const i = S.rows.findIndex(r => String(r[cfg.key]) === k);
   if (i >= 0) S.rows[i] = d.header; else S.rows.push(d.header);
-  S.form = { entity: F.entity, doc: true, mode: 'edit', key: k, data: d.header, lines: d.lines, balance: d.balance || null, attachments: d.attachments || F.attachments || [], tab: F.tab, dirty: false, notice: null };
+  S.form = { entity: F.entity, doc: true, mode: 'edit', key: k, data: d.header, lines: d.lines, balance: d.balance || null, attachments: d.attachments || F.attachments || [], tab: F.tab, dirty: false, notice: null, uid: F.uid };
 }
 
 async function saveDoc(close) {

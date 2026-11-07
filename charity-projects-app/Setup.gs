@@ -24,7 +24,7 @@ function setupApp() {
     var f = ENTITIES.users.fields.filter(function (x) { return x.name === c; })[0];
     return f ? f.label : ({ PasswordHash: 'كلمة المرور (مشفرة)', Salt: 'ملح التشفير', Permissions: 'الصلاحيات JSON' })[c] || c;
   }));
-  ['accounts', 'projects', 'lookups', 'audit'].forEach(function (k) {
+  ['accounts', 'projects', 'lookups', 'expenseItems', 'audit'].forEach(function (k) {
     var cfg = ENTITIES[k];
     ensureSheet_(ss, cfg.sheet,
       cfg.fields.map(function (f) { return f.name; }),
@@ -49,6 +49,7 @@ function setupApp() {
 
   seedAdmin_();
   seedLookups_();
+  seedExpenseItems_();
 
   var def = ss.getSheetByName('Sheet1') || ss.getSheetByName('ورقة1');
   if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
@@ -124,6 +125,15 @@ function seedLookups_() {
   data.forEach(function (d, i) {
     appendObj_('Lookups', { LookupId: i + 1, LookupType: d[0], Code: d[1], Name: d[2], IsActive: true, CreatedAt: now, CreatedBy: 'system' });
   });
+}
+
+function seedExpenseItems_() {
+  if (readTable_('ExpenseItems').length) return;
+  var now = new Date();
+  appendObjs_('ExpenseItems', [
+    ['01', 'مواد بناء'], ['02', 'أجور عمالة ومقاولين'], ['03', 'نقل وشحن'], ['04', 'معدات وتجهيزات'],
+    ['05', 'كفالات ومساعدات نقدية'], ['06', 'مواد غذائية وتوزيع'], ['07', 'مصاريف إدارية']
+  ].map(function (d) { return { ItemId: d[0], ItemName: d[1], IsActive: true, CreatedAt: now, CreatedBy: 'system' }; }));
 }
 
 function showAppUrl_() {

@@ -308,11 +308,18 @@ function renderTotals() {
   } else {
     const b = F.balance;
     box.innerHTML = `<div class="tot"><h4>إجمالي السند</h4>${CUR.map(([c, n, d]) => `<div class="r"><span>${n}</span><b>${fmtNum(h['Total' + c], d)}</b></div>`).join('')}</div>`
-      + (b ? (() => { const eq = voucherEq(b, h); return `<div class="tot ${CUR.some(([c]) => (b['bal' + c] - eq[c]) < 0) ? 'bad' : 'ok'}"><h4>رصيد المشروع (من السندات المرحّلة)</h4>
-        <div class="r"><span></span><span>متاح / بعد هذا السند</span></div>
-        ${CUR.map(([c, n, d]) => { const after = b['bal' + c] - eq[c]; return `<div class="r"><span>${n}</span><b>${fmtNum(b['bal' + c], d)} / <span class="${after < 0 ? 'diff' : 'good'}">${fmtNum(after, d)}</span></b></div>`; }).join('')}
-        <div class="r"><small class="fh-sub">يُحوَّل الصرف بمتوسط سعر التحويلات الواردة للمشروع</small></div></div>`; })()
-        : `<div class="tot"><h4>رصيد المشروع</h4><div class="r"><span>اختر المشروع لعرض الرصيد المتاح</span></div></div>`);
+      + (b ? (() => {
+        const eq = voucherEq(b, h);
+        const bad = CUR.some(([c]) => (b['bal' + c] - eq[c]) < 0);
+        return `<div class="tot wide ${bad ? 'bad' : 'ok'}"><h4>رصيد المشروع ${esc(F.data.ProjectId || '')} — ${esc(F.data.ProjectName || '')} (من السندات المرحّلة)</h4>
+          <table class="bal-table"><thead><tr><th>العملة</th><th>المستلم</th><th>المنصرف سابقاً</th><th>الرصيد المتاح</th><th>هذا السند</th><th>المتبقي بعد السند</th></tr></thead><tbody>
+          ${CUR.map(([c, n, d]) => { const after = b['bal' + c] - eq[c]; return `<tr><td>${n}</td>
+            <td class="num">${fmtNum(b['in' + c], d)}</td><td class="num">${fmtNum(b['out' + c], d)}</td>
+            <td class="num"><b>${fmtNum(b['bal' + c], d)}</b></td><td class="num">${fmtNum(eq[c], d)}</td>
+            <td class="num"><b class="${after < 0 ? 'diff' : 'good'}">${fmtNum(after, d)}</b></td></tr>`; }).join('')}
+          </tbody></table>
+          <div class="r"><small class="fh-sub">${bad ? '⚠ مبلغ السند يتجاوز الرصيد المتاح للمشروع. ' : ''}يُحوَّل الصرف إلى العملات الثلاث بمتوسط سعر التحويلات الواردة للمشروع.</small></div></div>`; })()
+        : `<div class="tot wide"><h4>رصيد المشروع</h4><div class="r"><span>اختر المشروع لعرض المستلم والمنصرف والرصيد المتاح</span></div></div>`);
   }
 }
 
@@ -512,16 +519,30 @@ async function openBalances() {
       <button class="cmd" id="bExp">${icon('export')}<span>تصدير إلى Excel</span></button></div>
     <div class="content">
       <div class="view-head"><div class="view-title">${icon('chart')} أرصدة المشروعات <span class="fh-sub">(من السندات المرحّلة فقط — المصروف محوّل بمتوسط سعر التحويلات الواردة لكل مشروع)</span></div>
+        <span class="chip"><select id="bView" aria-label="عرض">
+          <option value="has">المشروعات التي لها رصيد</option><option value="active">المشروعات التي عليها حركة</option>
+          <option value="neg">المشروعات ذات الرصيد السالب</option><option value="all">كل المشروعات</option></select></span>
         <div class="search">${icon('search')}<input id="bq" placeholder="بحث عن مشروع"></div></div>
+      <div class="fh-sub" id="bCount" style="margin-bottom:6px"></div>
       <div class="grid-wrap" id="balWrap"><div class="empty">جارٍ التحميل…</div></div>
     </div>`;
   let rows = [];
   const cols = [['ProjectId', 'المشروع'], ['Description', 'الوصف'], ['ProjectGroup', 'المجموعة']];
   const nums = [];
   CUR.forEach(([c, n, d]) => { nums.push(['in' + c, `وارد ${n}`, d], ['out' + c, `مصروف ${n}`, d], ['bal' + c, `رصيد ${n}`, d]); });
-  const filtered = () => { const q = $('#bq').value.trim().toLowerCase(); return rows.filter(r => !q || cols.some(([k]) => String(r[k] || '').toLowerCase().includes(q))); };
+  const views = {
+    has: r => CUR.some(([c]) => Number(r['bal' + c]) !== 0),
+    active: r => CUR.some(([c]) => Number(r['in' + c]) || Number(r['out' + c])),
+    neg: r => CUR.some(([c]) => Number(r['bal' + c]) < 0),
+    all: () => true
+  };
+  const filtered = () => {
+    const q = $('#bq').value.trim().toLowerCase(), v = views[$('#bView').value] || views.has;
+    return rows.filter(r => v(r) && (!q || cols.some(([k]) => String(r[k] || '').toLowerCase().includes(q))));
+  };
   const draw = () => {
     const list = filtered();
+    $('#bCount').textContent = `عرض ${list.length} من ${rows.length} مشروع`;
     const sum = k => list.reduce((s, r) => s + (Number(r[k]) || 0), 0);
     $('#balWrap').innerHTML = `<table class="grid"><thead><tr>${cols.map(([, l]) => `<th>${l}</th>`).join('')}${nums.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
       <tbody>${list.length ? list.map(r => `<tr data-p="${esc(r.ProjectId)}">${cols.map(([k], i) => `<td class="${i === 0 ? 'link' : ''}">${esc(r[k])}</td>`).join('')}
@@ -535,6 +556,7 @@ async function openBalances() {
   };
   const loadB = async () => { try { rows = await api('apiBalances', S.token); draw(); } catch (e) { toast(e.message, 'err'); } };
   $('#bq').oninput = draw;
+  $('#bView').onchange = draw;
   $('#bRef').onclick = loadB;
   $('#bExp').onclick = () => {
     const cell = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };

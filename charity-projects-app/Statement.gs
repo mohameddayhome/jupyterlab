@@ -64,7 +64,7 @@ function apiStatement(token, projectId, fromDate, toDate) {
       rows.push({
         date: dateKey_(h.Date), entity: 'payments', type: 'صرف', doc: String(h.VoucherNo), line: Number(l.LineId) || 0,
         desc: l.Description ? (h.Description + ' — ' + l.Description) : h.Description,
-        account: String(l.AccountId) + ' - ' + (l.AccountName || ''),
+        account: String(l.AccountId) + ' - ' + (l.AccountName || ''), item: l.ExpenseItemName || '',
         amount: Number(l.Amount) || 0, currency: l.Currency,
         inKWD: 0, inUSD: 0, inDJF: 0, outKWD: e.KWD, outUSD: e.USD, outDJF: e.DJF
       });

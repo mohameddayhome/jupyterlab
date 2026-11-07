@@ -100,7 +100,12 @@ function buildOptions_() {
   var opts = {};
   opts.accounts = readTable_('ChartOfAccounts')
     .filter(function (r) { return r.IsActive === '' || isTrue_(r.IsActive); })
-    .map(function (r) { return { v: String(r.AccountId), l: String(r.AccountId) + ' - ' + r.AccountName, name: r.AccountName, AccountName: r.AccountName }; });
+    .map(function (r) {
+      return { v: String(r.AccountId), l: String(r.AccountId) + ' - ' + r.AccountName, name: r.AccountName, AccountName: r.AccountName, cash: isTrue_(r.IsCashBank) };
+    });
+  opts.expenseItems = readTable_('ExpenseItems')
+    .filter(function (r) { return r.IsActive === '' || isTrue_(r.IsActive); })
+    .map(function (r) { return { v: String(r.ItemId), l: String(r.ItemId) + ' - ' + r.ItemName, name: r.ItemName, ItemName: r.ItemName }; });
   opts.projects = readTable_('Projects').map(function (r) {
     return { v: String(r.ProjectId), l: String(r.ProjectId) + ' - ' + r.Description, name: r.Description,
       Description: r.Description, AccountId: String(r.AccountId), AccountName: r.AccountName };

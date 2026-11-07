@@ -29,6 +29,7 @@ var PAGES = [
   { key: 'accounts', title: 'دليل الحسابات', group: 'المالية', icon: 'book', actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'receipts', title: 'سندات التحويل', group: 'المالية', icon: 'receipt', actions: ['view', 'add', 'edit', 'delete', 'post'] },
   { key: 'payments', title: 'سندات الصرف', group: 'المالية', icon: 'payment', actions: ['view', 'add', 'edit', 'delete', 'post'] },
+  { key: 'expenseItems', title: 'بنود الصرف', group: 'المالية', icon: 'list', actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'statement', title: 'كشف حساب مشروع', group: 'التقارير', icon: 'statement', actions: ['view'] },
   { key: 'balances', title: 'أرصدة المشروعات', group: 'التقارير', icon: 'chart', actions: ['view'] },
   { key: 'performance', title: 'تقرير أداء المشروعات', group: 'التقارير', icon: 'perf', actions: ['view'] },
@@ -61,6 +62,7 @@ var ENTITIES = {
       { name: 'AccountId', label: 'معرف الحساب', type: 'text', required: true, list: true, text: true },
       { name: 'AccountName', label: 'اسم الحساب', type: 'text', required: true, list: true },
       { name: 'MainAccount', label: 'الحساب الرئيسي', type: 'select', source: { entity: 'accounts' }, list: true, text: true },
+      { name: 'IsCashBank', label: 'حساب نقدية (صندوق / بنك)', type: 'checkbox', list: true },
       { name: 'IsActive', label: 'نشط', type: 'checkbox', default: true, list: true },
       { name: 'CreatedAt', label: 'تاريخ الإنشاء', type: 'datetime', system: true, list: true },
       { name: 'CreatedBy', label: 'أنشئ بواسطة', type: 'text', system: true },
@@ -71,7 +73,8 @@ var ENTITIES = {
       { entity: 'projects', field: 'AccountId', label: 'مشروعات' },
       { entity: 'accounts', field: 'MainAccount', label: 'حسابات فرعية' },
       { sheet: 'ReceiptLines', field: 'AccountId', label: 'سطر في سندات التحويل' },
-      { sheet: 'PaymentLines', field: 'AccountId', label: 'سطر في سندات الصرف' }
+      { sheet: 'PaymentLines', field: 'AccountId', label: 'سطر في سندات الصرف' },
+      { sheet: 'Payments', field: 'CreditAccountId', label: 'سند صرف (حساب دائن)' }
     ]
   },
 
@@ -122,6 +125,21 @@ var ENTITIES = {
       { sheet: 'Receipts', field: 'Bank', match: 'Name', when: { LookupType: 'Bank' }, label: 'سندات تحويل' },
       { sheet: 'Receipts', field: 'JournalType', match: 'Name', when: { LookupType: 'JournalType' }, label: 'سندات تحويل' }
     ]
+  },
+
+  expenseItems: {
+    page: 'expenseItems', sheet: 'ExpenseItems', key: 'ItemId', titleField: 'ItemName',
+    singular: 'بند صرف', plural: 'بنود الصرف', icon: 'list',
+    fields: [
+      { name: 'ItemId', label: 'رقم البند', type: 'text', required: true, list: true, text: true },
+      { name: 'ItemName', label: 'اسم بند الصرف', type: 'text', required: true, list: true },
+      { name: 'IsActive', label: 'نشط', type: 'checkbox', default: true, list: true },
+      { name: 'CreatedAt', label: 'تاريخ الإنشاء', type: 'datetime', system: true, list: true },
+      { name: 'CreatedBy', label: 'أنشئ بواسطة', type: 'text', system: true },
+      { name: 'ModifiedAt', label: 'تاريخ التعديل', type: 'datetime', system: true },
+      { name: 'ModifiedBy', label: 'عُدّل بواسطة', type: 'text', system: true }
+    ],
+    refs: [{ sheet: 'PaymentLines', field: 'ExpenseItemId', label: 'سطر في سندات الصرف' }]
   },
 
   users: {
@@ -237,6 +255,8 @@ ENTITIES.payments = {
     { name: 'Date', label: 'التاريخ', section: 'بيانات السند', type: 'date', required: true, list: true },
     { name: 'ProjectId', label: 'معرف المشروع', section: 'المشروع', type: 'select', source: { entity: 'projects' }, required: true, list: true, text: true },
     { name: 'ProjectName', label: 'اسم المشروع', section: 'المشروع', type: 'text', derive: { from: 'ProjectId', entity: 'projects', field: 'Description' }, list: true },
+    { name: 'CreditAccountId', label: 'الصرف من حساب (دائن)', section: 'بيانات السند', type: 'select', source: { entity: 'accounts', filter: 'cash' }, required: true, list: true, text: true },
+    { name: 'CreditAccountName', label: 'اسم الحساب الدائن', section: 'بيانات السند', type: 'text', derive: { from: 'CreditAccountId', entity: 'accounts', field: 'AccountName' } },
     { name: 'Description', label: 'البيان', section: 'المشروع', type: 'textarea', required: true, list: true },
     { name: 'TotalKWD', label: 'إجمالي دينار', type: 'number', decimals: 3, calc: true, hidden: true, list: true },
     { name: 'TotalUSD', label: 'إجمالي دولار', type: 'number', decimals: 2, calc: true, hidden: true, list: true },
@@ -246,8 +266,10 @@ ENTITIES.payments = {
     sheet: 'PaymentLines', fk: 'VoucherNo',
     fields: [
       { name: 'LineId', label: 'رقم السطر', type: 'number', calc: true, width: 60 },
-      { name: 'AccountId', label: 'حساب الصرف', type: 'select', source: { entity: 'accounts' }, required: true, text: true, width: 220 },
-      { name: 'AccountName', label: 'اسم الحساب', type: 'text', derive: { from: 'AccountId', entity: 'accounts', field: 'AccountName' }, width: 170 },
+      { name: 'AccountId', label: 'حساب الصرف (مدين)', type: 'select', source: { entity: 'accounts' }, required: true, text: true, width: 220 },
+      { name: 'AccountName', label: 'اسم الحساب', type: 'text', derive: { from: 'AccountId', entity: 'accounts', field: 'AccountName' }, width: 150 },
+      { name: 'ExpenseItemId', label: 'بند الصرف', type: 'select', source: { entity: 'expenseItems' }, required: true, text: true, width: 200 },
+      { name: 'ExpenseItemName', label: 'اسم البند', type: 'text', derive: { from: 'ExpenseItemId', entity: 'expenseItems', field: 'ItemName' }, width: 140 },
       { name: 'Amount', label: 'المبلغ', type: 'number', decimals: 3, required: true, positive: true, width: 120 },
       { name: 'Currency', label: 'العملة', type: 'select', source: { "static": CURRENCIES }, required: true, width: 130, "default": 'KWD' },
       { name: 'Description', label: 'البيان', type: 'text', width: 240 }

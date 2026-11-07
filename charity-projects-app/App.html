@@ -370,7 +370,7 @@ async function deleteRecords(entity, keys, afterFn) {
     const n = await api('apiDelete', S.token, entity, keys);
     toast(`تم حذف ${n} سجل`, 'ok');
     S.sel.clear();
-    if (['accounts', 'lookups', 'projects'].includes(entity)) refreshOptions();
+    if (['accounts', 'lookups', 'projects', 'expenseItems'].includes(entity)) refreshOptions();
     if (afterFn) afterFn(); else loadRows(entity);
   } catch (e) { toast(e.message, 'err'); }
 }
@@ -428,7 +428,7 @@ function fieldControl(f, v, editable) {
   if (f.type === 'checkbox') return `<div><input type="checkbox" ${attrs} ${v ? 'checked' : ''}></div>`;
   if (f.type === 'textarea') return `<textarea class="ctrl" ${attrs}>${esc(v)}</textarea>`;
   if (f.type === 'select' && f.source.entity && !ro) {
-    return comboHtml(f.source.entity, v, attrs, f.source.entity === S.form.entity ? String(S.form.key == null ? '' : S.form.key) : '');
+    return comboHtml(f.source.entity, v, attrs, f.source.entity === S.form.entity ? String(S.form.key == null ? '' : S.form.key) : '', f.source.filter);
   }
   if (f.type === 'select') {
     let opts = [];
@@ -629,7 +629,7 @@ async function saveForm(close) {
     const k = String(saved[cfg.key]);
     const i = S.rows.findIndex(r => String(r[cfg.key]) === (F.mode === 'add' ? k : String(F.key)));
     if (i >= 0) S.rows[i] = saved; else S.rows.push(saved);
-    if (['accounts', 'lookups', 'projects'].includes(F.entity)) await refreshOptions();
+    if (['accounts', 'lookups', 'projects', 'expenseItems'].includes(F.entity)) await refreshOptions();
     if (F.entity === 'users' && String(saved.UserId) === String(S.boot.user.id)) {
       S.boot = await api('apiBootstrap', S.token); renderSitemap(); setActiveNav('users');
     }
@@ -678,10 +678,10 @@ function changePasswordDlg(forced) {
 
 
 /* ---------------- حقل اختيار بالبحث (رقم أو اسم) ---------------- */
-function comboHtml(entity, v, hiddenAttrs, exclude) {
+function comboHtml(entity, v, hiddenAttrs, exclude, filter) {
   const o = (S.boot.options[entity] || []).find(x => x.v === String(v));
   const label = o ? o.l : (v == null ? '' : v);
-  return `<div class="combo"><input class="ctrl combo-in" type="text" data-combo="${entity}" data-exclude="${esc(exclude || '')}"
+  return `<div class="combo"><input class="ctrl combo-in" type="text" data-combo="${entity}" data-exclude="${esc(exclude || '')}" data-filter="${esc(filter || '')}"
     value="${esc(label)}" placeholder="ابحث بالرقم أو الاسم…" autocomplete="off" role="combobox" aria-autocomplete="list"><input type="hidden" ${hiddenAttrs} value="${esc(v == null ? '' : v)}"></div>`;
 }
 const Combo = { el: null, items: [], idx: -1 };
@@ -706,7 +706,7 @@ function comboPosition() {
 function comboFilter(showAll) {
   const inp = Combo.el; if (!inp) return;
   const words = showAll ? [] : inp.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const all = (S.boot.options[inp.dataset.combo] || []).filter(o => o.v !== inp.dataset.exclude);
+  const all = (S.boot.options[inp.dataset.combo] || []).filter(o => o.v !== inp.dataset.exclude && (inp.dataset.filter !== 'cash' || o.cash));
   Combo.items = all.filter(o => words.every(w => o.l.toLowerCase().includes(w))).slice(0, 80);
   Combo.idx = Combo.items.length ? 0 : -1;
   comboRender();
@@ -715,7 +715,7 @@ function comboRender() {
   const l = comboListEl();
   l.innerHTML = Combo.items.length
     ? Combo.items.map((o, i) => `<div data-v="${esc(o.v)}" class="${i === Combo.idx ? 'on' : ''}" role="option"><b>${esc(o.v)}</b> ${esc(o.name != null ? o.name : o.l)}</div>`).join('')
-    : '<div class="none">لا توجد نتائج</div>';
+    : `<div class="none">${Combo.el && Combo.el.dataset.filter === 'cash' ? 'لا توجد حسابات صندوق/بنك. فعّل "حساب نقدية" للحساب من دليل الحسابات.' : 'لا توجد نتائج'}</div>`;
   l.classList.remove('hidden');
   comboPosition();
   const on = $('.on', l); if (on) on.scrollIntoView({ block: 'nearest' });

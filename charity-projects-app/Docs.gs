@@ -71,6 +71,12 @@ function validateRefsAndDerive_(fields, o, table, prefix) {
     var t = ENTITIES[f.source.entity];
     var found = table(f.source.entity).some(function (r) { return String(r[t.key]) === String(o[f.name]); });
     if (!found) throw new Error(prefix + 'القيمة "' + o[f.name] + '" غير موجودة في ' + t.plural + '.');
+    if (f.source.filter === 'cash') {
+      var acc = table(f.source.entity).filter(function (r) { return String(r[t.key]) === String(o[f.name]); })[0];
+      if (!isTrue_(acc.IsCashBank)) {
+        throw new Error(prefix + 'الحساب "' + o[f.name] + '" ليس حساب صندوق أو بنك. فعّل "حساب نقدية" له من دليل الحسابات.');
+      }
+    }
   });
   fields.forEach(function (f) {
     if (!f.derive) return;
@@ -138,6 +144,13 @@ function apiSaveDoc(token, entity, header, lines, mode, origKey) {
         validateRefsAndDerive_(cfg.lines.fields, o, table, p);
         return o;
       });
+      if (entity === 'payments') {
+        cl.forEach(function (o, i) {
+          if (String(o.AccountId) === String(h.CreditAccountId)) {
+            throw new Error('السطر ' + (i + 1) + ': حساب الصرف (المدين) لا يجوز أن يكون نفس الحساب الدائن.');
+          }
+        });
+      }
       calcDoc_(entity, h, cl);
       delete h._balanced; delete h._diff;
 
@@ -258,8 +271,12 @@ function projectAgg_(o) {
     var e = toEq_(amt, l.Currency, x);
     x.outKWD += e.KWD; x.outUSD += e.USD; x.outDJF += e.DJF;
     if (o.items) {
-      var acc = String(l.AccountId);
-      var it = x.items[acc] || (x.items[acc] = { AccountId: acc, AccountName: l.AccountName, outKWD: 0, outUSD: 0, outDJF: 0, lines: 0 });
+      // بنود الصرف: حسب بند الصرف، والسطور القديمة بدون بند تُجمّع حسب الحساب
+      var hasItem = l.ExpenseItemId !== '' && l.ExpenseItemId !== undefined && l.ExpenseItemId !== null;
+      var acc = hasItem ? 'I:' + l.ExpenseItemId : 'A:' + l.AccountId;
+      var it = x.items[acc] || (x.items[acc] = {
+        code: String(hasItem ? l.ExpenseItemId : l.AccountId), name: hasItem ? l.ExpenseItemName : l.AccountName + ' (حساب)',
+        kind: hasItem ? 'item' : 'account', outKWD: 0, outUSD: 0, outDJF: 0, lines: 0 });
       it.outKWD += e.KWD; it.outUSD += e.USD; it.outDJF += e.DJF; it.lines++;
     }
   });

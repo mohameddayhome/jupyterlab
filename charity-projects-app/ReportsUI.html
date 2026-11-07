@@ -108,8 +108,8 @@ function performanceTable(rows, forPrint) {
       <td class="num" style="font-weight:700;${bal < 0 ? 'color:var(--danger)' : ''}">${f(bal)}</td>
       <td>${pctBar(pct, pct > 100 ? 'bad' : pct > 85 ? 'warn' : '')}</td><td class="num">${r.items.length}</td></tr>`;
     if (!open || !r.items.length) return main;
-    return main + `<tr class="items-row"><td colspan="8"><table class="items"><thead><tr><th>بند الصرف (الحساب)</th><th>المبلغ (${n})</th><th>من المنصرف</th><th>عدد السطور</th></tr></thead><tbody>
-      ${r.items.map(it => { const p = outV ? it['out' + c] / outV * 100 : 0; return `<tr><td>${esc(it.AccountId)} - ${esc(it.AccountName)}</td><td class="num">${f(it['out' + c])}</td><td>${pctBar(p)}</td><td class="num">${it.lines}</td></tr>`; }).join('')}
+    return main + `<tr class="items-row"><td colspan="8"><table class="items"><thead><tr><th>بند الصرف</th><th>المبلغ (${n})</th><th>من المنصرف</th><th>عدد السطور</th></tr></thead><tbody>
+      ${r.items.map(it => { const p = outV ? it['out' + c] / outV * 100 : 0; return `<tr><td>${esc(it.code)} - ${esc(it.name)}</td><td class="num">${f(it['out' + c])}</td><td>${pctBar(p)}</td><td class="num">${it.lines}</td></tr>`; }).join('')}
       </tbody></table></td></tr>`;
   }).join('');
   return `<table class="grid"><thead><tr><th>المشروع</th><th>الوصف</th><th>المجموعة</th><th>المستلم (${n})</th><th>المنصرف (${n})</th>
@@ -134,7 +134,7 @@ function drawPerformance() {
       ${card('نسبة الصرف', totIn ? fmtNum(totOut / totIn * 100, 1) + '%' : '—', 'من المستلم')}
     </div>
     <div class="grid-wrap">${performanceTable(rows, false)}</div>
-    <div class="hint" style="margin-top:8px">اضغط على المشروع لعرض بنود الصرف (مجمّعة حسب حساب الصرف). المنصرف بأي عملة محوّل بمتوسط سعر تحويلات المشروع.</div>`;
+    <div class="hint" style="margin-top:8px">اضغط على المشروع لعرض بنود الصرف (السندات القديمة بدون بند تظهر حسب الحساب). المنصرف بأي عملة محوّل بمتوسط سعر تحويلات المشروع.</div>`;
   $$('tr[data-p]', body).forEach(tr => tr.onclick = (e) => {
     const p = tr.dataset.p;
     if (e.target.classList.contains('link') && can('statement', 'view')) { setActiveNav('statement'); return openStatement(p); }
@@ -147,7 +147,7 @@ function exportPerformance() {
   const rows = [['المشروع', 'الوصف', 'المجموعة', 'بند الصرف', ...CUR.flatMap(([, n]) => [`المستلم ${n}`, `المنصرف ${n}`, `المتبقي ${n}`])]];
   pfRows().forEach(r => {
     rows.push([r.ProjectId, r.Description, r.ProjectGroup, 'الإجمالي', ...CUR.flatMap(([c]) => [r['in' + c], r['out' + c], r['bal' + c]])]);
-    r.items.forEach(it => rows.push([r.ProjectId, r.Description, r.ProjectGroup, `${it.AccountId} - ${it.AccountName}`, ...CUR.flatMap(([c]) => ['', it['out' + c], ''])]));
+    r.items.forEach(it => rows.push([r.ProjectId, r.Description, r.ProjectGroup, `${it.code} - ${it.name}`, ...CUR.flatMap(([c]) => ['', it['out' + c], ''])]));
   });
   downloadCsv('تقرير أداء المشروعات.csv', rows);
 }

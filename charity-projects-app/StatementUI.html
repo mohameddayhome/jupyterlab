@@ -63,7 +63,7 @@ function statementTable(d, c, forPrint) {
         <td class="num ${d.opening[c] < 0 ? 'neg' : ''}">${f(d.opening[c])}</td></tr>
       ${d.rows.length ? d.rows.map(r => `<tr>
         <td>${esc(r.date)}</td><td>${r.entity === 'receipts' ? '<span class="st posted">' + esc(r.type) + '</span>' : '<span class="st draft">' + esc(r.type) + '</span>'}</td>
-        <td>${docLink(r)}</td><td title="${esc(r.desc)}">${esc(r.desc)}</td><td title="${esc(r.account)}">${esc(r.account)}</td>
+        <td>${docLink(r)}</td><td title="${esc(r.desc)}">${esc(r.desc)}</td><td title="${esc(r.account)}">${esc(r.account)}${r.item ? `<br><small class="fh-sub">بند: ${esc(r.item)}</small>` : ''}</td>
         <td class="num">${orig(r)}</td>
         <td class="num in">${r['in' + c] ? f(r['in' + c]) : ''}</td>
         <td class="num out">${r['out' + c] ? f(r['out' + c]) : ''}</td>
